@@ -43,7 +43,7 @@
 
 | 元件 | 檔案 | 用在 |
 |---|---|---|
-| `Page` | shell.tsx | **每一頁最外層**。給標題、返回、右上動作；`width="narrow"`（閱讀、表單）或 `"wide"`（清單、方格、圖表） |
+| `Page` | shell.tsx | **每一頁最外層**。給標題、返回、右上動作；`width="narrow"`（單題閱讀、表單）或 `"wide"`（清單、方格、圖表，以及資料庫筆記閱讀頁——筆記多寬表格與多層列點，使用者要求加寬） |
 | `AppShell` | shell.tsx | 導覽外殼。新頁面加在 `App.tsx` 的 `<Route element={<AppShell />}>` 底下；全螢幕頁（刷題、登入）放外面 |
 | `Button` `LinkButton` | primitives.tsx | `primary` 一個畫面只有一顆；`secondary` 一般動作；`ghost` 次要或取消；`danger` 刪除類。跳頁用 `LinkButton`，動作用 `Button` |
 | `IconButton` | primitives.tsx | 只有圖示的按鈕，`label` 必填。切換型（星號）用 `pressed` |

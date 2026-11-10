@@ -275,6 +275,7 @@ export function KbReaderPage() {
     <Page
       title={doc?.title ?? "筆記"}
       back="/kb"
+      width="wide"
       actions={
         <IconButton label={editing ? "結束編輯" : "編輯區塊"} pressed={editing} onClick={() => setEditing((v) => !v)}>
           <Icon name="edit" />

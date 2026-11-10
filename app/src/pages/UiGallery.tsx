@@ -35,7 +35,7 @@ function Group({ title, note, children }: { title: string; note?: string; childr
   return (
     <section aria-labelledby={`g-${title}`} className="scroll-mt-4">
       <h2 id={`g-${title}`} className="text-title font-semibold text-ink-strong">{title}</h2>
-      {note && <p className="mt-1 mb-3 max-w-(--measure) text-ui text-ink-muted">{note}</p>}
+      {note && <p className="mt-1 mb-3 max-w-(--measure) text-ui break-words text-ink-muted [overflow-wrap:anywhere]">{note}</p>}
       <div className={note ? "" : "mt-3"}>{children}</div>
     </section>
   );
