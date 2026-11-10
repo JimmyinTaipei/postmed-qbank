@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { createPortal } from "react-dom";
 import { prefs, useFigInvert } from "@/data";
 import { Icon } from "../icons";
-import { IconButton } from "../primitives";
+import { IconButton, cx } from "../primitives";
 
 export interface ViewerFig {
   src: string; // 已解析成網址
@@ -212,7 +212,7 @@ function Viewer({ fig, onClose }: { fig: ViewerFig; onClose: () => void }) {
       </div>
       <div
         ref={stage}
-        className={`viewer-stage flex min-h-0 flex-1 overflow-auto bg-paper${fig.mono ? " mono" : ""}${inverted ? " inverted" : ""}`}
+        className={cx("viewer-stage flex min-h-0 flex-1 overflow-auto bg-paper", fig.mono && "mono", inverted && "inverted")}
         style={{ touchAction: "none", overscrollBehavior: "contain", cursor: zoom > 1 ? "grab" : "zoom-in" }}
       >
         {base.w > 0 && (
