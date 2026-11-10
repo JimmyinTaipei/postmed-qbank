@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://postmed-qbank.local/schema/index-row.schema.json",
+  "title": "索引列（c/index/<SUBJECT>.json 的一列；規格書 §4.3 末段）",
+  "type": "object", "additionalProperties": false,
+  "required": ["id", "label", "sid", "kind", "school", "year", "unit", "chap", "xchap", "tags", "qtype", "has_fig", "trust", "human_verified", "pack", "canonical"],
+  "properties": {
+    "id": {"type": "string"}, "label": {"type": "string"}, "sid": {"type": "string"},
+    "kind": {"type": "string"}, "school": {"type": ["string", "null"]}, "year": {"type": ["integer", "null"]},
+    "unit": {"type": ["string", "null"], "description": "書的單元（篩選「書與單元」用；規格書未列，第 0 階段新增）"},
+    "chap": {"type": "string"}, "xchap": {"type": "array", "items": {"type": "string"}},
+    "tags": {"type": "array", "items": {"type": "string"}, "description": "topic／type／method 合併、去重"},
+    "qtype": {"enum": ["single", "multi", "text", "numeric"]},
+    "has_fig": {"type": "boolean"},
+    "trust": {"enum": ["official", "key", "teacher", "ai", "pending"]},
+    "human_verified": {"type": "boolean"},
+    "pack": {"type": "string", "description": "<SUBJECT>/<章>，對應 c/pack/<SUBJECT>/<章>-<hash>.json"},
+    "canonical": {"type": "string"}
+  }
+}

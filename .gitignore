@@ -1,0 +1,10 @@
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+/reports/
+/app/fixtures/*
+!/app/fixtures/README.md
+!/app/fixtures/CASES.md
+dist/

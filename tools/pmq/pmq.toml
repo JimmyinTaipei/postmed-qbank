@@ -1,0 +1,19 @@
+# 所有主檔路徑只寫在這裡（規格書 §1.1）。主檔搬家時只改這個檔。
+# 相對路徑以 root 為基準；~ 會展開。
+
+[paths]
+root       = "~/Library/Mobile Documents/com~apple~CloudDocs/後醫/08_考古題與模擬考/82_考題整理"
+physics    = "01_題庫製作/物理"
+biochem    = "01_題庫製作/生化"
+notes      = "02_學習筆記"
+structure_db_out = "structure_db/out"
+structure_db_src = "~/Projects/structure_db"
+# 後醫、私醫、後獸醫原卷與答案 PDF（生化答案抽查用；只讀）
+exam_pdfs  = "~/Library/Mobile Documents/com~apple~CloudDocs/後醫/08_考古題與模擬考/81_考古題"
+content_git = "~/Projects/postmed-content.git"
+cache      = "~/Library/Caches/postmed-qbank"
+
+[sample]
+# 給介面開發用的兩份筆記（相對 notes）
+kb_biochem = "02_生化/B2_代謝篇/2-3_PDH_TCA_and_Glyoxylate_Cycle.md"
+kb_physics = "03_物理/2_電磁學/Ch12動電學.md"

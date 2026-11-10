@@ -1,0 +1,9 @@
+{
+  "name": "pmq-mathcheck",
+  "private": true,
+  "type": "module",
+  "description": "pmq check math：用與前端同一版 KaTeX 排全庫公式。app/ 必須鎖定同一個 katex 版本。",
+  "dependencies": {
+    "katex": "0.19.1"
+  }
+}

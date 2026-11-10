@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://postmed-qbank.local/schema/question.schema.json",
+  "title": "題目（內容契約，規格書 §4.3）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "subject", "label", "source", "alt_sources", "canonical", "chap", "xchap", "tags", "qtype",
+               "group", "ques", "opt", "opt_span", "answer", "source_answer", "idea", "sol", "teacher", "sol_meta",
+               "figs", "extraction", "file", "line", "h"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1, "description": "不變的唯一鍵；格式依 taxonomy.subjects[].id_pattern"},
+    "subject": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "label": {"type": "string", "minLength": 1, "description": "顯示時固定寫成「label｜id」"},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sid", "kind", "school", "year", "paper", "book", "unit", "qno"],
+      "properties": {
+        "sid": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["postmed_w", "postmed_c", "postmed_v", "private_med", "transfer", "national", "textbook", "cram", "ai", "self"]},
+        "school": {"type": ["string", "null"]},
+        "year": {"type": ["integer", "null"]},
+        "paper": {"type": ["string", "null"]},
+        "book": {"type": ["string", "null"]},
+        "unit": {"type": ["string", "null"]},
+        "qno": {"type": ["string", "null"]}
+      }
+    },
+    "alt_sources": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "label", "relation", "confirmed"],
+        "properties": {
+          "id": {"type": "string"}, "label": {"type": "string"},
+          "relation": {"enum": ["same", "adapted"]},
+          "confirmed": {"type": "boolean", "description": "true 才參與 canonical 合併"}
+        }
+      }
+    },
+    "canonical": {"type": "string", "description": "同題群組的代表題；沒有同題就等於自己"},
+    "chap": {"type": "string", "pattern": "^[A-Z]{3}:.+$"},
+    "xchap": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z]{3}:.+$"}},
+    "tags": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}},
+    "qtype": {"enum": ["single", "multi", "text", "numeric"]},
+    "group": {
+      "type": ["object", "null"], "additionalProperties": false, "required": ["gid", "stem", "order", "parts"],
+      "properties": {
+        "gid": {"type": "string"},
+        "stem": {"type": ["string", "null"], "description": "共用題幹 md；物理的共用條件已引在 ques 內，故為 null"},
+        "order": {"type": ["integer", "null"]},
+        "parts": {"type": "array", "items": {"type": "string"}, "description": "同一題內的小題代號（物理 subquestions）"}
+      }
+    },
+    "ques": {"type": "string", "description": "題幹與選項的 Markdown；圖已改寫成 ![alt](fig:<fid>)，其餘與主檔相同"},
+    "opt": {
+      "type": ["array", "null"], "minItems": 2,
+      "items": {"type": "array", "prefixItems": [{"type": "string", "pattern": "^[A-H]$"}, {"type": "integer", "minimum": 0}, {"type": "integer", "minimum": 0}], "items": false, "minItems": 3},
+      "description": "[字母, 起, 訖]：選項內文在 ques 的位置（UTF-16 單位，規格書 §4.5）"
+    },
+    "opt_span": {
+      "type": ["array", "null"], "prefixItems": [{"type": "integer"}, {"type": "integer"}], "items": false, "minItems": 2,
+      "description": "[題幹結束, 選項後補充開始]：ques.slice(0, a) 是題幹，ques.slice(b) 顯示在選項下方"
+    },
+    "answer": {
+      "type": "object", "additionalProperties": false, "required": ["mode", "keys", "text", "trust", "ai_agree", "note"],
+      "properties": {
+        "mode": {"enum": ["single", "all", "any", "text", "numeric", "pending"]},
+        "keys": {"type": "array", "items": {"type": "string", "pattern": "^[A-H]$"}},
+        "text": {"type": ["string", "null"]},
+        "trust": {"enum": ["official", "key", "teacher", "ai", "pending"]},
+        "ai_agree": {"type": "boolean"},
+        "note": {"type": "string"}
+      }
+    },
+    "source_answer": {
+      "type": ["object", "null"], "additionalProperties": false, "required": ["value", "mode", "kind", "note"],
+      "properties": {"value": {}, "mode": {"type": ["string", "null"]}, "kind": {"type": ["string", "null"]}, "note": {"type": "string"}}
+    },
+    "idea": {"type": "string"},
+    "sol": {"type": "string"},
+    "teacher": {
+      "type": "array", "description": "老師原解（物理 assets/教師解析 的轉錄），顯示在詳解下方的折疊區",
+      "items": {"type": "object", "additionalProperties": false, "required": ["title", "md", "file"],
+                "properties": {"title": {"type": "string"}, "md": {"type": "string"}, "file": {"type": "string"}}}
+    },
+    "sol_meta": {
+      "type": "object", "additionalProperties": false,
+      "required": ["origin", "model", "human_verified", "verified_at", "issues", "state", "raw"],
+      "properties": {
+        "origin": {"enum": ["official", "teacher", "ai", "human", "mixed"]},
+        "model": {"type": ["string", "null"]},
+        "human_verified": {"type": "boolean"},
+        "verified_at": {"type": ["string", "null"]},
+        "issues": {"type": "array", "items": {"type": "string"}},
+        "state": {
+          "type": ["object", "null"], "additionalProperties": false, "required": ["question", "answer", "solution"],
+          "description": "物理 status 文字對應成的固定代碼；null 表示對應不到（列入驗證報告）",
+          "properties": {
+            "question": {"enum": ["text_layer", "checked", "source_missing", "needs_check", null]},
+            "answer": {"enum": ["key_ai_agree", "teacher_check", "ai_reviewed", "needs_check", "ai_candidate", null]},
+            "solution": {"enum": ["ai_unreviewed", "ai_reviewed", "incomplete", "needs_check", null]}
+          }
+        },
+        "raw": {"type": ["object", "null"], "additionalProperties": {"type": ["string", "null"]}}
+      }
+    },
+    "figs": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["fid", "role", "src", "w", "h", "mono", "fallback", "alt", "max_w"],
+        "properties": {
+          "fid": {"type": "string"},
+          "role": {"enum": ["q", "sol"]},
+          "src": {"type": "string", "pattern": "^a/[0-9a-f]{64}\\.[a-z0-9]+$"},
+          "w": {"type": ["integer", "null"]}, "h": {"type": ["integer", "null"]},
+          "mono": {"type": "boolean"},
+          "fallback": {"type": ["string", "null"], "pattern": "^a/[0-9a-f]{64}\\.[a-z0-9]+$"},
+          "alt": {"type": "string"},
+          "max_w": {"type": ["integer", "null"], "description": "最大顯示寬度 px（生化 width=\"…cm\" × 37.8）"}
+        }
+      }
+    },
+    "extraction": {"type": ["string", "null"]},
+    "file": {"type": "string", "description": "主檔路徑（相對 pmq.toml 的 root）；修訂寫回用"},
+    "line": {"type": ["integer", "null"], "description": "生化：ID: 所在行號"},
+    "h": {
+      "type": "object", "additionalProperties": false, "required": ["ques", "idea", "sol"],
+      "description": "主檔中修訂寫回會替換的那段文字的 sha1（物理：區段本文；生化：該欄位的行範圍，含「鍵:」）",
+      "properties": {"ques": {"type": "string"}, "idea": {"type": "string"}, "sol": {"type": "string"}}
+    }
+  }
+}

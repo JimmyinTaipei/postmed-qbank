@@ -1,0 +1,3 @@
+#!/bin/sh
+# 內容 git：.git 在 ~/Projects/postmed-content.git，工作區是 82_考題整理（見 pmq.toml）。
+exec git --git-dir="$HOME/Projects/postmed-content.git" "$@"

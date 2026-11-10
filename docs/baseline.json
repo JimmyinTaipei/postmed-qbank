@@ -1,0 +1,22 @@
+{
+  "frozen": "2026-11-10",
+  "note": "搬遷步驟 1 的基準數字。pmq check 每次與它比對；數字變了要說明原因（新增題目是正常原因）。",
+  "PHY": {
+    "questions": 9302,
+    "by_category": {"後醫": 1188, "轉學考": 1010, "其他教材": 2169, "原文書題庫": 4935},
+    "questions_with_figure_meta": 1480,
+    "figure_meta_entries": 1488,
+    "body_image_refs": 1473,
+    "body_image_refs_by_folder": {"原題圖": 1448, "重繪": 11, "解析圖": 9, "原卷": 5},
+    "registry": {"items": 1087, "approved": 1081, "text": 5, "pending": 1, "manual_edit": 466}
+  },
+  "BCH": {
+    "blocks": 3742,
+    "questions": 3742,
+    "duplicate_id": null,
+    "changes": ["2026-11-10 使用者決定刪除主檔裡重複的 KMU-111-16 第二筆（高醫_111_生物生化.md 原第 334–349 行）：blocks 3743→3742、postmed_w 1492→1491"],
+    "by_kind": {"postmed_w": 1491, "postmed_c": 387, "postmed_v": 720, "private_med": 160, "national": 984},
+    "img_refs": 83
+  },
+  "structure_db": {"molecules": 390, "reactions": 220, "pathways": 366}
+}

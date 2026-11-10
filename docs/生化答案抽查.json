@@ -1,0 +1,196 @@
+{
+ "date": "2026-11-10",
+ "method": "每個來源類別 4 題、共 20 題，以固定種子挑選（`pmq/answers.py`，每份考卷最多 1 題）。用 pdftotext 擷取來源 PDF 的文字層，逐題找出該題答案後人工判讀；擷取片段在 `reports/answer_excerpts.md`。後醫、私醫、後獸醫的來源是 `81_考古題/`（`01_來源索引/README.md` 指向那裡），醫事國考是 `01_來源索引/原始PDF/醫事國考/` 的 ANS 檔。",
+ "items": [
+  {
+   "id": "KMU-106-55",
+   "label": "高醫 106 55",
+   "kind": "postmed_w",
+   "bank": "D",
+   "source_answer": "D",
+   "result": "相符",
+   "evidence": "81_考古題/01_後西醫/01_高醫/106/106_高醫_生物生化.pdf 內「後醫-普通生物及生化概論」答案表"
+  },
+  {
+   "id": "KMU-113-69",
+   "label": "高醫 113 69",
+   "kind": "postmed_w",
+   "bank": "A",
+   "source_answer": "A",
+   "result": "相符",
+   "evidence": "81_考古題/01_後西醫/01_高醫/113/113_高醫_生物生化.pdf（高點解析）所附「後醫-普通生物及生化概論」答案表"
+  },
+  {
+   "id": "NTHU-113-51",
+   "label": "清華 113 51",
+   "kind": "postmed_w",
+   "bank": "C",
+   "source_answer": "C",
+   "result": "相符",
+   "evidence": "81_考古題/01_後西醫/04_清華/113/113_清華_生物生化.pdf 內答案表"
+  },
+  {
+   "id": "NCHU-115-24",
+   "label": "中興 115 24",
+   "kind": "postmed_w",
+   "bank": "D",
+   "source_answer": "D",
+   "result": "相符",
+   "evidence": "81_考古題/01_後西醫/03_中興/115/115_中興_生物生化答.pdf（中興大學公告答案）"
+  },
+  {
+   "id": "CMU-111-15",
+   "label": "中國 111 15",
+   "kind": "postmed_c",
+   "bank": "C",
+   "source_answer": "C",
+   "result": "相符",
+   "evidence": "81_考古題/02_後中醫/中國/111/111_中國_生物.pdf 內「生物學試題參考答案」"
+  },
+  {
+   "id": "TCU-112-50",
+   "label": "慈濟 112 50",
+   "kind": "postmed_c",
+   "bank": "C",
+   "source_answer": "C",
+   "result": "相符",
+   "evidence": "81_考古題/02_後中醫/慈濟/112/112_慈濟_生物.pdf 內「試題參考答案疑義釋疑公告」第 50 題：維持原答案(C)"
+  },
+  {
+   "id": "ISU-114-34",
+   "label": "義守 114 34",
+   "kind": "postmed_c",
+   "bank": "B",
+   "source_answer": "B",
+   "result": "相符",
+   "evidence": "81_考古題/02_後中醫/義守/114/114_義守_生物.pdf 內「生物學試題參考答案」"
+  },
+  {
+   "id": "TCU-115-38",
+   "label": "慈濟 115 38",
+   "kind": "postmed_c",
+   "bank": "C",
+   "source_answer": "C",
+   "result": "相符",
+   "evidence": "81_考古題/02_後中醫/慈濟/115/115生物學_參考答案.pdf（慈濟大學生物學科答案）"
+  },
+  {
+   "id": "AU-108-46",
+   "label": "亞大 108 46",
+   "kind": "postmed_v",
+   "bank": "A",
+   "source_answer": null,
+   "result": "無法判讀",
+   "evidence": "81_考古題/04_後獸醫/108/108_亞大_生化.pdf 只有試題，資料夾內沒有答案檔"
+  },
+  {
+   "id": "AU-113-54",
+   "label": "亞大 113 54",
+   "kind": "postmed_v",
+   "bank": "B",
+   "source_answer": null,
+   "result": "無法判讀",
+   "evidence": "81_考古題/04_後獸醫/113/113_亞大_生化.pdf 只有試題，資料夾內沒有答案檔"
+  },
+  {
+   "id": "AU-110-34",
+   "label": "亞大 110 34",
+   "kind": "postmed_v",
+   "bank": "C",
+   "source_answer": null,
+   "result": "無法判讀",
+   "evidence": "81_考古題/04_後獸醫/110/110_亞大_生化.pdf 只有試題，資料夾內沒有答案檔"
+  },
+  {
+   "id": "AU-109-66",
+   "label": "亞大 109 66",
+   "kind": "postmed_v",
+   "bank": "B",
+   "source_answer": null,
+   "result": "無法判讀",
+   "evidence": "81_考古題/04_後獸醫/109/109_亞大_生化.pdf 只有試題，資料夾內沒有答案檔"
+  },
+  {
+   "id": "PMM-110-04",
+   "label": "私醫 110 04",
+   "kind": "private_med",
+   "bank": "B",
+   "source_answer": "B",
+   "result": "相符",
+   "evidence": "81_考古題/03_私醫/110/110_私醫_生物.pdf（高點解析，題號前標示答案 (B)；非官方答案表）"
+  },
+  {
+   "id": "PMM-112-01",
+   "label": "私醫 112 01",
+   "kind": "private_med",
+   "bank": "A",
+   "source_answer": "A",
+   "result": "相符",
+   "evidence": "81_考古題/03_私醫/112/112_私醫_生物.pdf 解析【解答】A"
+  },
+  {
+   "id": "PMM-114-06",
+   "label": "私醫 114 06",
+   "kind": "private_med",
+   "bank": "D",
+   "source_answer": "D",
+   "result": "相符",
+   "evidence": "81_考古題/03_私醫/114/私醫_114_普生.pdf 內「普通生物學科答案」"
+  },
+  {
+   "id": "PMM-111-20",
+   "label": "私醫 111 20",
+   "kind": "private_med",
+   "bank": "C",
+   "source_answer": "C",
+   "result": "相符",
+   "evidence": "81_考古題/03_私醫/111/111_私醫_生物.pdf 內「【普通生物學科】答案」"
+  },
+  {
+   "id": "DEN-114-1-73",
+   "label": "牙醫 114-1 73",
+   "kind": "national",
+   "bank": "B",
+   "source_answer": "B",
+   "result": "相符",
+   "evidence": "01_來源索引/原始PDF/醫事國考/114-1/114020_ANS0201_牙醫學(一).pdf（考選部測驗式試題標準答案）"
+  },
+  {
+   "id": "MLS-113-2-74",
+   "label": "醫檢 113-2 74",
+   "kind": "national",
+   "bank": "A",
+   "source_answer": "A",
+   "result": "相符",
+   "evidence": "01_來源索引/原始PDF/醫事國考/113-2/113090_ANS55_生物化學與臨床生化學.pdf（考選部標準答案）"
+  },
+  {
+   "id": "DEN-115-1-76",
+   "label": "牙醫 115-1 76",
+   "kind": "national",
+   "bank": "D",
+   "source_answer": "D",
+   "result": "相符",
+   "evidence": "01_來源索引/原始PDF/醫事國考/115-1/115020_ANS0201_牙醫學(一).pdf（考選部標準答案）"
+  },
+  {
+   "id": "DEN-110-1-80",
+   "label": "牙醫 110-1 80",
+   "kind": "national",
+   "bank": "B",
+   "source_answer": "B",
+   "result": "相符",
+   "evidence": "01_來源索引/原始PDF/醫事國考/110-1/110020_ANS11_牙醫學(一).pdf（考選部標準答案）"
+  }
+ ],
+ "summary": {
+  "match": 16,
+  "mismatch": 0,
+  "unknown": 4
+ },
+ "notes": [
+  "後獸醫（亞大 106–114）的來源 PDF 都只有試題、沒有答案；這 720 題的「官方答案」無法用現有來源確認。若你手上有亞大公告答案，放進對應年份資料夾後重跑 `bin/pmq check answers` 即可再抽查。",
+  "私醫 110 與 112 的依據是補習班解析版的標示，不是學校公告的答案表。",
+  "主檔答案一律沒有改動，`answer.trust` 仍照規格書設為 official。"
+ ]
+}

@@ -1,0 +1,171 @@
+/*
+ * 設計代碼（規格書 §13.1、§13.4）。全站的顏色、字級、圓角、動畫時間只能出自這個檔。
+ * 淺色取自護理國考站；深色為本專案所訂。兩欄的對比都算過，數字在 /dev/ui 的「色彩」區即時列出。
+ * 改這裡的任何顏色後：開 /dev/ui 看對比表是否仍全部合格，並同步更新規格書 §13.1 的表。
+ */
+
+/* [data-theme] 也可以放在任何元素上（/dev/ui 用它把淺色與深色並排） */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* 表面 */
+  --page: #f7f8fb;
+  --card: #ffffff;
+  --sidebar: #f1f3f8;
+  --hover: #eceef3;
+  --border: #e3e6ec; /* 分隔線、卡片邊線：裝飾用 */
+  --border-strong: #868c99; /* 輸入框、勾選框的外框：與底色 ≥ 3:1 */
+
+  /* 文字 */
+  --text-strong: #26262b;
+  --text: #444441;
+  --text-muted: #6b6b70;
+
+  /* 藍：唯一的主色 */
+  --blue-light: #d7e1f2; /* 選中底、徽章底；上面只放 --blue-ink 或 --blue-deep */
+  --blue-mid: #b6ccf0; /* 次要按鈕底；上面只放 --blue-ink */
+  --blue-accent: #6592cd; /* 進度條、圖示；只放在 --card 或 --page 上 */
+  --blue-deep: #2c5a96; /* 連結、主要按鈕底、焦點框 */
+  --blue-ink: #0e2240; /* 淺藍底上的字 */
+  --on-deep: #ffffff; /* --blue-deep 底上的字 */
+  --focus: #2c5a96;
+
+  /* 狀態：只用在答對、答錯、警示 */
+  --correct: #639922;
+  --correct-bg: #eaf3de;
+  --correct-ink: #27500a;
+  --incorrect: #e24b4a;
+  --incorrect-bg: #fcebeb;
+  --incorrect-ink: #791f1f;
+  --warning: #ef9f27; /* 只當色塊或邊線，不單獨當文字或圖示 */
+  --warning-bg: #fcf1dc;
+  --warning-ink: #6b4406;
+
+  /* 圖片紙卡：深淺色都是白底黑字 */
+  --paper: #ffffff;
+  --paper-ink: #26262b;
+
+  /* 螢光筆（資料庫閱讀頁） */
+  --hl-yellow: #fff1a8;
+  --hl-green: #d5f0c2;
+  --hl-pink: #fbd5e0;
+  --hl-blue: #cfe3fb;
+
+  --scrim: rgb(14 20 32 / 0.45);
+  --shadow-pop: 0 8px 28px rgb(14 20 32 / 0.16);
+
+  /* 字 */
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-code: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-meta: 0.8125rem; /* 13：來源、頁碼、徽章 */
+  --fs-ui: 0.9375rem; /* 15：按鈕、清單、表單 */
+  --fs-base: 1rem; /* 16：輸入框（iOS 不放大頁面的下限） */
+  --fs-body: 1.0625rem; /* 17：題幹、詳解 */
+  --fs-title: 1.25rem; /* 20：區塊標題 */
+  --fs-display: 1.5rem; /* 24：頁面標題、大數字 */
+  --lh-body: 1.6;
+  --lh-ui: 1.4;
+  --measure: 40rem; /* 內文欄寬上限 */
+
+  /* 形狀 */
+  --r-card: 12px;
+  --r-btn: 8px;
+  --r-chip: 6px;
+  --tap: 44px; /* 可點區域下限 */
+  --option-h: 56px; /* 選項列下限 */
+
+  /* 動畫：只用在換題、面板開合、作答回饋 */
+  --dur-fast: 150ms;
+  --dur: 200ms;
+  --dur-slow: 300ms;
+  --ease-out: cubic-bezier(0.22, 0.8, 0.26, 1);
+}
+
+/* 深色。同一組值寫兩次：一次給「跟隨系統」，一次給設定頁強制。改的時候兩處一起改。 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0f1420;
+    --card: #171d2b;
+    --sidebar: #131928;
+    --hover: #1f2738;
+    --border: #2a3347;
+    --border-strong: #6b7791;
+    --text-strong: #e8ecf4;
+    --text: #c5ccda;
+    --text-muted: #8e97a8;
+    --blue-light: #1f3152;
+    --blue-mid: #2e4a7a;
+    --blue-accent: #8fb3e8;
+    --blue-deep: #a9c6f0;
+    --blue-ink: #e3edfb;
+    --on-deep: #0e2240;
+    --focus: #8fb3e8;
+    --correct: #8cc152;
+    --correct-bg: #1e2d14;
+    --correct-ink: #c6e6a0;
+    --incorrect: #f07a79;
+    --incorrect-bg: #3a1a1a;
+    --incorrect-ink: #f7c1c0;
+    --warning: #f2b552;
+    --warning-bg: #33270f;
+    --warning-ink: #f5d08a;
+    --hl-yellow: #5c4a00;
+    --hl-green: #1f4a1a;
+    --hl-pink: #5a2238;
+    --hl-blue: #1e3f66;
+    --scrim: rgb(0 0 0 / 0.6);
+    --shadow-pop: 0 8px 28px rgb(0 0 0 / 0.5);
+  }
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0f1420;
+  --card: #171d2b;
+  --sidebar: #131928;
+  --hover: #1f2738;
+  --border: #2a3347;
+  --border-strong: #6b7791;
+  --text-strong: #e8ecf4;
+  --text: #c5ccda;
+  --text-muted: #8e97a8;
+  --blue-light: #1f3152;
+  --blue-mid: #2e4a7a;
+  --blue-accent: #8fb3e8;
+  --blue-deep: #a9c6f0;
+  --blue-ink: #e3edfb;
+  --on-deep: #0e2240;
+  --focus: #8fb3e8;
+  --correct: #8cc152;
+  --correct-bg: #1e2d14;
+  --correct-ink: #c6e6a0;
+  --incorrect: #f07a79;
+  --incorrect-bg: #3a1a1a;
+  --incorrect-ink: #f7c1c0;
+  --warning: #f2b552;
+  --warning-bg: #33270f;
+  --warning-ink: #f5d08a;
+  --hl-yellow: #5c4a00;
+  --hl-green: #1f4a1a;
+  --hl-pink: #5a2238;
+  --hl-blue: #1e3f66;
+  --scrim: rgb(0 0 0 / 0.6);
+  --shadow-pop: 0 8px 28px rgb(0 0 0 / 0.5);
+}
+
+/* 觸控裝置：按鈕與間距放大（規格書 §2.5） */
+@media (pointer: coarse) {
+  :root {
+    --tap: 48px;
+    --option-h: 60px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+    --dur-slow: 0ms;
+  }
+}

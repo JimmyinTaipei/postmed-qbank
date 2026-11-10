@@ -1,0 +1,153 @@
+// 個人資料的寫入與查詢（規格書 §4.6、§5）。第 1A 階段只寫本機 IndexedDB。
+// 1B：在每個寫入後把列放進待送佇列（db.outbox）並觸發同步；函式簽名不變，畫面不用改。
+
+import { ulid } from "@/lib/ulid";
+import { db } from "./db";
+import { prefs } from "./prefs";
+import type { Attempt, FlagKind, ItemKey, Session, SessionMode } from "./types";
+
+const now = () => Date.now();
+
+export const flags = {
+  async set(item: ItemKey, kind: FlagKind, value: boolean): Promise<void> {
+    await db.flag.put({ item, kind, value: value ? 1 : 0, updated_at: now() });
+  },
+};
+
+export const attempts = {
+  /**
+   * 記一筆作答。答錯會自動進錯題本（flag.wrong = 1）。
+   * 回傳的列在離開該題前是「未封存」的，信心程度可用 setConfidence 改。
+   */
+  async record(input: {
+    item: ItemKey;
+    sessionId: string | null;
+    mode: SessionMode;
+    chosen: string[] | null;
+    correct: boolean;
+    elapsedMs: number;
+    contentH: string;
+  }): Promise<Attempt> {
+    const row: Attempt = {
+      id: ulid(),
+      item: input.item,
+      session_id: input.sessionId,
+      mode: input.mode,
+      chosen: input.chosen,
+      correct: input.correct ? 1 : 0,
+      confidence: 2,
+      elapsed_ms: Math.max(0, Math.round(input.elapsedMs)),
+      content_h: input.contentH,
+      device: prefs.device(),
+      created_at: now(),
+      open: 1,
+    };
+    await db.transaction("rw", db.attempt, db.flag, db.srs_state, async () => {
+      await db.attempt.add(row);
+      if (!input.correct) {
+        await db.flag.put({ item: input.item, kind: "wrong", value: 1, updated_at: row.created_at });
+        // 之前標過「粗心錯，不追蹤」的題目又答錯：恢復追蹤
+        await db.srs_state.where("item").equals(input.item).modify({ suspended: 0, updated_at: row.created_at });
+      }
+    });
+    return row;
+  },
+
+  /** 只能改還沒封存的作答（attempt 表在伺服器上是只增的）。 */
+  async setConfidence(id: string, confidence: 1 | 2 | 3): Promise<void> {
+    await db.attempt.where("id").equals(id).and((a) => a.open === 1).modify({ confidence });
+  },
+
+  /** 離開題目、結束一場、App 進背景時呼叫：封存所有未封存的作答。 */
+  async seal(): Promise<void> {
+    await db.attempt.where("open").equals(1).modify({ open: 0 });
+  },
+
+  /** 粗心錯，不追蹤（規格書 §5.3）：不進錯題本、不進複習；作答紀錄仍是答錯。 */
+  async markCareless(item: ItemKey): Promise<void> {
+    const t = now();
+    await db.transaction("rw", db.flag, db.srs_state, async () => {
+      await db.flag.put({ item, kind: "wrong", value: 0, updated_at: t });
+      const cur = await db.srs_state.get(item);
+      await db.srs_state.put({
+        ...(cur ?? { item, due: t, stability: null, difficulty: null, reps: 0, lapses: 0, state: 0, last_review: null }),
+        suspended: 1,
+        updated_at: t,
+      });
+    });
+  },
+
+  /** 取消「粗心錯」：放回錯題本並恢復追蹤。 */
+  async undoCareless(item: ItemKey): Promise<void> {
+    const t = now();
+    await db.transaction("rw", db.flag, db.srs_state, async () => {
+      await db.flag.put({ item, kind: "wrong", value: 1, updated_at: t });
+      await db.srs_state.where("item").equals(item).modify({ suspended: 0, updated_at: t });
+    });
+  },
+};
+
+export const sessions = {
+  async create(input: { mode: SessionMode; filter: Session["filter"]; items: string[] }): Promise<Session> {
+    const t = now();
+    const row: Session = {
+      id: ulid(t),
+      mode: input.mode,
+      filter: input.filter,
+      items: input.items,
+      cursor: 0,
+      started_at: t,
+      ended_at: null,
+      time_limit_s: null,
+      score: null,
+      device: prefs.device(),
+      updated_at: t,
+      deleted: 0,
+    };
+    await db.session.add(row);
+    return row;
+  },
+  async get(id: string): Promise<Session | null> {
+    const s = await db.session.get(id);
+    return s && !s.deleted ? s : null;
+  },
+  async setCursor(id: string, cursor: number): Promise<void> {
+    await db.session.update(id, { cursor, updated_at: now() });
+  },
+  async end(id: string): Promise<void> {
+    const t = now();
+    await attempts.seal();
+    const s = await db.session.get(id);
+    if (!s || s.ended_at) return;
+    const rows = await db.attempt.where("session_id").equals(id).toArray();
+    const latest = new Map(rows.sort((a, b) => a.created_at - b.created_at).map((a) => [a.item, a]));
+    const right = [...latest.values()].filter((a) => a.correct).length;
+    await db.session.update(id, { ended_at: t, updated_at: t, score: s.items.length ? right / s.items.length : null });
+  },
+  /** 捨棄一場（作答紀錄保留）。 */
+  async remove(id: string): Promise<void> {
+    await db.session.update(id, { deleted: 1, updated_at: now() });
+  },
+};
+
+export const settings = {
+  async get<T>(key: string): Promise<T | null> {
+    const row = await db.setting.get(key);
+    if (!row) return null;
+    try {
+      return JSON.parse(row.value) as T;
+    } catch {
+      return null;
+    }
+  },
+  async set(key: string, value: unknown): Promise<void> {
+    await db.setting.put({ key, value: JSON.stringify(value), updated_at: now() });
+  },
+};
+
+/** 清掉這台裝置上的全部個人資料（設定頁；1B 之後雲端資料不受影響）。 */
+export async function wipeLocal(): Promise<void> {
+  await db.transaction("rw", db.tables, async () => {
+    for (const t of db.tables) await t.clear();
+  });
+}

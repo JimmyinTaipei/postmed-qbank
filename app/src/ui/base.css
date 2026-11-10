@@ -1,0 +1,460 @@
+@import "tailwindcss";
+@import "./tokens.css";
+@import "katex/dist/katex.min.css";
+
+/*
+ * Tailwind 只認得下面這些名字。預設色盤、字級、圓角都清掉了，
+ * 所以寫 bg-red-500、text-sm、rounded-lg 不會有任何效果——這是刻意的（docs/UI規範.md「什麼不准做」）。
+ */
+@theme inline {
+  --color-*: initial;
+  --color-page: var(--page);
+  --color-card: var(--card);
+  --color-sidebar: var(--sidebar);
+  --color-hover: var(--hover);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ink-strong: var(--text-strong);
+  --color-ink: var(--text);
+  --color-ink-muted: var(--text-muted);
+  --color-blue-light: var(--blue-light);
+  --color-blue-mid: var(--blue-mid);
+  --color-blue-accent: var(--blue-accent);
+  --color-blue-deep: var(--blue-deep);
+  --color-blue-ink: var(--blue-ink);
+  --color-on-deep: var(--on-deep);
+  --color-focus: var(--focus);
+  --color-correct: var(--correct);
+  --color-correct-bg: var(--correct-bg);
+  --color-correct-ink: var(--correct-ink);
+  --color-incorrect: var(--incorrect);
+  --color-incorrect-bg: var(--incorrect-bg);
+  --color-incorrect-ink: var(--incorrect-ink);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-ink: var(--warning-ink);
+  --color-paper: var(--paper);
+  --color-paper-ink: var(--paper-ink);
+  --color-hl-yellow: var(--hl-yellow);
+  --color-hl-green: var(--hl-green);
+  --color-hl-pink: var(--hl-pink);
+  --color-hl-blue: var(--hl-blue);
+  --color-scrim: var(--scrim);
+
+  --font-*: initial;
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-code);
+
+  --text-*: initial;
+  --text-meta: var(--fs-meta);
+  --text-meta--line-height: var(--lh-ui);
+  --text-ui: var(--fs-ui);
+  --text-ui--line-height: var(--lh-ui);
+  --text-base: var(--fs-base);
+  --text-base--line-height: var(--lh-ui);
+  --text-body: var(--fs-body);
+  --text-body--line-height: var(--lh-body);
+  --text-title: var(--fs-title);
+  --text-title--line-height: 1.3;
+  --text-display: var(--fs-display);
+  --text-display--line-height: 1.2;
+
+  --radius-*: initial;
+  --radius-card: var(--r-card);
+  --radius-btn: var(--r-btn);
+  --radius-chip: var(--r-chip);
+
+  --shadow-*: initial;
+  --shadow-pop: var(--shadow-pop);
+
+  --ease-*: initial;
+  --ease-out: var(--ease-out);
+
+  --container-measure: var(--measure);
+  --spacing-tap: var(--tap);
+  --spacing-option: var(--option-h);
+}
+
+@custom-variant coarse (@media (pointer: coarse));
+
+/* ---------- 基礎 ---------- */
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    overscroll-behavior: none;
+    background: var(--page);
+  }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--page);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: var(--fs-ui);
+    line-height: var(--lh-ui);
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--text-strong);
+    font-weight: 600;
+    text-wrap: balance;
+  }
+  input,
+  textarea,
+  select {
+    font-size: var(--fs-base); /* 16px：iOS 不會在聚焦時放大頁面 */
+    font-family: inherit;
+    color: var(--text-strong);
+  }
+  button,
+  a,
+  [role="button"],
+  summary,
+  label {
+    touch-action: manipulation;
+  }
+  button,
+  [role="button"],
+  summary {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  a {
+    color: var(--blue-deep);
+    text-underline-offset: 3px;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  ::selection {
+    background: var(--blue-mid);
+    color: var(--blue-ink);
+  }
+  summary {
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- 內容：Markdown ＋ 公式 ＋ 圖（MarkdownView 的輸出） ---------- */
+
+.md {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p,
+.md ul,
+.md ol,
+.md blockquote,
+.md pre,
+.md .md-scroll,
+.md .math-display {
+  margin: 0.7em 0;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4,
+.md h5,
+.md h6 {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  margin: 1.1em 0 0.4em;
+}
+.md h1,
+.md h2 {
+  font-size: var(--fs-title);
+  line-height: 1.3;
+}
+.md ul,
+.md ol {
+  padding-left: 1.5em;
+}
+.md ul {
+  list-style: disc;
+}
+.md ul ul {
+  list-style: circle;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li {
+  margin: 0.2em 0;
+}
+.md li > p {
+  margin: 0.2em 0;
+}
+.md blockquote {
+  border-left: 3px solid var(--blue-mid);
+  padding: 0.1em 0 0.1em 0.9em;
+  color: var(--text);
+}
+.md strong,
+.md b {
+  font-weight: 600;
+}
+.md mark {
+  background: var(--hl-yellow);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 0.1em;
+}
+.md code {
+  font-family: var(--font-code);
+  font-size: 0.9em;
+  background: var(--hover);
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+}
+.md pre {
+  overflow-x: auto;
+  background: var(--hover);
+  border-radius: var(--r-btn);
+  padding: 0.75em 1em;
+}
+.md pre code {
+  background: none;
+  padding: 0;
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.2em 0;
+}
+.md sub,
+.md sup {
+  line-height: 0;
+}
+
+/* 寬表格與長公式：自己橫向捲動，不撐破版面；也不觸發左右滑換題 */
+.md .md-scroll,
+.md .math-display {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.md .math-display {
+  padding: 0.15em 0;
+  text-align: center;
+}
+.md .math-display > .katex-display {
+  margin: 0;
+  display: inline-block;
+  min-width: min-content;
+  text-align: center;
+}
+.md .katex {
+  font-size: 1.08em;
+}
+.md .math-inline {
+  /* 行內長公式可在公式內換行（KaTeX 會在關係符號處斷行） */
+  white-space: normal;
+}
+.md .math-error {
+  font-family: var(--font-code);
+  font-size: 0.9em;
+  color: var(--incorrect-ink);
+  text-decoration: underline wavy var(--incorrect);
+  text-underline-offset: 3px;
+  background: none;
+  padding: 0;
+  white-space: pre-wrap;
+}
+.md table {
+  border-collapse: collapse;
+  font-size: var(--fs-ui);
+  line-height: 1.5;
+  min-width: max-content;
+}
+.md th,
+.md td {
+  border: 1px solid var(--border);
+  padding: 0.45em 0.75em;
+  text-align: left;
+  vertical-align: top;
+  max-width: 28em;
+  min-width: 3em;
+}
+.md th {
+  background: var(--sidebar);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.md .ta-center {
+  text-align: center;
+}
+.md .ta-right {
+  text-align: right;
+}
+
+/* 題圖：一律放在白色紙卡上（深色模式也是） */
+.md .fig {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  padding: 8px;
+  margin: 0.3em 0;
+  line-height: 0;
+  cursor: zoom-in;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.md .fig img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.md .fig-missing {
+  display: inline-block;
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-chip);
+  padding: 0.2em 0.6em;
+}
+/* 純黑白線稿可反相。<html data-fig-invert="1"> 由 useTheme 在「深色＋設定開啟」時加上；檢視器自己加 .inverted */
+:root[data-fig-invert="1"] .fig.mono,
+.viewer-stage.inverted {
+  background: var(--page);
+}
+:root[data-fig-invert="1"] .fig.mono img,
+.viewer-stage.inverted img {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* 選項與短內容：去掉段落外距 */
+.md.md-tight p {
+  margin: 0.25em 0;
+}
+.md.md-tight > p:first-child {
+  margin-top: 0;
+}
+.md.md-tight > p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---------- 動畫 ---------- */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes panel-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes slide-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+@keyframes slide-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+@keyframes pulse-soft {
+  50% {
+    opacity: 0.5;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@utility anim-fade {
+  animation: fade-in var(--dur) var(--ease-out);
+}
+@utility anim-rise {
+  animation: rise-in var(--dur) var(--ease-out);
+}
+@utility anim-sheet {
+  animation: sheet-up var(--dur-slow) var(--ease-out);
+}
+@utility anim-panel {
+  animation: panel-in var(--dur-slow) var(--ease-out);
+}
+@utility anim-next {
+  animation: slide-from-right var(--dur) var(--ease-out);
+}
+@utility anim-prev {
+  animation: slide-from-left var(--dur) var(--ease-out);
+}
+@utility anim-pulse {
+  animation: pulse-soft 1.6s ease-in-out infinite;
+}
+@utility anim-spin {
+  animation: spin 0.9s linear infinite;
+}
+
+/* 安全區（瀏海、Home 指示條） */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility px-safe {
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}

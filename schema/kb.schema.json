@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://postmed-qbank.local/schema/kb.schema.json",
+  "title": "講義筆記區塊樹（規格書 §9.4；第 0 階段為簡化版轉接器）",
+  "type": "object", "additionalProperties": false,
+  "required": ["doc", "subject", "title", "file", "blocks", "figs", "refs"],
+  "$defs": {
+    "block": {
+      "type": "object", "additionalProperties": false, "required": ["bid", "type", "md", "children"],
+      "properties": {
+        "bid": {"type": "string", "pattern": "^[0-9a-f]{12}$"},
+        "type": {"enum": ["heading", "list_item", "paragraph", "table", "table_group", "figure", "math", "quote", "rule", "html"]},
+        "level": {"type": "integer", "description": "heading：1–6；list_item：巢狀層級（0 起）"},
+        "ordered": {"type": "boolean"},
+        "md": {"type": "string", "description": "該區塊自己的 Markdown（不含子區塊）；圖已改寫成 fig:"},
+        "lines": {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "integer"}], "items": false, "description": "主檔行範圍 [起, 訖)，0 起"},
+        "children": {"type": "array", "items": {"$ref": "#/$defs/block"}}
+      }
+    }
+  },
+  "properties": {
+    "doc": {"type": "string"}, "subject": {"type": "string"}, "title": {"type": "string"}, "file": {"type": "string"},
+    "blocks": {"type": "array", "items": {"$ref": "#/$defs/block"}},
+    "figs": {"type": "array", "items": {"type": "object"}},
+    "refs": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["bid", "text", "qid"],
+      "properties": {"bid": {"type": "string"}, "text": {"type": "string"}, "qid": {"type": ["string", "null"]}}},
+      "description": "句尾考古題出處 → 題目 ID；qid 為 null 表示對應不到"}
+  }
+}

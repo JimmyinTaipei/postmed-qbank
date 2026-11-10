@@ -1,0 +1,4 @@
+#!/bin/sh
+# Usage: bin/pmq check | check math | check answers | sample
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+PYTHONPATH="$HERE/tools/pmq" exec "$HERE/.venv/bin/python" -m pmq "$@"

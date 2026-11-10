@@ -1,0 +1,51 @@
+// 更多：主導覽放不下的頁面。
+
+import { useFlagCount } from "@/data";
+import { Icon, type IconName } from "@/ui/icons";
+import { Badge, ListCard, ListRow, SectionTitle } from "@/ui/primitives";
+import { Page } from "@/ui/shell";
+
+const GROUPS: { title: string; items: { to: string; label: string; meta: string; icon: IconName; stage?: string }[] }[] = [
+  {
+    title: "題目",
+    items: [
+      { to: "/wrong", label: "錯題本", meta: "答錯的題目", icon: "x" },
+      { to: "/browse", label: "題庫瀏覽", meta: "用題號或來源找題目", icon: "search", stage: "第 2 階段" },
+      { to: "/papers", label: "原卷", meta: "整份考卷、模擬考", icon: "file", stage: "第 2 階段" },
+    ],
+  },
+  {
+    title: "分析",
+    items: [
+      { to: "/stats", label: "統計", meta: "每日題數、弱點章節", icon: "chart", stage: "第 2 階段" },
+      { to: "/analysis", label: "考題分析", meta: "各單元歷年出題數", icon: "grid", stage: "第 2 階段" },
+    ],
+  },
+  {
+    title: "其他",
+    items: [
+      { to: "/patches", label: "修訂佇列", meta: "在網站上改過、待寫回主檔的內容", icon: "edit", stage: "第 3 階段" },
+      { to: "/settings", label: "設定", meta: "外觀、資料", icon: "sliders" },
+    ],
+  },
+];
+
+export function More() {
+  const wrong = useFlagCount("wrong");
+  return (
+    <Page title="更多">
+      {GROUPS.map((g) => (
+        <section key={g.title} aria-labelledby={`h-${g.title}`}>
+          <SectionTitle id={`h-${g.title}`}>{g.title}</SectionTitle>
+          <ListCard>
+            {g.items.map((it) => (
+              <li key={it.to}>
+                <ListRow to={it.to} title={it.label} meta={it.meta} leading={<Icon name={it.icon} size={20} />} trailing={it.to === "/wrong" && wrong ? <Badge tone="incorrect">{wrong}</Badge> : it.stage ? <Badge>{it.stage}</Badge> : undefined} />
+              </li>
+            ))}
+          </ListCard>
+        </section>
+      ))}
+    </Page>
+  );
+}

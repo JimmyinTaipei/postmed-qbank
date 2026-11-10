@@ -1,0 +1,1136 @@
+[
+ {
+  "name": "one_per_line",
+  "ques": "Which is a vector?\n(A) mass\n(B) speed\n(C) velocity\n(D) energy",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     23,
+     27
+    ],
+    [
+     "B",
+     32,
+     37
+    ],
+    [
+     "C",
+     42,
+     50
+    ],
+    [
+     "D",
+     55,
+     61
+    ]
+   ],
+   "span": [
+    19,
+    61
+   ]
+  }
+ },
+ {
+  "name": "one_line_all",
+  "ques": "Pick one: (A) 1 m (B) 2 m (C) 3 m (D) 4 m",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     14,
+     17
+    ],
+    [
+     "B",
+     22,
+     25
+    ],
+    [
+     "C",
+     30,
+     33
+    ],
+    [
+     "D",
+     38,
+     41
+    ]
+   ],
+   "span": [
+    10,
+    41
+   ]
+  }
+ },
+ {
+  "name": "two_per_line",
+  "ques": "題幹\n(A) 甲　(B) 乙\n(C) 丙　(D) 丁",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     7,
+     8
+    ],
+    [
+     "B",
+     13,
+     14
+    ],
+    [
+     "C",
+     19,
+     20
+    ],
+    [
+     "D",
+     25,
+     26
+    ]
+   ],
+   "span": [
+    3,
+    26
+   ]
+  }
+ },
+ {
+  "name": "fullwidth_parens",
+  "ques": "下列何者正確？\n（A）甲\n（B）乙\n（C）丙\n（D）丁",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     11,
+     12
+    ],
+    [
+     "B",
+     16,
+     17
+    ],
+    [
+     "C",
+     21,
+     22
+    ],
+    [
+     "D",
+     26,
+     27
+    ]
+   ],
+   "span": [
+    8,
+    27
+   ]
+  }
+ },
+ {
+  "name": "mixed_paren_styles",
+  "ques": "何者？\n(A) 甲\n（B）乙\n(C) 丙",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     8,
+     9
+    ],
+    [
+     "B",
+     13,
+     14
+    ],
+    [
+     "C",
+     19,
+     20
+    ]
+   ],
+   "span": [
+    4,
+    20
+   ]
+  }
+ },
+ {
+  "name": "five_options_E",
+  "ques": "Q\n(A) a\n(B) b\n(C) c\n(D) d\n(E) e",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     6,
+     7
+    ],
+    [
+     "B",
+     12,
+     13
+    ],
+    [
+     "C",
+     18,
+     19
+    ],
+    [
+     "D",
+     24,
+     25
+    ],
+    [
+     "E",
+     30,
+     31
+    ]
+   ],
+   "span": [
+    2,
+    31
+   ]
+  }
+ },
+ {
+  "name": "eight_options_H",
+  "ques": "Q (A) 1 (B) 2 (C) 3 (D) 4 (E) 5 (F) 6 (G) 7 (H) 8",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     6,
+     7
+    ],
+    [
+     "B",
+     12,
+     13
+    ],
+    [
+     "C",
+     18,
+     19
+    ],
+    [
+     "D",
+     24,
+     25
+    ],
+    [
+     "E",
+     30,
+     31
+    ],
+    [
+     "F",
+     36,
+     37
+    ],
+    [
+     "G",
+     42,
+     43
+    ],
+    [
+     "H",
+     48,
+     49
+    ]
+   ],
+   "span": [
+    2,
+    49
+   ]
+  }
+ },
+ {
+  "name": "math_inline_options",
+  "ques": "求加速度\n(A) $2\\,\\mathrm{m/s^2}$\n(B) $4\\,\\mathrm{m/s^2}$\n(C) $8$",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     9,
+     28
+    ],
+    [
+     "B",
+     33,
+     52
+    ],
+    [
+     "C",
+     57,
+     60
+    ]
+   ],
+   "span": [
+    5,
+    60
+   ]
+  }
+ },
+ {
+  "name": "marker_inside_inline_math",
+  "ques": "已知 $f(A)=1$ 與 $g (B) = 2$，則\n(A) 1\n(B) 2",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     32,
+     33
+    ],
+    [
+     "B",
+     38,
+     39
+    ]
+   ],
+   "span": [
+    28,
+    39
+   ]
+  }
+ },
+ {
+  "name": "marker_inside_display_math",
+  "ques": "$$\nx = (A) + (B)\n$$\n(A) yes\n(B) no",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     24,
+     27
+    ],
+    [
+     "B",
+     32,
+     34
+    ]
+   ],
+   "span": [
+    20,
+    34
+   ]
+  }
+ },
+ {
+  "name": "display_math_in_option",
+  "ques": "Find E.\n(A) $$E=mc^2$$\n(B) $$E=\\frac12mv^2$$",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     12,
+     22
+    ],
+    [
+     "B",
+     27,
+     44
+    ]
+   ],
+   "span": [
+    8,
+    44
+   ]
+  }
+ },
+ {
+  "name": "escaped_dollar",
+  "ques": "價格 \\$5 與 \\$6 何者\n(A) \\$5\n(B) \\$6",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     20,
+     23
+    ],
+    [
+     "B",
+     28,
+     31
+    ]
+   ],
+   "span": [
+    16,
+    31
+   ]
+  }
+ },
+ {
+  "name": "unclosed_dollar_literal",
+  "ques": "成本 $5 元\n\n(A) 是\n(B) 否",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     13,
+     14
+    ],
+    [
+     "B",
+     19,
+     20
+    ]
+   ],
+   "span": [
+    9,
+    20
+   ]
+  }
+ },
+ {
+  "name": "stem_cites_letters_first",
+  "ques": "若 (A) 與 (B) 同時成立，則下列何者正確？\n(A) 甲\n(B) 乙\n(C) 丙\n(D) 丁",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     30,
+     31
+    ],
+    [
+     "B",
+     36,
+     37
+    ],
+    [
+     "C",
+     42,
+     43
+    ],
+    [
+     "D",
+     48,
+     49
+    ]
+   ],
+   "span": [
+    26,
+    49
+   ]
+  }
+ },
+ {
+  "name": "option_cites_other_options",
+  "ques": "何者正確？\n(A) 甲\n(B) 乙\n(C) 丙\n(D) (A)與(B)皆是",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     10,
+     11
+    ],
+    [
+     "B",
+     16,
+     17
+    ],
+    [
+     "C",
+     22,
+     23
+    ],
+    [
+     "D",
+     28,
+     37
+    ]
+   ],
+   "span": [
+    6,
+    37
+   ]
+  }
+ },
+ {
+  "name": "two_full_rounds_take_last",
+  "ques": "參考 (A) a (B) b (C) c\n\n(A) x\n(B) y\n(C) z",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     26,
+     27
+    ],
+    [
+     "B",
+     32,
+     33
+    ],
+    [
+     "C",
+     38,
+     39
+    ]
+   ],
+   "span": [
+    22,
+    39
+   ]
+  }
+ },
+ {
+  "name": "image_options",
+  "ques": "哪一張圖正確？\n(A) ![](fig:F1)\n(B) ![](fig:F2)\n(C) ![](fig:F3)",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     12,
+     23
+    ],
+    [
+     "B",
+     28,
+     39
+    ],
+    [
+     "C",
+     44,
+     55
+    ]
+   ],
+   "span": [
+    8,
+    55
+   ]
+  }
+ },
+ {
+  "name": "tail_figure_after_options",
+  "ques": "如圖\n(A) 1\n(B) 2\n(C) 3\n\n![原題圖1](fig:F9)",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     7,
+     8
+    ],
+    [
+     "B",
+     13,
+     14
+    ],
+    [
+     "C",
+     19,
+     20
+    ]
+   ],
+   "span": [
+    3,
+    20
+   ]
+  }
+ },
+ {
+  "name": "tail_text_after_options",
+  "ques": "Q\n(A) 1\n(B) 2\n\n（註：本題送分）",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     6,
+     7
+    ],
+    [
+     "B",
+     12,
+     13
+    ]
+   ],
+   "span": [
+    2,
+    13
+   ]
+  }
+ },
+ {
+  "name": "options_separated_by_blank_lines",
+  "ques": "Q\n\n(A) one\n\n(B) two\n\n(C) three\n\nNote below.",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     7,
+     10
+    ],
+    [
+     "B",
+     16,
+     19
+    ],
+    [
+     "C",
+     25,
+     30
+    ]
+   ],
+   "span": [
+    3,
+    30
+   ]
+  }
+ },
+ {
+  "name": "chinese_punct_before_marker",
+  "ques": "選出正確者：(A)甲、(B)乙、(C)丙",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     9,
+     11
+    ],
+    [
+     "B",
+     14,
+     16
+    ],
+    [
+     "C",
+     19,
+     20
+    ]
+   ],
+   "span": [
+    6,
+    20
+   ]
+  }
+ },
+ {
+  "name": "ideographic_space_before",
+  "ques": "題　(A)甲　(B)乙",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     5,
+     6
+    ],
+    [
+     "B",
+     10,
+     11
+    ]
+   ],
+   "span": [
+    2,
+    11
+   ]
+  }
+ },
+ {
+  "name": "letter_glued_to_word_not_marker",
+  "ques": "function f(A) and g(B) here\n(A) 1\n(B) 2",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     32,
+     33
+    ],
+    [
+     "B",
+     38,
+     39
+    ]
+   ],
+   "span": [
+    28,
+    39
+   ]
+  }
+ },
+ {
+  "name": "followed_by_paren_rejected",
+  "ques": "(A)) bad (B)) bad",
+  "expect": null
+ },
+ {
+  "name": "missing_A",
+  "ques": "Q\n(B) 1\n(C) 2\n(D) 3",
+  "expect": null
+ },
+ {
+  "name": "single_option_only",
+  "ques": "Q\n(A) only",
+  "expect": null
+ },
+ {
+  "name": "gap_in_letters",
+  "ques": "Q\n(A) 1\n(B) 2\n(D) 4",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     6,
+     7
+    ],
+    [
+     "B",
+     12,
+     19
+    ]
+   ],
+   "span": [
+    2,
+    19
+   ]
+  }
+ },
+ {
+  "name": "no_options_text",
+  "ques": "Explain why the sky is blue.",
+  "expect": null
+ },
+ {
+  "name": "empty_string",
+  "ques": "",
+  "expect": null
+ },
+ {
+  "name": "lowercase_not_marker",
+  "ques": "Q\n(a) 1\n(b) 2",
+  "expect": null
+ },
+ {
+  "name": "letter_I_not_marker",
+  "ques": "Q (A) 1 (B) 2 (I) 9",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     6,
+     7
+    ],
+    [
+     "B",
+     12,
+     19
+    ]
+   ],
+   "span": [
+    2,
+    19
+   ]
+  }
+ },
+ {
+  "name": "table_cell_options",
+  "ques": "| (A) 1 | (B) 2 |\n|---|---|\n| (C) 3 | (D) 4 |",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     6,
+     9
+    ],
+    [
+     "B",
+     14,
+     29
+    ],
+    [
+     "C",
+     34,
+     37
+    ],
+    [
+     "D",
+     42,
+     45
+    ]
+   ],
+   "span": [
+    2,
+    45
+   ]
+  }
+ },
+ {
+  "name": "bold_marker_not_counted",
+  "ques": "Q\n**(A)** 1\n**(B)** 2",
+  "expect": null
+ },
+ {
+  "name": "list_item_markers",
+  "ques": "Q\n- (A) 1\n- (B) 2\n- (C) 3",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     8,
+     11
+    ],
+    [
+     "B",
+     16,
+     19
+    ],
+    [
+     "C",
+     24,
+     25
+    ]
+   ],
+   "span": [
+    4,
+    25
+   ]
+  }
+ },
+ {
+  "name": "non_bmp_before_options",
+  "ques": "𝑥 與 𝑦 的關係\n(A) 𝑥=𝑦\n(B) 𝑥>𝑦",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     16,
+     21
+    ],
+    [
+     "B",
+     26,
+     31
+    ]
+   ],
+   "span": [
+    12,
+    31
+   ]
+  }
+ },
+ {
+  "name": "emoji_in_option",
+  "ques": "Q\n(A) 😀 happy\n(B) 😢 sad",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     6,
+     14
+    ],
+    [
+     "B",
+     19,
+     25
+    ]
+   ],
+   "span": [
+    2,
+    25
+   ]
+  }
+ },
+ {
+  "name": "crlf_lines",
+  "ques": "Q\r\n(A) 1\r\n(B) 2\r\n",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     7,
+     8
+    ],
+    [
+     "B",
+     14,
+     15
+    ]
+   ],
+   "span": [
+    3,
+    17
+   ]
+  }
+ },
+ {
+  "name": "trailing_spaces_trimmed",
+  "ques": "Q\n(A)   1   \n(B) 2   ",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     8,
+     9
+    ],
+    [
+     "B",
+     17,
+     18
+    ]
+   ],
+   "span": [
+    2,
+    21
+   ]
+  }
+ },
+ {
+  "name": "subquestion_parts_ignored",
+  "ques": "(a) 求 v；(b) 求 a\n\n(A) 1\n(B) 2",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     21,
+     22
+    ],
+    [
+     "B",
+     27,
+     28
+    ]
+   ],
+   "span": [
+    17,
+    28
+   ]
+  }
+ },
+ {
+  "name": "blank_line_inside_display_math_option",
+  "ques": "Q\n(A) 1\n(B) $$\nx\n\ny\n$$\n\nafter",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     6,
+     7
+    ],
+    [
+     "B",
+     12,
+     22
+    ]
+   ],
+   "span": [
+    2,
+    22
+   ]
+  }
+ },
+ {
+  "name": "inline_math_cannot_span_blank_line",
+  "ques": "設 $x\n\n(A) 1\n(B) 2 $",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     10,
+     11
+    ],
+    [
+     "B",
+     16,
+     19
+    ]
+   ],
+   "span": [
+    6,
+    19
+   ]
+  }
+ },
+ {
+  "name": "restart_after_broken_run",
+  "ques": "Q (A) 1 (C) 3\n(A) x (B) y",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     18,
+     19
+    ],
+    [
+     "B",
+     24,
+     25
+    ]
+   ],
+   "span": [
+    14,
+    25
+   ]
+  }
+ },
+ {
+  "name": "longer_earlier_run_wins_over_later_short",
+  "ques": "Q\n(A) 1\n(B) 2\n(C) 3\n(D) 4\n\n說明：(A) 與 (B) 為誤",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     6,
+     7
+    ],
+    [
+     "B",
+     12,
+     13
+    ],
+    [
+     "C",
+     18,
+     19
+    ],
+    [
+     "D",
+     24,
+     25
+    ]
+   ],
+   "span": [
+    2,
+    25
+   ]
+  }
+ },
+ {
+  "name": "start_of_text_marker",
+  "ques": "(A) 1 (B) 2",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     4,
+     5
+    ],
+    [
+     "B",
+     10,
+     11
+    ]
+   ],
+   "span": [
+    0,
+    11
+   ]
+  }
+ },
+ {
+  "name": "multiline_option_body",
+  "ques": "Q\n(A) first line\ncontinued\n(B) second",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     6,
+     26
+    ],
+    [
+     "B",
+     31,
+     37
+    ]
+   ],
+   "span": [
+    2,
+    37
+   ]
+  }
+ },
+ {
+  "name": "option_cites_own_letter",
+  "ques": "Which graph?\n\n(A) 見原圖 (A)\n\n(B) 見原圖 (B)\n\n(C) 見原圖 (C)\n\n![原題圖](fig:F1)",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     18,
+     25
+    ],
+    [
+     "B",
+     31,
+     38
+    ],
+    [
+     "C",
+     44,
+     51
+    ]
+   ],
+   "span": [
+    14,
+    51
+   ]
+  }
+ },
+ {
+  "name": "placeholder_options_empty",
+  "ques": "選出正確的圖\n![](fig:F2)\n(A)　(B)　(C)",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     23,
+     23
+    ],
+    [
+     "B",
+     27,
+     27
+    ],
+    [
+     "C",
+     30,
+     30
+    ]
+   ],
+   "span": [
+    19,
+    30
+   ]
+  }
+ },
+ {
+  "name": "cyrillic_C_breaks_run",
+  "ques": "Q\n(A) 1.3 с\n(B) 1.0 с (С) 0.97 с\n(D) 0.93 с",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     6,
+     11
+    ],
+    [
+     "B",
+     16,
+     43
+    ]
+   ],
+   "span": [
+    2,
+    43
+   ]
+  }
+ },
+ {
+  "name": "nbsp_before_marker",
+  "ques": "Q (A) 1 (B) 2",
+  "expect": {
+   "opt": [
+    [
+     "A",
+     6,
+     7
+    ],
+    [
+     "B",
+     12,
+     13
+    ]
+   ],
+   "span": [
+    2,
+    13
+   ]
+  }
+ }
+]
