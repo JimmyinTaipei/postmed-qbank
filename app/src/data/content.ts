@@ -13,6 +13,7 @@ import { useSyncExternalStore } from "react";
 import { db } from "./db";
 import { Offline, request, ServerError } from "./net";
 import { prefs } from "./prefs";
+import { sha256 } from "@/lib/sha256";
 import type { ContentInfo, IndexRow, KbDoc, Question, SubjectId, Taxonomy } from "./types";
 
 export interface Manifest {
@@ -102,8 +103,8 @@ const has = async (key: string) => (await db.cfile.where("key").equals(key).coun
 // ---------- manifest ----------
 
 async function hashText(text: string): Promise<string> {
-  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  const d = await sha256(new TextEncoder().encode(text));
+  return Array.from(d, (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
 }
 
 let active: Stored | null = null;

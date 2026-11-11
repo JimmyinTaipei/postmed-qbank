@@ -18,10 +18,11 @@ def make_hash(password: str, salt: bytes | None = None) -> str:
     return f"pbkdf2_sha256${ITERATIONS}${base64.b64encode(salt).decode()}${base64.b64encode(dk).decode()}"
 
 
-def main():
-    pw = getpass.getpass("新密碼（建議 4 個以上的詞組成的長密語）：", stream=sys.stderr)
-    if len(pw) < 12:
-        print("太短了：至少 12 個字元。", file=sys.stderr)
+def main(min_len: int = 12):
+    prompt = "新密碼（建議 4 個以上的詞組成的長密語）：" if min_len >= 12 else "本機測試版的密碼（長度不限）："
+    pw = getpass.getpass(prompt, stream=sys.stderr)
+    if len(pw) < min_len:
+        print("沒有輸入密碼。" if min_len <= 1 else f"太短了：至少 {min_len} 個字元。", file=sys.stderr)
         return 1
     if getpass.getpass("再輸入一次：", stream=sys.stderr) != pw:
         print("兩次不一樣。", file=sys.stderr)

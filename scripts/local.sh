@@ -3,7 +3,7 @@
 # 完全不連 Cloudflare，不會動到正式站或護理站。用法見 docs/本機測試步驟.md。
 #
 #   scripts/local.sh password   設定本機測試版的登入密碼（只存在 worker/.dev.vars，和正式站無關）
-#   scripts/local.sh start      建置 App → 建立本機資料表 → 啟動 http://localhost:8787（按 Ctrl-C 停止）
+#   scripts/local.sh start      建置 App → 建立本機資料表 → 啟動 http://localhost:8787，同一個 Wi-Fi 的 iPad 也連得到（按 Ctrl-C 停止）
 #   scripts/local.sh publish    把主檔的題庫發佈到本機測試版（另開一個終端機視窗執行）
 #   scripts/local.sh pmq …      對本機測試版執行 pmq，例如  scripts/local.sh pmq usage、scripts/local.sh pmq backup now
 #   scripts/local.sh reset      刪掉本機測試版的所有資料（作答、題庫內容）；下次 start 從空的開始
@@ -33,8 +33,8 @@ admin_token() { grep -E '^ADMIN_TOKEN=' "${VARS}" | head -1 | cut -d= -f2-; }
 cmd=${1:-}
 case "${cmd}" in
   password)
-    echo "→ 設定本機測試版的密碼（輸入兩次，畫面不顯示；至少 12 個字元）"
-    hash=$("${HERE}/bin/pmq" auth hash) || die "沒有設定"
+    echo "→ 設定本機測試版的密碼（輸入兩次，畫面不顯示；長度不限）"
+    hash=$("${HERE}/bin/pmq" auth hash --local) || die "沒有設定"
     tok=""
     [ -f "${VARS}" ] && tok=$(admin_token || true)
     [ -n "${tok}" ] || tok=$(openssl rand -hex 24)
@@ -52,11 +52,13 @@ case "${cmd}" in
     echo "→ 建立本機資料表"
     wr d1 migrations apply postmed-qbank --local >/dev/null || die "本機資料表建立失敗"
     ok "本機資料表就緒"
+    lan=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)
     echo
-    echo "  本機測試版：http://localhost:${PORT}   （停止：在這個視窗按 Ctrl-C）"
-    echo "  第一次用要先在另一個終端機視窗執行  scripts/local.sh publish"
+    echo "  Mac 的瀏覽器：http://localhost:${PORT}"
+    [ -n "${lan}" ] && echo "  iPad（同一個 Wi-Fi）：http://${lan}:${PORT}   （沒有離線功能，見 docs/本機測試步驟.md）"
+    echo "  停止：在這個視窗按 Ctrl-C。第一次用要先在另一個終端機視窗執行  scripts/local.sh publish"
     echo
-    wr dev --port "${PORT}" --ip 127.0.0.1
+    wr dev --port "${PORT}" --ip 0.0.0.0
     ;;
 
   publish|pmq)

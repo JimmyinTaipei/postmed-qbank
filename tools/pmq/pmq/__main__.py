@@ -35,6 +35,7 @@ def main(argv=None):
     rs.add_argument("--url")
     au = sub.add_parser("auth", help="pmq auth hash：把密碼轉成 Worker 的 AUTH_HASH（只印雜湊，不存密碼）")
     au.add_argument("what", choices=["hash"])
+    au.add_argument("--local", action="store_true", help="本機測試版用：不限密碼長度")
     args = ap.parse_args(argv)
     cfg = Config()
     cfg.reports.mkdir(parents=True, exist_ok=True)
@@ -84,7 +85,7 @@ def main(argv=None):
         return restore_sqlite(cfg, args.zip, args.sqlite) if args.sqlite else restore_remote(cfg, args.zip, url)
     if args.cmd == "auth":
         from .authhash import main as hash_main
-        return hash_main()
+        return hash_main(min_len=1 if args.local else 12)
 
 
 if __name__ == "__main__":
