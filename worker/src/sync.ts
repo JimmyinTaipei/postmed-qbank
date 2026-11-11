@@ -30,7 +30,7 @@ function upsertSql(t: SyncTable): string {
 
 const SQL = Object.fromEntries(SYNC_TABLES.map((t) => [t.name, upsertSql(t)]));
 
-function bindValues(t: SyncTable, row: Record<string, unknown>): unknown[] {
+export function bindValues(t: SyncTable, row: Record<string, unknown>): unknown[] {
   const r = pickCols(t, row);
   return t.cols.map((c) => {
     const v = r[c];

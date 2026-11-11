@@ -29,13 +29,13 @@ export interface Rating {
 }
 
 /** 複習卡片：點卡片或按空白鍵翻面；翻面後才出現四顆評分鈕。 */
-export function ReviewCard({ front, back, figs, flipped, onFlip, ratings, onRate }: { front: string; back: string; figs?: Fig[]; flipped: boolean; onFlip: () => void; ratings: Rating[]; onRate: (v: Rating["value"]) => void }) {
+export function ReviewCard({ front, back, figs, flipped, onFlip, ratings, onRate, bigFront }: { front: string; back: string; figs?: Fig[]; flipped: boolean; onFlip: () => void; ratings: Rating[]; onRate: (v: Rating["value"]) => void; /** 正面只是一個詞（單字卡）：放大顯示 */ bigFront?: boolean }) {
   return (
     <div className="space-y-3">
       <Card as="article" className="flex min-h-64 flex-col">
         <div className="flex-1 p-5 sm:p-6">
-          <Markdown text={front} figs={figs} role="q" />
-          {flipped && (
+          <Markdown text={front} figs={figs} role="q" className={bigFront ? "text-display font-semibold text-ink-strong" : undefined} />
+          {flipped && back.trim() && (
             <div className="anim-rise mt-5 border-t border-line pt-5">
               <Markdown text={back} figs={figs} role="sol" />
             </div>
@@ -229,13 +229,13 @@ export function MarkdownEditor({ value, onChange, figs, role = "sol", label = "M
     });
   };
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <div>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="min-w-0">
         <label htmlFor={id} className="mb-1.5 block text-meta font-medium text-ink-muted">{label}</label>
         <textarea ref={ref} id={id} data-autofocus value={value} onChange={(e) => onChange(e.target.value)} onPaste={onPaste} spellCheck={false} autoCapitalize="none" autoCorrect="off" className={cx("block w-full resize-y rounded-btn border border-line-strong bg-card p-3 font-mono leading-relaxed", minRows === "short" ? "min-h-40" : "min-h-72 lg:min-h-[60dvh]")} />
         <p className="mt-1.5 text-meta text-ink-muted">從 ChatGPT、Claude 網頁複製的回答，貼上時會自動轉成 Markdown（公式變成 $…$）。</p>
       </div>
-      <div>
+      <div className="min-w-0">
         <div className="mb-1.5 text-meta font-medium text-ink-muted">預覽</div>
         <div className="min-h-24 rounded-btn border border-line p-3" aria-live="polite">
           <Markdown text={value} figs={figs} role={role} />

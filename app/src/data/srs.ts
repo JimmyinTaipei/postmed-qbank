@@ -110,7 +110,7 @@ export async function reviewQueue(now = Date.now()): Promise<ReviewQueue> {
   const cfg = await srsConfig();
   const today = startOfDay(now);
   const tomorrow = today + DAY_MS;
-  const logs = await db.review_log.where("reviewed_at").aboveOrEqual(today).toArray();
+  const logs = (await db.review_log.where("reviewed_at").aboveOrEqual(today).toArray()).filter((l) => l.item.startsWith("q:"));
   const modes = await db.attempt.bulkGet(logs.map((l) => l.attempt_id ?? ""));
   let reviews = 0;
   let news = 0;
@@ -119,7 +119,8 @@ export async function reviewQueue(now = Date.now()): Promise<ReviewQueue> {
     if (l.state_before === 0) news++;
     else reviews++;
   });
-  const all = await db.srs_state.toArray();
+  // 卡片（card:…）另外排（./cards.ts），這裡只有題目
+  const all = await db.srs_state.where("item").startsWith("q:").toArray();
   const live = all.filter((s) => !s.suspended);
   const due = live.filter((s) => s.state !== 0 && s.due < tomorrow).sort((a, b) => a.due - b.due);
   const fresh = live.filter((s) => s.state === 0).sort((a, b) => a.updated_at - b.updated_at);
@@ -136,11 +137,11 @@ export async function reviewQueue(now = Date.now()): Promise<ReviewQueue> {
   };
 }
 
-/** 未來幾天每天到期的題數（第 0 天含逾期）。 */
-export async function dueForecast(days: number, now = Date.now()): Promise<number[]> {
+/** 未來幾天每天到期的題數（第 0 天含逾期）。prefix：只算題目（"q:"）或卡片（"card:"）。 */
+export async function dueForecast(days: number, now = Date.now(), prefix = "q:"): Promise<number[]> {
   const today = startOfDay(now);
   const out = new Array<number>(days).fill(0);
-  await db.srs_state.each((s) => {
+  await db.srs_state.where("item").startsWith(prefix).each((s) => {
     if (s.suspended || s.state === 0) return;
     const i = Math.max(0, Math.floor((startOfDay(s.due) - today) / DAY_MS));
     if (i < days) out[i]++;
@@ -179,6 +180,8 @@ export const srs = {
     const logs = await db.review_log.toArray();
     const by = new Map<string, ReviewLog[]>();
     for (const l of logs) by.set(l.item, [...(by.get(l.item) ?? []), l]);
+    // 從 Anki 搬來的卡片：排程沿用 Anki 的 FSRS 狀態，用網站的參數重播 Anki 的紀錄會算出不同的到期日，所以不重算
+    for (const [item, list] of [...by]) if (list.some((l) => l.device === "anki")) by.delete(item);
     let changed = 0;
     const t = Date.now();
     await db.transaction("rw", db.srs_state, db.outbox, async () => {

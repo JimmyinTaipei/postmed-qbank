@@ -1,7 +1,8 @@
 // 題目右上 ⋯ 選單的共用項目（刷題畫面與單題頁）。規格書 §9.2：存疑・編輯・加入複習・標為已確認；
 // 第 2 階段加上：已掌握（移出錯題本）、恢復追蹤（取消「粗心錯，不追蹤」，§5.3）。
 
-import { attempts, content, flags, patches, srs, useFlags, useQuestion, useSrsState, wrongBook, type ItemKey } from "@/data";
+import { useNavigate } from "react-router-dom";
+import { answerText, attempts, content, flags, patches, srs, useFlags, useQuestion, useSrsState, wrongBook, type ItemKey } from "@/data";
 import type { MenuItem } from "@/ui/overlays";
 import { useToast } from "@/ui/overlays";
 import { useEditor } from "./EditQuestion";
@@ -11,6 +12,7 @@ export function useQuestionMenu(item: ItemKey, id: string): MenuItem[] {
   const st = useSrsState(item);
   const toast = useToast();
   const edit = useEditor();
+  const nav = useNavigate();
   const q = useQuestion(id).data;
   const verified = !!q && typeof q === "object" && q.sol_meta.human_verified;
   const inReview = !!st && !st.suspended;
@@ -48,6 +50,19 @@ export function useQuestionMenu(item: ItemKey, id: string): MenuItem[] {
           },
         },
   ];
+  items.push(
+    q && typeof q === "object"
+      ? {
+          label: "做成卡片",
+          icon: "list",
+          onSelect: () => {
+            const ans = answerText(q);
+            const back = [ans && `**答案** ${ans}`, q.idea && `**思路**\n\n${q.idea}`, q.sol && `**詳解**\n\n${q.sol}`].filter(Boolean).join("\n\n");
+            nav("/cards/new", { state: { kind: "basic", front: q.ques, back, origin: { from: "q", id } } });
+          },
+        }
+      : { label: "做成卡片", icon: "list", disabledReason: "題目還沒載入" },
+  );
   if (flag.wrong)
     items.push({
       label: "已掌握（移出錯題本）",

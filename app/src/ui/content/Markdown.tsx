@@ -5,6 +5,7 @@ import { content, type Fig } from "@/data";
 import { cx } from "../primitives";
 import { useFigureViewer } from "./FigureViewer";
 import { pickFig, renderMarkdown } from "./render";
+import { playSound } from "./sound";
 
 interface Props {
   text: string;
@@ -36,6 +37,12 @@ export const Markdown = memo(function Markdown({ text, figs, role = "q", tight, 
       return true;
     };
     const click = (e: MouseEvent) => {
+      const snd = (e.target as HTMLElement | null)?.closest?.<HTMLElement>(".snd");
+      if (snd && el.contains(snd)) {
+        e.stopPropagation();
+        void playSound(snd.dataset.snd ?? "");
+        return;
+      }
       if (openFig(e.target)) {
         e.stopPropagation(); // 圖在選項裡時，點圖是放大，不是選這個選項
         return;

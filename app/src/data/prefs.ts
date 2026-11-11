@@ -66,6 +66,20 @@ export const prefs = {
   setOffline(subject: string, on: boolean) {
     write("pmq.offline." + subject, on ? "1" : "0");
   },
+  /** 卡片翻面時自動播放背面的聲音（第 5 階段；預設開，和 Anki 一樣） */
+  cardAutoplay(): boolean {
+    return read("pmq.cardAutoplay") !== "0";
+  },
+  setCardAutoplay(on: boolean) {
+    write("pmq.cardAutoplay", on ? "1" : "0");
+  },
+  /** 上次新增卡片用的牌組 */
+  lastDeck(): string | null {
+    return read("pmq.lastDeck");
+  },
+  setLastDeck(id: string) {
+    write("pmq.lastDeck", id);
+  },
   subscribe(fn: () => void) {
     listeners.add(fn);
     return () => listeners.delete(fn);
@@ -86,4 +100,7 @@ export function useFigInvert(): boolean {
 }
 export function useShowUnverified(): boolean {
   return useSyncExternalStore(prefs.subscribe, prefs.showUnverified);
+}
+export function useCardAutoplay(): boolean {
+  return useSyncExternalStore(prefs.subscribe, prefs.cardAutoplay);
 }

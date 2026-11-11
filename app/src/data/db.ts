@@ -4,7 +4,7 @@
 // 第 1B 階段（版本 2）加了：cfile（下載到裝置的內容包檔案）、kv（同步游標、目前的 manifest 等本機狀態）。
 
 import Dexie, { type Table } from "dexie";
-import type { Attempt, ContentPatch, Flag, Highlight, Note, ReviewLog, Session, Setting, SrsState } from "./types";
+import type { Attempt, Card, ContentPatch, Deck, Flag, Highlight, Media, Note, ReviewLog, Session, Setting, SrsState } from "./types";
 export type { SrsState } from "./types";
 
 /** 待送佇列的一筆：哪張表的哪一列（主鍵）。送出時才讀那一列目前的值，同一列改很多次只送最後一次。 */
@@ -39,6 +39,9 @@ class PmqDB extends Dexie {
   note!: Table<Note, string>;
   highlight!: Table<Highlight, string>;
   content_patch!: Table<ContentPatch, string>;
+  deck!: Table<Deck, string>;
+  card!: Table<Card, string>;
+  media!: Table<Media, string>;
   outbox!: Table<OutboxEntry, number>;
   cfile!: Table<ContentFile, string>;
   kv!: Table<Kv, string>;
@@ -64,6 +67,10 @@ class PmqDB extends Dexie {
     this.version(2).stores({
       cfile: "key",
       kv: "key",
+    });
+    // 第 5 階段：卡片依牌組列出、依更新時間排序
+    this.version(3).stores({
+      card: "id, deck_id, updated_at",
     });
   }
 }

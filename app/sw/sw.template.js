@@ -2,7 +2,7 @@
 //
 // - App 外殼（index.html、/assets/*）：安裝時全部先存；之後 /assets/* 一律先用快取（檔名含雜湊）。
 // - 網頁導覽：先上網（5 秒逾時），連不上就用快取的 index.html —— 所以飛航模式也能開 App。
-// - 圖（/a/*）：看過就存，之後離線也看得到。
+// - 圖（/a/*、卡片的 /m/* 圖）：看過就存，之後離線也看得到。
 // - 內容包（/c/*）與 API 不經過這裡：內容包由 App 存在 IndexedDB。
 
 const VERSION = "__VERSION__";
@@ -86,4 +86,6 @@ self.addEventListener("fetch", (event) => {
   if (req.mode === "navigate") return event.respondWith(navigate(req));
   if (p.startsWith("/assets/") || PRECACHE.includes(p)) return event.respondWith(cacheFirst(req, SHELL));
   if (p.startsWith("/a/")) return event.respondWith(cacheFirst(req, IMG));
+  // 卡片的圖（/m/*.png 等）同上；卡片的聲音不進離線快取（規格書 §9.5），直接走網路
+  if (p.startsWith("/m/") && !/\.(mp3|m4a|aac|wav|ogg|oga|opus|flac)$/i.test(p)) return event.respondWith(cacheFirst(req, IMG));
 });

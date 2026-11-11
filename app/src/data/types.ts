@@ -360,6 +360,58 @@ export interface Setting {
   seq?: number;
 }
 
+// ---------- 卡片（第 5 階段，規格書 §9.5） ----------
+
+export interface Deck {
+  id: string;
+  name: string; // 這一層的名稱（不含上層）
+  subject: string | null;
+  parent: string | null;
+  updated_at: number;
+  deleted: 0 | 1;
+  seq?: number;
+}
+
+/** basic＝問答；reverse＝正反兩張（同一則筆記的兩面互換）；cloze＝克漏字（遮第 ord+1 個 {{cN::…}}）。 */
+export type CardKind = "basic" | "reverse" | "cloze";
+
+export interface CardOrigin {
+  from: "anki" | "site" | "q" | "kb" | "tsv";
+  /** 同一則筆記的卡片共用：Anki 的 guid，或網站產生的 note ID。編輯時一起改。 */
+  guid?: string;
+  note?: string;
+  ord?: number;
+  model?: string;
+  deck?: string;
+  nid?: number;
+  cid?: number;
+  /** 由題目做成：題目 ID；由筆記做成：kb 文件與區塊 */
+  id?: string;
+  doc?: string;
+  bid?: string;
+}
+
+export interface Card {
+  id: string;
+  deck_id: string;
+  kind: CardKind;
+  front_md: string;
+  back_md: string;
+  tags: string[] | null;
+  origin: CardOrigin | null;
+  updated_at: number;
+  deleted: 0 | 1;
+  seq?: number;
+}
+
+export interface Media {
+  sha: string;
+  mime: string | null;
+  bytes: number | null;
+  created_at: number | null;
+  seq?: number;
+}
+
 export type ThemePref = "system" | "light" | "dark";
 
 export type SyncState =

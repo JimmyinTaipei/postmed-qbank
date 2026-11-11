@@ -81,11 +81,13 @@
 | 樣板 | 元件 | 示範頁 | 接功能的階段 |
 |---|---|---|---|
 | 清單頁＋搜尋列 | `SearchBar`、`ListCard`、`ListRow` | `/wrong` `/browse` `/patches`（已接） | 2、3（完成） |
-| 複習卡片 | `ReviewCard`（翻面、四顆評分鈕） | `/dev/ui`（題目的複習改用刷題畫面；卡片在第 5 階段用） | 5 |
+| 複習卡片 | `ReviewCard`（翻面、四顆評分鈕；`back` 空的就不畫分隔線；`bigFront` 讓單字卡正面用大字） | `/cards/review`（全螢幕、不在外框裡；空白鍵翻面、1–4 評分） | 5（完成） |
+| 卡片與牌組 | 牌組樹用 `ListCard`＋`ListRow`（左邊收合鈕、右邊今天要出的張數 `Badge`）；卡片頁的標籤 `Badge` 要能換行（`whitespace-normal [overflow-wrap:anywhere]`） | `/cards` `/cards/d/:deckId` `/cards/c/:cardId` | 5（完成） |
+| 卡片內容 | `Markdown` 認得 `![](m/…)`（`.card-img`）、`[sound:m/…]`（`.snd` 喇叭鈕，點了才下載）、`<div class="card-label">`（欄位小標）；克漏字由 `cardFaces()` 先換成 `.cloze`／`.cloze-a`（公式裡用 `\boxed`／`\color`） | 卡片頁、複習畫面、編輯預覽 | 5（完成） |
 | 原卷方格、模擬考計時列 | `PaperGrid`、`ExamTimerBar`（`remainingS = null` 時是不計時、顯示已用時間） | `/papers`、模擬考畫面 | 2（完成） |
 | 圖表卡 | `ChartCard`、`BarList`、`ColumnChart`、`HeatTable`（`rowName` 給列的顯示名稱） | `/stats` `/analysis` | 2（完成） |
 | 資料庫閱讀頁 | `KbBlocks`（收合；編輯模式下每個區塊一個 ✎ `Menu`，項目由頁面用 `editMenu(b)` 給；`marks` 顯示修訂標記「已修訂／新增／刪除・待寫回／已寫回・待發佈／衝突／修訂待處理」，刪除待寫回的區塊加 `.kb-deleted` 淡化＋刪除線）、`HighlightPalette`、`KbHighlightLayer` | `/kb` `/kb/:subject/:doc` `/kb/new/:id`（網站上新增的筆記） | 4（完成） |
-| 編輯面板 | `EditPanel`／`MarkdownEditor`（原始碼＋即時預覽＋貼上轉換） | 題目編輯（`pages/EditQuestion.tsx`）、筆記閱讀頁的編輯區塊／插入列點、新筆記草稿頁 | 3、4（完成） |
+| 編輯面板 | `EditPanel`／`MarkdownEditor`（原始碼＋即時預覽＋貼上轉換；兩欄都 `min-w-0`，超長字或公式不會撐破頁面） | 題目編輯（`pages/EditQuestion.tsx`）、筆記閱讀頁的編輯區塊／插入列點、新筆記草稿頁、卡片編輯 | 3、4、5（完成） |
 | 個人筆記區、手寫區外框 | `QuestionView` 最下面兩個收合區 | 任何一題作答後 | 3（筆記完成）、6 |
 | 各種狀態 | `EmptyState`、`Skeleton`、`Notice`、`SyncStatus` | `/dev/ui`「狀態」 | — |
 

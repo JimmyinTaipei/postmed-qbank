@@ -16,6 +16,7 @@ import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
 import { More } from "./pages/More";
 import { KbDraftPage, KbIndex, KbReaderPage } from "./pages/Kb";
+import { CardEditPage, CardPage, CardReviewPage, CardsIndex, DeckPage } from "./pages/Cards";
 import { PatchesPage } from "./pages/Patches";
 import { EditorProvider } from "./pages/EditQuestion";
 import { ReviewPage } from "./pages/Review";
@@ -48,6 +49,7 @@ export function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/s/:sessionId" element={<SessionPlayer />} />
+            <Route path="/cards/review" element={<CardReviewPage />} />
             <Route element={<AppShell />}>
               <Route index element={<Today />} />
               <Route path="/practice" element={<PracticeSetup />} />
@@ -57,6 +59,11 @@ export function App() {
               <Route path="/kb" element={<KbIndex />} />
               <Route path="/kb/new/:id" element={<KbDraftPage />} />
               <Route path="/kb/:subject/:doc" element={<KbReaderPage />} />
+              <Route path="/cards" element={<CardsIndex />} />
+              <Route path="/cards/d/:deckId" element={<DeckPage />} />
+              <Route path="/cards/new" element={<CardEditPage />} />
+              <Route path="/cards/c/:cardId" element={<CardPage />} />
+              <Route path="/cards/c/:cardId/edit" element={<CardEditPage />} />
               <Route path="/more" element={<More />} />
               <Route path="/wrong" element={<WrongBookPage />} />
               <Route path="/browse" element={<BrowsePage />} />

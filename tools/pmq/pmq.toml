@@ -35,3 +35,53 @@ ENG = "05_英文"
 [site]
 # 第一次部署後，把 workers.dev 網址填在這裡（docs/部署步驟.md）。也可用環境變數 PMQ_URL 或 --url 覆寫。
 url = ""
+
+[anki]
+# 第 5 階段：pmq anki import 預設匯入的牌組（含子牌組；2026-11-11 使用者決定，docs/第5階段_Anki檢查報告.md）。
+# 指令列用 --deck 指定時以指令列為準。
+import = [
+  "05_English::1_高中核心6000單",
+  "05_English::2_補習班講義",
+  "05_English::3_GRE紅寶書",
+  "05_English::4_TOEIC",
+  "03_Physics::Ch0 Math, Constants & Units",
+  "03_Physics::Ch01 一維運動", "03_Physics::Ch02 二維運動", "03_Physics::Ch03 牛頓三定律之應用",
+  "03_Physics::Ch04 功與能", "03_Physics::Ch05 質心運動及動量守恆", "03_Physics::Ch06 轉動與滾動",
+  "03_Physics::Ch07 震盪", "03_Physics::Ch08 重力場及重力位能", "03_Physics::Ch09 電場",
+  "03_Physics::Ch10 電位能與電位", "03_Physics::Ch11 電容器與電容", "03_Physics::Ch12 動電學",
+  "03_Physics::Ch13 磁場", "03_Physics::Ch14 載流導線四周建立磁場", "03_Physics::Ch29 特殊相對論",
+  "03_Physics::Ch30 量子物理",
+  "03_Physics::Other Resources::公式整理",
+]
+
+# Anki 最上層牌組 → 網站科目
+[anki.subjects]
+"01_Biology" = "BIO"
+"02_Biochemistry" = "BCH"
+"03_Physics" = "PHY"
+"04_Chemistry" = "CHE"
+"05_English" = "ENG"
+
+# 欄位的小標題（空字串＝不加標題）。背面第一個欄位一律不加。
+[anki.labels]
+"Extra" = "補充"
+"Back Extra" = "補充"
+"Source" = "出處"
+"Image" = ""
+"Back" = ""
+
+# 個別筆記類型：正面放哪些欄位、背面依序放哪些欄位、欄位的小標題。沒列的類型照 Anki 樣板自動判斷。
+[anki.models."0_後醫單字基本型"]
+front = ["Word"]
+back = ["Part of Speech", "Meaning and Definition", "Sentence", "Memo & Confusable", "Derivative",
+        "Synonyms", "Antonyms", "Prefix & Roots", "Image", "Source"]
+
+[anki.models."0_後醫單字基本型".labels]
+"Part of Speech" = ""
+"Meaning and Definition" = ""
+"Sentence" = "例句"
+"Memo & Confusable" = "辨析"
+"Derivative" = "衍生字"
+"Synonyms" = "同義字"
+"Antonyms" = "反義字"
+"Prefix & Roots" = "字根字首"

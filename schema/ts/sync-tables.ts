@@ -85,6 +85,31 @@ export const SYNC_TABLES: SyncTable[] = [
     order: ["updated_at", "device"],
   },
   {
+    // 第 5 階段：卡片。牌組與卡片「較新者勝」；媒體只增（檔案本體在 R2 m/<sha>.<副檔名>，內容永不變）。
+    name: "deck",
+    pk: ["id"],
+    cols: ["id", "name", "subject", "parent", "updated_at", "deleted"],
+    json: [],
+    kind: "lww",
+    order: ["updated_at", "name"],
+  },
+  {
+    name: "card",
+    pk: ["id"],
+    cols: ["id", "deck_id", "kind", "front_md", "back_md", "tags", "origin", "updated_at", "deleted"],
+    json: ["tags", "origin"],
+    kind: "lww",
+    order: ["updated_at", "front_md"],
+  },
+  {
+    name: "media",
+    pk: ["sha"],
+    cols: ["sha", "mime", "bytes", "created_at"],
+    json: [],
+    kind: "append",
+    order: [],
+  },
+  {
     name: "setting",
     pk: ["key"],
     cols: ["key", "value", "updated_at"],

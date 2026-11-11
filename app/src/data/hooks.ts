@@ -167,8 +167,8 @@ export function useReviewQueue(): ReviewQueue | undefined {
   return useLiveQuery(() => reviewQueue());
 }
 
-export function useDueForecast(days: number): number[] | undefined {
-  return useLiveQuery(() => dueForecast(days), [days]);
+export function useDueForecast(days: number, prefix: "q:" | "card:" = "q:"): number[] | undefined {
+  return useLiveQuery(() => dueForecast(days, Date.now(), prefix), [days, prefix]);
 }
 
 export function useSrsConfig(): SrsConfig | undefined {

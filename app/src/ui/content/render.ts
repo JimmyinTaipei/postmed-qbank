@@ -12,12 +12,18 @@ import type { Fig } from "@/data";
 
 const md = new MarkdownIt({ html: true, breaks: true, linkify: false, typographer: false });
 
-// 圖：![alt](fig:<fid>) → 佔位字；其他來源的圖一律不顯示（主檔的相對路徑在網站上無效）
+// 圖：![alt](fig:<fid>) → 佔位字；卡片的圖 ![](m/<sha256>.<副檔名>)（第 5 階段）→ 另一種佔位字；
+// 其他來源的圖一律不顯示（主檔的相對路徑在網站上無效）
+const MEDIA = /^m\/[0-9a-f]{64}\.[a-z0-9]{2,5}$/;
 md.renderer.rules.image = (tokens, idx) => {
   const src = String(tokens[idx].attrGet("src") ?? "");
   const m = /^fig:([0-9A-Za-z_-]+)$/.exec(src);
-  return m ? `@@F${m[1]}@@` : "";
+  if (m) return `@@F${m[1]}@@`;
+  return MEDIA.test(src) ? `@@G${src.slice(2)}@@` : "";
 };
+
+// 卡片的聲音：[sound:m/<sha256>.mp3] → 播放鈕（點了才下載，不進離線快取，規格書 §9.5）
+const SOUND = /\[sound:(m\/[0-9a-f]{64}\.[a-z0-9]{2,5})\]/g;
 
 const ALLOWED_TAGS = [
   "p", "br", "strong", "b", "em", "i", "u", "s", "del", "sub", "sup", "mark", "code", "pre", "blockquote",
@@ -26,6 +32,8 @@ const ALLOWED_TAGS = [
 const ALLOWED_ATTR = ["href", "colspan", "rowspan", "class", "start", "title"];
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+const SPEAKER = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>';
 
 const mathCache = new Map<string, string>();
 
@@ -91,6 +99,7 @@ export function renderMarkdown(text: string, o: RenderOptions): string {
     last = b;
   }
   src += text.slice(last);
+  src = src.replace(SOUND, (_, m: string) => `@@S${m.slice(2)}@@`);
 
   // 2. Markdown → HTML
   let html = md.render(src);
@@ -115,5 +124,7 @@ export function renderMarkdown(text: string, o: RenderOptions): string {
     return renderMath(m.tex, true);
   });
   html = html.replace(/@@F([0-9A-Za-z_-]+)@@/g, (_, fid: string) => renderFig(fid, o));
+  html = html.replace(/@@G([0-9a-f]{64}\.[a-z0-9]{2,5})@@/g, (_, f: string) => `<img class="card-img" src="/m/${f}" alt="" decoding="async" loading="lazy" draggable="false">`);
+  html = html.replace(/@@S([0-9a-f]{64}\.[a-z0-9]{2,5})@@/g, (_, f: string) => `<button type="button" class="snd" data-snd="/m/${f}" aria-label="播放聲音">${SPEAKER}</button>`);
   return html;
 }

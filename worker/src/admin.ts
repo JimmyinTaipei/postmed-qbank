@@ -4,9 +4,11 @@
 import type { Context } from "hono";
 import type { App } from "./env";
 import { buildExportZip, nightlyBackup, restore } from "./backup";
+import { bindValues, MAX_PUSH, rowFromDb } from "./sync";
+import { invalid, SYNC_TABLE } from "../../schema/ts/sync-tables";
 import { contentType, sha256Hex } from "./util";
 
-const BLOB_KEY = /^(c\/(?!manifest\.json$)(?!manifests\/)[^\u0000]+\.json|a\/[0-9a-f]{64}\.[a-z0-9]{2,5})$/;
+const BLOB_KEY = /^(c\/(?!manifest\.json$)(?!manifests\/)[^\u0000]+\.json|[am]\/[0-9a-f]{64}\.[a-z0-9]{2,5})$/;
 const HASHED_C = /-([0-9a-f]{12})\.json$/;
 
 async function listAll(c: Context<App>, prefix: string): Promise<Map<string, number>> {
@@ -24,8 +26,8 @@ async function listAll(c: Context<App>, prefix: string): Promise<Map<string, num
 export async function have(c: Context<App>): Promise<Response> {
   const body = await c.req.json<{ keys?: string[] }>().catch(() => ({}) as { keys?: string[] });
   const keys = Array.isArray(body.keys) ? body.keys.filter((k) => typeof k === "string") : [];
-  const [cs, as] = await Promise.all([listAll(c, "c/"), listAll(c, "a/")]);
-  return c.json({ missing: keys.filter((k) => !cs.has(k) && !as.has(k)) });
+  const [cs, as, ms] = await Promise.all([listAll(c, "c/"), listAll(c, "a/"), keys.some((k) => k.startsWith("m/")) ? listAll(c, "m/") : new Map()]);
+  return c.json({ missing: keys.filter((k) => !cs.has(k) && !as.has(k) && !ms.has(k)) });
 }
 
 /** PUT /api/admin/blob/<key>：檔名裡的雜湊必須與內容相符，傳錯的檔進不來。 */
@@ -34,7 +36,7 @@ export async function putBlob(c: Context<App>): Promise<Response> {
   if (!BLOB_KEY.test(key)) return c.json({ error: "bad_key", key }, 400);
   const data = new Uint8Array(await c.req.arrayBuffer());
   const sha = await sha256Hex(data);
-  if (key.startsWith("a/")) {
+  if (key.startsWith("a/") || key.startsWith("m/")) {
     if (key.slice(2, 66) !== sha) return c.json({ error: "hash_mismatch", key, sha }, 400);
   } else {
     const m = HASHED_C.exec(key);
@@ -42,6 +44,15 @@ export async function putBlob(c: Context<App>): Promise<Response> {
   }
   await c.env.R2.put(key, data, { httpMetadata: { contentType: contentType(key) }, sha256: sha });
   return c.json({ ok: true, key, bytes: data.length });
+}
+
+/** GET /api/admin/blob/m/<sha>.<ext>：卡片的媒體檔（pmq anki export 打包用）。 */
+export async function getBlob(c: Context<App>): Promise<Response> {
+  const key = decodeURIComponent(new URL(c.req.url).pathname.slice("/api/admin/blob/".length));
+  if (!/^m\/[0-9a-f]{64}\.[a-z0-9]{2,5}$/.test(key)) return c.json({ error: "bad_key", key }, 400);
+  const obj = await c.env.R2.get(key);
+  if (!obj) return c.json({ error: "not_found", key }, 404);
+  return new Response(obj.body, { headers: { "Content-Type": contentType(key) } });
 }
 
 interface Manifest {
@@ -169,4 +180,60 @@ export async function updatePatches(c: Context<App>): Promise<Response> {
     out.push(r.meta.changes ? { id, ok: true } : { id, ok: false, reason: "stale_or_missing" });
   }
   return c.json({ results: out });
+}
+
+// ---------- 卡片匯入（第 5 階段；pmq anki import 用） ----------
+
+const IMPORT_TABLES = new Set(["deck", "card", "media", "srs_state", "review_log"]);
+
+/**
+ * POST /api/admin/rows {mode:"insert"|"upsert", rows:[{table,row}]}，每批最多 500 列。
+ * insert：主鍵已存在就不動（重複匯入不覆寫網站上改過的內容與進度）。
+ * upsert：覆寫（pmq anki import --update，只用在卡片內容）。寫入後由觸發程序給 seq，裝置下次同步拿到。
+ */
+export async function importRows(c: Context<App>): Promise<Response> {
+  const body = await c.req.json<{ mode?: string; rows?: unknown }>().catch(() => ({}) as { mode?: string; rows?: unknown });
+  if (!Array.isArray(body.rows)) return c.json({ error: "bad_request", message: "缺少 rows" }, 400);
+  if (body.rows.length > MAX_PUSH) return c.json({ error: "too_many", message: `每批最多 ${MAX_PUSH} 列` }, 413);
+  const upsert = body.mode === "upsert";
+  const stmts: D1PreparedStatement[] = [];
+  const rejected: { i: number; error: string }[] = [];
+  let inserted = 0;
+  body.rows.forEach((e: unknown, i: number) => {
+    const { table, row } = (e ?? {}) as { table?: string; row?: unknown };
+    const t = typeof table === "string" && IMPORT_TABLES.has(table) ? SYNC_TABLE[table] : undefined;
+    if (!t) return rejected.push({ i, error: "不能匯入這張表" });
+    const bad = invalid(t, row);
+    if (bad) return rejected.push({ i, error: bad });
+    const cols = t.cols.map((x) => `"${x}"`).join(", ");
+    const marks = t.cols.map(() => "?").join(", ");
+    const set = t.cols.filter((x) => !t.pk.includes(x)).map((x) => `"${x}" = excluded."${x}"`).join(", ");
+    const sql = upsert && t.kind === "lww"
+      ? `INSERT INTO ${t.name} (${cols}) VALUES (${marks}) ON CONFLICT(${t.pk.join(", ")}) DO UPDATE SET ${set} RETURNING 1 AS w`
+      : `INSERT OR IGNORE INTO ${t.name} (${cols}) VALUES (${marks}) RETURNING 1 AS w`;
+    stmts.push(c.env.DB.prepare(sql).bind(...bindValues(t, row as Record<string, unknown>)));
+  });
+  if (stmts.length) {
+    const res = await c.env.DB.batch(stmts);
+    // meta.changes 會把觸發程序補 seq 的那次更新也算進去，所以用 RETURNING 的列數
+    for (const r of res) inserted += r.results.length;
+  }
+  return c.json({ ok: true, written: inserted, rejected });
+}
+
+/** GET /api/admin/cards：全部牌組、卡片、卡片的排程與評分紀錄（pmq anki export 用）。 */
+export async function exportCards(c: Context<App>): Promise<Response> {
+  const [decks, cards, srs, logs] = await c.env.DB.batch([
+    c.env.DB.prepare("SELECT * FROM deck WHERE deleted = 0"),
+    c.env.DB.prepare("SELECT * FROM card WHERE deleted = 0"),
+    c.env.DB.prepare("SELECT * FROM srs_state WHERE item LIKE 'card:%'"),
+    c.env.DB.prepare("SELECT * FROM review_log WHERE item LIKE 'card:%' ORDER BY reviewed_at"),
+  ]);
+  const conv = (name: string, rows: unknown[]) => rows.map((r) => rowFromDb(SYNC_TABLE[name], r as Record<string, unknown>));
+  return c.json({
+    decks: conv("deck", decks.results),
+    cards: conv("card", cards.results),
+    srs_state: conv("srs_state", srs.results),
+    review_log: conv("review_log", logs.results),
+  });
 }

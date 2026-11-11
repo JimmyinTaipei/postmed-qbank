@@ -92,3 +92,13 @@ class Remote:
 
     def backup_now(self):
         return self._req("POST", "/api/admin/backup", {})
+
+    # 第 5 階段：卡片匯入匯出
+    def post_rows(self, rows, mode="insert"):
+        return self._req("POST", "/api/admin/rows", {"mode": mode, "rows": rows})
+
+    def get_cards(self):
+        return self._req("GET", "/api/admin/cards")
+
+    def get_blob(self, key):
+        return self._req("GET", "/api/admin/blob/" + urllib.parse.quote(key, safe="/"), raw=True)

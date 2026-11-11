@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { sessions, useActiveSessions, useContentInfo, useFlagCount, useReviewQueue, useSubjectProgress, useTaxonomy, useTodaySummary, type Session } from "@/data";
+import { sessions, useActiveSessions, useCardQueue, useContentInfo, useFlagCount, useReviewQueue, useSubjectProgress, useTaxonomy, useTodaySummary, type Session } from "@/data";
 import { formatAgo, percent } from "@/lib/format";
 import { Icon } from "@/ui/icons";
 import { Dialog } from "@/ui/overlays";
@@ -18,6 +18,7 @@ export function Today() {
   const wrong = useFlagCount("wrong");
   const progress = useSubjectProgress();
   const review = useReviewQueue();
+  const cq = useCardQueue(null);
   const [discard, setDiscard] = useState<Session | null>(null);
   const date = new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric", weekday: "long" });
 
@@ -56,6 +57,12 @@ export function Today() {
           </LinkButton>
           {review && <p className="-mt-3 text-meta text-ink-muted">今天沒有要複習的題目{review.dueTotal > 0 ? "（已達每日上限）" : ""}。</p>}
         </>
+      )}
+
+      {cq && cq.items.length > 0 && (
+        <LinkButton to="/cards/review" block icon="list">
+          複習卡片（{cq.items.length} 張）
+        </LinkButton>
       )}
 
       <section aria-labelledby="h-resume">

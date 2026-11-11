@@ -29,6 +29,7 @@ class Config:
         self.migrations = PROJECT / "worker/migrations"
         self.sample = data.get("sample", {})
         self.kb = data.get("kb", {})
+        self.anki = data.get("anki", {})
         self.project = PROJECT
         self.reports = PROJECT / "reports"
         self.schema = PROJECT / "schema"

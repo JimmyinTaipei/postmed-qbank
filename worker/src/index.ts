@@ -4,7 +4,7 @@
 // 沒有有效 cookie 時，除了登入頁與它需要的幾個靜態檔，其他一律 401（網頁導覽則轉到 /login）。
 
 import { Hono } from "hono";
-import { backupNow, exportZip, getManifest, have, listPatches, putBlob, putManifest, restoreRoute, updatePatches, usage } from "./admin";
+import { backupNow, exportCards, getBlob, exportZip, getManifest, have, importRows, listPatches, putBlob, putManifest, restoreRoute, updatePatches, usage } from "./admin";
 import { checkAdmin, checkSession, listDevices, login, loginStatus, logout, revokeDevice } from "./auth";
 import { buildExportZip, nightlyBackup } from "./backup";
 import type { App, Env } from "./env";
@@ -18,6 +18,7 @@ const CSP = [
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'", // KaTeX 與 React 的 style 屬性
   "img-src 'self' data: blob:",
+  "media-src 'self' blob:",
   "font-src 'self' data:",
   "connect-src 'self'",
   "worker-src 'self'",
@@ -58,6 +59,7 @@ api.use("/api/admin/*", async (c, next) => {
 });
 api.post("/api/admin/have", have);
 api.put("/api/admin/blob/*", putBlob);
+api.get("/api/admin/blob/*", getBlob);
 api.post("/api/admin/manifest", putManifest);
 api.get("/api/admin/manifest", getManifest);
 api.get("/api/admin/export", exportZip);
@@ -66,6 +68,8 @@ api.post("/api/admin/backup", backupNow);
 api.get("/api/admin/usage", usage);
 api.get("/api/admin/patches", listPatches);
 api.post("/api/admin/patches", updatePatches);
+api.post("/api/admin/rows", importRows);
+api.get("/api/admin/cards", exportCards);
 
 api.use("/api/*", async (c, next) => {
   if (c.req.path === "/api/login" || c.req.path.startsWith("/api/admin/")) return next();
@@ -149,7 +153,7 @@ async function handle(req: Request, env: Env, ctx: ExecutionContext): Promise<Re
   }
   if (!session) {
     if (PUBLIC.has(path) || (await loginAllow(env, url.origin)).has(path)) return env.ASSETS.fetch(req);
-    if (!/^\/(c|a|assets)\//.test(path) && wantsHtml(req)) {
+    if (!/^\/(c|a|m|assets)\//.test(path) && wantsHtml(req)) {
       const next = path === "/" ? "" : `?next=${encodeURIComponent(path + url.search)}`;
       return Response.redirect(`${url.origin}/login${next}`, 302);
     }
@@ -157,7 +161,7 @@ async function handle(req: Request, env: Env, ctx: ExecutionContext): Promise<Re
   }
 
   let res: Response;
-  if (path.startsWith("/c/") || path.startsWith("/a/")) {
+  if (path.startsWith("/c/") || path.startsWith("/a/") || path.startsWith("/m/")) {
     let key: string;
     try {
       key = decodeURIComponent(path.slice(1));

@@ -7,6 +7,10 @@ import { Page } from "@/ui/shell";
 
 const GROUPS: { title: string; items: { to: string; label: string; meta: string; icon: IconName; stage?: string }[] }[] = [
   {
+    title: "卡片",
+    items: [{ to: "/cards", label: "卡片", meta: "Anki 搬來的牌組、自己做的卡片", icon: "list" }],
+  },
+  {
     title: "題目",
     items: [
       { to: "/wrong", label: "錯題本", meta: "答錯的題目", icon: "x" },

@@ -361,6 +361,8 @@ export function KbReaderPage() {
     else if (KB_DELETABLE.has(b.type)) items.push({ label: "刪除這個區塊", icon: "trash", danger: true, onSelect: () => setDeleting(base) });
     else items.push({ label: "刪除這個區塊", icon: "trash", disabledReason: "標題不能在網站上刪（會連整節一起刪）" });
     if (conflict) items.push({ label: "到修訂佇列處理衝突", icon: "alert", onSelect: () => nav("/patches") });
+    if (b.md.trim() && b.type !== "html" && b.type !== "code")
+      items.push({ label: "做成卡片", icon: "list", onSelect: () => nav("/cards/new", { state: { kind: "cloze", front: b.md, back: "", origin: { from: "kb", doc: key, bid: b.bid } } }) });
     return items;
   };
 

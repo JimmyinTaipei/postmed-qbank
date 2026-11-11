@@ -3,9 +3,9 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { sessions, useActiveSessions, useDueForecast, useReviewQueue } from "@/data";
+import { sessions, useActiveSessions, useCardQueue, useDueForecast, useReviewQueue } from "@/data";
 import { Icon } from "@/ui/icons";
-import { Button, Card, EmptyState, LinkButton, Notice, Skeleton, Stat } from "@/ui/primitives";
+import { Button, Card, EmptyState, LinkButton, Notice, SectionTitle, Skeleton, Stat } from "@/ui/primitives";
 import { Page } from "@/ui/shell";
 import { ChartCard, ColumnChart } from "@/ui/templates";
 
@@ -14,6 +14,8 @@ export function ReviewPage() {
   const q = useReviewQueue();
   const active = useActiveSessions();
   const forecast = useDueForecast(14);
+  const cq = useCardQueue(null);
+  const cardForecast = useDueForecast(14, "card:");
   const [busy, setBusy] = useState(false);
   const running = active?.find((s) => s.mode === "review");
 
@@ -26,7 +28,7 @@ export function ReviewPage() {
 
   const over = q ? q.dueTotal - q.dueShown : 0;
   return (
-    <Page title="今日複習" subtitle="答錯的題目與手動加入的題目，依記憶曲線排程">
+    <Page title="今日複習" subtitle="題目與卡片，依記憶曲線排程">
       {!q ? (
         <Card className="p-5"><Skeleton lines={3} /></Card>
       ) : (
@@ -64,6 +66,28 @@ export function ReviewPage() {
         </>
       )}
 
+      <section aria-labelledby="h-cards" className="space-y-3">
+        <SectionTitle id="h-cards" action={<LinkButton to="/cards" variant="ghost">所有牌組</LinkButton>}>卡片</SectionTitle>
+        {!cq ? (
+          <Card className="p-5"><Skeleton lines={2} /></Card>
+        ) : cq.dueTotal + cq.newTotal + cq.doneToday.reviews + cq.doneToday.news === 0 ? (
+          <Card><EmptyState icon="list" title="還沒有要複習的卡片">Anki 的牌組搬進來、或自己新增卡片之後，到期的卡會出現在這裡。</EmptyState></Card>
+        ) : (
+          <>
+            <Card className="grid grid-cols-3 gap-4 p-5">
+              <Stat value={cq.dueShown} label="今天要複習" hint={cq.dueTotal > cq.dueShown ? `另有 ${cq.dueTotal - cq.dueShown} 張明天再出` : undefined} />
+              <Stat value={cq.newShown} label="今天的新卡" hint={cq.newTotal > cq.newShown ? `共 ${cq.newTotal.toLocaleString()} 張等著開始` : undefined} />
+              <Stat value={cq.doneToday.reviews + cq.doneToday.news} label="今天已複習" />
+            </Card>
+            {cq.items.length > 0 ? (
+              <LinkButton to="/cards/review" variant={q?.items.length ? "secondary" : "primary"} block icon="repeat">複習卡片（{cq.items.length} 張）</LinkButton>
+            ) : (
+              <p className="text-meta text-ink-muted">今天的卡片複習完了{cq.dueTotal > 0 ? "（已達每日上限）" : ""}。</p>
+            )}
+          </>
+        )}
+      </section>
+
       <ChartCard title="未來兩週到期" subtitle="每天會到期的題數（今天含逾期）">
         {forecast ? (
           <ColumnChart unit="題" data={forecast.map((value, i) => ({ label: i === 0 ? "今" : i % 2 ? "" : `+${i}`, value }))} />
@@ -71,6 +95,12 @@ export function ReviewPage() {
           <Skeleton lines={3} />
         )}
       </ChartCard>
+
+      {cardForecast && cardForecast.some((v) => v > 0) && (
+        <ChartCard title="卡片：未來兩週到期" subtitle="每天會到期的卡片數（今天含逾期）">
+          <ColumnChart unit="張" data={cardForecast.map((value, i) => ({ label: i === 0 ? "今" : i % 2 ? "" : `+${i}`, value }))} />
+        </ChartCard>
+      )}
 
       <p className="flex items-start gap-1.5 text-meta text-ink-muted">
         <Icon name="info" size={14} className="mt-0.5 shrink-0" />

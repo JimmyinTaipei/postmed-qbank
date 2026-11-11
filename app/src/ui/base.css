@@ -375,6 +375,58 @@
   border-radius: var(--r-chip);
   padding: 0.2em 0.6em;
 }
+/* 卡片（第 5 階段）：卡片的圖、聲音鈕、克漏字、欄位小標題 */
+.md .card-img {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  padding: 6px;
+  margin: 0.3em 0;
+}
+.md .snd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 0.2em;
+  vertical-align: middle;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--blue-ink);
+  cursor: pointer;
+}
+.md .snd:hover {
+  background: var(--hover);
+}
+.md .cloze {
+  display: inline-block;
+  padding: 0 0.45em;
+  border-radius: var(--r-chip);
+  background: var(--blue-light);
+  color: var(--blue-ink);
+  font-weight: 600;
+}
+.md .cloze-a {
+  color: var(--blue-ink);
+  font-weight: 600;
+  background: var(--blue-light);
+  border-radius: var(--r-chip);
+  padding: 0 0.2em;
+}
+.md .card-label {
+  margin-top: 1.1em;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
 /* 純黑白線稿可反相。<html data-fig-invert="1"> 由 useTheme 在「深色＋設定開啟」時加上；檢視器自己加 .inverted */
 :root[data-fig-invert="1"] .fig.mono,
 .viewer-stage.inverted {

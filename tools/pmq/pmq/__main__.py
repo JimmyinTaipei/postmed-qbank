@@ -3,7 +3,7 @@
 第 0 階段：check、check math、check answers、sample。
 第 1B 階段：publish、usage、backup pull、restore、auth hash。
 第 3 階段：patches list／pull／resolve。
-第 5 階段：anki inspect。
+第 5 階段：anki inspect／import／export。
 """
 import argparse
 import json
@@ -48,8 +48,12 @@ def main(argv=None):
     au.add_argument("what", choices=["hash"])
     au.add_argument("--local", action="store_true", help="本機測試版用：不限密碼長度")
     an = sub.add_parser("anki", help="pmq anki inspect：只讀檢查 Anki 匯出的 .apkg／.colpkg")
-    an.add_argument("what", choices=["inspect"])
-    an.add_argument("paths", nargs="+", help=".apkg／.colpkg 檔，或放這些檔的資料夾")
+    an.add_argument("what", choices=["inspect", "import", "export"])
+    an.add_argument("paths", nargs="*", help="inspect／import：.apkg／.colpkg 檔或放這些檔的資料夾；export：輸出的 .apkg 路徑")
+    an.add_argument("--deck", action="append", help="import：要匯入的牌組（含子牌組，可重複）；預設讀 pmq.toml [anki] import。export：要匯出的網站牌組名稱")
+    an.add_argument("--dry-run", action="store_true", help="import：只轉換、出預覽（reports/anki_import_preview.md），不上傳")
+    an.add_argument("--update", action="store_true", help="import：已存在的卡片也覆寫內容（進度不動）")
+    an.add_argument("--url")
     args = ap.parse_args(argv)
     cfg = Config()
     cfg.reports.mkdir(parents=True, exist_ok=True)
@@ -75,10 +79,22 @@ def main(argv=None):
         print(md.split("\n## ", 2)[1] if "\n## " in md else md[:2000])
         print(f"報告：{cfg.reports / '驗證報告.md'}")
         return 1 if result["errors"] else 0
-    if args.cmd == "anki":
+    if args.cmd == "anki" and args.what == "inspect":
         from .anki import run_inspect
         out = run_inspect(cfg, args.paths)
         print(f"報告：{out}")
+        return 0
+    if args.cmd == "anki" and args.what == "import":
+        from .anki_import import run_import
+        if not args.paths:
+            ap.error("pmq anki import 要給 .apkg 檔或資料夾")
+        run_import(cfg, args.paths, args.deck, args.dry_run, args.update, args.url or cfg.site_url)
+        return 0
+    if args.cmd == "anki" and args.what == "export":
+        from .anki_export import run_export
+        if len(args.paths) != 1:
+            ap.error("pmq anki export 要給一個輸出檔路徑，例如 ~/Desktop/網站卡片.apkg")
+        run_export(cfg, args.paths[0], args.deck, args.url or cfg.site_url)
         return 0
     if args.cmd == "sample":
         from .sample import make_sample
