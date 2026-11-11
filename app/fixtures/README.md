@@ -1,6 +1,6 @@
 # app/fixtures：介面開發用樣本
 
-由 `bin/pmq sample` 從真實主檔產生（只讀主檔）。除了這份說明與 `CASES.md`，其他檔案不進版本庫；需要時重跑 `bin/pmq sample`（約 1.5 分鐘）。
+由 `bin/pmq sample` 從真實主檔產生（只讀主檔）。**第 1B 階段起 App 不再讀這個資料夾**：畫面的內容一律來自 Worker（`pmq publish` 發佈到 R2 的內容包），`/dev/ui` 的特殊情況題目也改用發佈出去的 `cases` 檔。這裡的樣本只留給測試與離線開發參考。除了這份說明與 `CASES.md`，其他檔案不進版本庫；需要時重跑 `bin/pmq sample`（約 1.5 分鐘）。
 
 ## 版面（與正式內容包相同，規格書 §4.1）
 

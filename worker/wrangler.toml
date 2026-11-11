@@ -1,0 +1,34 @@
+# postmed-qbank 的 Worker 設定（規格書 §2.4、§11）。
+#
+# 硬性規則：name、database_name、bucket_name 三個都必須是 postmed-qbank。
+# scripts/deploy.sh 部署前會檢查，不符就中止。不設定 routes、不綁網域：網址只用 workers.dev。
+
+name = "postmed-qbank"
+main = "src/index.ts"
+compatibility_date = "2026-10-15"
+workers_dev = true
+preview_urls = false
+
+[assets]
+directory = "../app/dist"
+binding = "ASSETS"
+run_worker_first = true
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "postmed-qbank"
+# 第一次部署前，照 docs/部署步驟.md 建立 D1 後，把印出來的 database_id 貼在這裡
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "postmed-qbank"
+
+# 每天 18:00 UTC = 台北 02:00 備份個人資料到 R2（backup/YYYY-MM-DD.ndjson.gz）
+[triggers]
+crons = ["0 18 * * *"]
+
+[observability]
+enabled = true

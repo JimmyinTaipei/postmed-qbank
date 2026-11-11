@@ -165,23 +165,7 @@ def make_sample(cfg):
     files["packs"] = {p: write(f"pack/{p}", {"pack": p, "questions": qs}) for p, qs in sorted(packs.items())}
 
     # notes
-    source_to_id = {}
-    for q in by_sub["BCH"]:
-        parts = q["label"].replace("-", " ").split()
-        s = q["source"]
-        sess = q["id"].split("-")[2] if q["source"]["kind"] == "national" else None
-        try:
-            source_to_id[(s["school"], s["year"], sess, int(s["qno"]))] = q["id"]
-        except (TypeError, ValueError):
-            pass
-    kbb = KbBuilder(cfg, c.assets, c.report, source_to_id)
-    kb_docs = {}
-    for sub, key in (("BCH", "kb_biochem"), ("PHY", "kb_physics")):
-        rel = cfg.sample.get(key)
-        if not rel:
-            continue
-        doc = kbb.build(cfg.notes / rel, sub)
-        kb_docs[f"{sub}/{doc['doc']}"] = doc
+    kb_docs = build_kb_docs(cfg, c)
     files["kb"] = {k: write(f"kb/{k}", d) for k, d in kb_docs.items()}
 
     # assets: sample questions + notes; fallback PNGs only while under budget
@@ -245,6 +229,48 @@ def make_sample(cfg):
         print(f"  {k}: {json.dumps(count_blocks(d['blocks']), ensure_ascii=False)}；圖 {len(d['figs'])}；考古題出處 {len(d['refs'])}（對應不到 {sum(1 for r in d['refs'] if not r['qid'])}）")
     if bad or bad_idx or bad_tax or bad_kb or missing_assets:
         raise SystemExit("樣本沒有通過檢查")
+
+
+def build_kb_docs(cfg, c):
+    """pmq.toml [sample] 指定的兩份筆記 → 區塊樹（第 4 階段做完整的筆記轉接器之前，sample 與 publish 共用）。"""
+    source_to_id = {}
+    for q in c.questions:
+        if q["subject"] != "BCH":
+            continue
+        s = q["source"]
+        sess = q["id"].split("-")[2] if s["kind"] == "national" else None
+        try:
+            source_to_id[(s["school"], s["year"], sess, int(s["qno"]))] = q["id"]
+        except (TypeError, ValueError):
+            pass
+    kbb = KbBuilder(cfg, c.assets, c.report, source_to_id)
+    kb_docs = {}
+    for sub, key in (("BCH", "kb_biochem"), ("PHY", "kb_physics")):
+        rel = cfg.sample.get(key)
+        if not rel:
+            continue
+        doc = kbb.build(cfg.notes / rel, sub)
+        kb_docs[f"{sub}/{doc['doc']}"] = doc
+    return kb_docs
+
+
+def pick_cases(c):
+    """每種特殊情況、每科挑 1–2 題（與 sample 相同的規則，但不受樣本大小限制）。給 /dev/ui 的特殊情況連結用。"""
+    rng = random.Random(SEED)
+    cases = {}
+    for key, desc, pred, sortkey in CASES:
+        for sub in ("PHY", "BCH"):
+            pool = [q for q in c.questions if q["subject"] == sub and pred(q)]
+            if not pool:
+                continue
+            if sortkey is not None:
+                pool.sort(key=lambda q: (-sortkey(q), q["id"]))
+                picks = pool[:1]
+            else:
+                pool.sort(key=lambda q: q["id"])
+                picks = rng.sample(pool, min(2, len(pool)))
+            cases.setdefault(key, {"desc": desc, "ids": []})["ids"] += [q["id"] for q in picks]
+    return cases
 
 
 def _walk(p):

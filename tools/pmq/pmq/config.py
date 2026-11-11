@@ -22,6 +22,9 @@ class Config:
         self.exam_pdfs = rel(p["exam_pdfs"])
         self.content_git = rel(p["content_git"])
         self.cache = exp(p["cache"])
+        self.backup_dir = rel(p.get("backup_dir", "99_封存/題庫網備份"))
+        self.site_url = os.environ.get("PMQ_URL") or data.get("site", {}).get("url", "")
+        self.migrations = PROJECT / "worker/migrations"
         self.sample = data.get("sample", {})
         self.project = PROJECT
         self.reports = PROJECT / "reports"

@@ -2,9 +2,11 @@
 // 介面說明見 ./README.md。
 
 export * from "./types";
-export { content } from "./content";
+export { content, setOffline, useContentStatus, type ContentStatus } from "./content";
 export { attempts, flags, sessions, settings, wipeLocal } from "./personal";
-export { prefs, useFigInvert, useThemePref } from "./prefs";
+export { prefs, useDeviceName, useFigInvert, useOfflinePref, useThemePref } from "./prefs";
+export { startSync, syncNow, useSyncDetail, useSyncState } from "./sync";
+export { auth, type DeviceSession, type LoginResult } from "./auth";
 export * from "./hooks";
 export {
   buildContext,

@@ -20,7 +20,7 @@ export function SessionPlayer() {
     return (
       <Frame>
         <EmptyState title="找不到這個題組" action={<LinkButton to="/practice" variant="primary">重新出題</LinkButton>}>
-          它可能已經被捨棄，或是在另一台裝置上建立的（同步在第 1B 階段開放）。
+          它可能已經被捨棄；若是在另一台裝置上剛建立的，等幾秒同步完成後再開一次。
         </EmptyState>
       </Frame>
     );
@@ -175,7 +175,7 @@ function Stage(p: StageProps) {
   let body: React.ReactNode;
   if (q.loading && q.data === undefined) body = <Skeleton lines={7} className="mt-4" />;
   else if (q.error) body = <EmptyState tone="error" title="讀不到這一題" action={<Button onClick={q.reload}>再試一次</Button>}>{q.error.message}</EmptyState>;
-  else if (q.data === "missing") body = <EmptyState icon="cloudOff" title="本文未下載">這一題（{p.id}）的本文不在這台裝置上，先跳到下一題。</EmptyState>;
+  else if (q.data === "missing") body = <EmptyState icon="cloudOff" title="本文未下載">這一題（{p.id}）的本文不在這台裝置上，現在也連不上伺服器。先跳到下一題，或到設定頁開啟這一科的離線下載。</EmptyState>;
   else if (!q.data) body = <EmptyState title="此題已下架">題庫裡已經沒有 {p.id}。你的作答紀錄仍然保留。</EmptyState>;
   else return <Loaded {...p} q={q.data} />;
   return (

@@ -11,9 +11,15 @@ structure_db_src = "~/Projects/structure_db"
 # 後醫、私醫、後獸醫原卷與答案 PDF（生化答案抽查用；只讀）
 exam_pdfs  = "~/Library/Mobile Documents/com~apple~CloudDocs/後醫/08_考古題與模擬考/81_考古題"
 content_git = "~/Projects/postmed-content.git"
+# pmq backup pull 把個人資料整包存到這裡（規格書 §7.1），只留最近 8 份
+backup_dir = "99_封存/題庫網備份"
 cache      = "~/Library/Caches/postmed-qbank"
 
 [sample]
 # 給介面開發用的兩份筆記（相對 notes）
 kb_biochem = "02_生化/B2_代謝篇/2-3_PDH_TCA_and_Glyoxylate_Cycle.md"
 kb_physics = "03_物理/2_電磁學/Ch12動電學.md"
+
+[site]
+# 第一次部署後，把 workers.dev 網址填在這裡（docs/部署步驟.md）。也可用環境變數 PMQ_URL 或 --url 覆寫。
+url = ""

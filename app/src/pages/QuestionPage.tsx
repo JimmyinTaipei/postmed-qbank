@@ -43,7 +43,7 @@ export function QuestionPage() {
       ) : q.error ? (
         <EmptyState tone="error" title="讀不到這一題" action={<Button onClick={q.reload}>再試一次</Button>}>{q.error.message}</EmptyState>
       ) : q.data === "missing" ? (
-        <Card><EmptyState icon="cloudOff" title="本文未下載">{id} 在題庫索引裡，但本文不在這台裝置上（樣本資料只有部分題目）。</EmptyState></Card>
+        <Card><EmptyState icon="cloudOff" title="本文未下載">{id} 在題庫索引裡，但本文不在這台裝置上，現在也連不上伺服器。連上網路後再開一次，或到設定頁開啟這一科的離線下載。</EmptyState></Card>
       ) : !q.data ? (
         <Card><EmptyState title="找不到這一題">題庫裡沒有 {id}。請確認題號，或這題已經下架。</EmptyState></Card>
       ) : (

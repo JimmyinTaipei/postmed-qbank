@@ -1,4 +1,8 @@
-"""pmq — 後醫題庫網的 Mac 端指令（第 0 階段：check、check math、check answers、sample）。"""
+"""pmq — 後醫題庫網的 Mac 端指令。
+
+第 0 階段：check、check math、check answers、sample。
+第 1B 階段：publish、usage、backup pull、restore、auth hash。
+"""
 import argparse
 import json
 import sys
@@ -14,6 +18,23 @@ def main(argv=None):
     chk.add_argument("what", nargs="?", choices=["all", "math", "answers"], default="all")
     chk.add_argument("--no-math", action="store_true", help="略過公式檢查")
     sub.add_parser("sample", help="產生介面開發用樣本到 app/fixtures/")
+    pub = sub.add_parser("publish", help="驗證後上傳有變動的內容包與圖，最後換 manifest")
+    pub.add_argument("--subject", help="只發佈這一科（例如 PHY）；其他科沿用線上版本")
+    pub.add_argument("--dry-run", action="store_true", help="只列出要上傳什麼，不上傳")
+    pub.add_argument("--url", help="網站網址（預設讀 pmq.toml 的 [site] url）")
+    us = sub.add_parser("usage", help="本專案 D1 大小與 R2 用量（規格書 §11-6）")
+    us.add_argument("--url")
+    bk = sub.add_parser("backup", help="pmq backup pull：下載個人資料整包")
+    bk.add_argument("what", choices=["pull", "now"], help="pull＝下載整包到 backup_dir；now＝請伺服器立刻做一次每晚的 R2 備份")
+    bk.add_argument("--url")
+    rs = sub.add_parser("restore", help="把匯出的 zip 灌回空的資料庫")
+    rs.add_argument("zip")
+    g = rs.add_mutually_exclusive_group(required=True)
+    g.add_argument("--sqlite", help="灌進這個本機 SQLite 檔（新檔或空檔）")
+    g.add_argument("--remote", action="store_true", help="灌進線上的 D1（必須是空的）")
+    rs.add_argument("--url")
+    au = sub.add_parser("auth", help="pmq auth hash：把密碼轉成 Worker 的 AUTH_HASH（只印雜湊，不存密碼）")
+    au.add_argument("what", choices=["hash"])
     args = ap.parse_args(argv)
     cfg = Config()
     cfg.reports.mkdir(parents=True, exist_ok=True)
@@ -43,6 +64,27 @@ def main(argv=None):
         from .sample import make_sample
         make_sample(cfg)
         return 0
+    url = getattr(args, "url", None) or cfg.site_url
+    if args.cmd == "publish":
+        from .publish import publish
+        return publish(cfg, url, subject=args.subject, dry_run=args.dry_run)
+    if args.cmd == "usage":
+        from .publish import usage
+        return usage(cfg, url)
+    if args.cmd == "backup":
+        from .backup import backup_pull
+        if args.what == "pull":
+            return backup_pull(cfg, url)
+        from .remote import Remote
+        r = Remote(url).backup_now()
+        print(f"已寫入 R2 {r['key']}：" + "、".join(f"{k} {v}" for k, v in r["counts"].items() if v))
+        return 0
+    if args.cmd == "restore":
+        from .backup import restore_remote, restore_sqlite
+        return restore_sqlite(cfg, args.zip, args.sqlite) if args.sqlite else restore_remote(cfg, args.zip, url)
+    if args.cmd == "auth":
+        from .authhash import main as hash_main
+        return hash_main()
 
 
 if __name__ == "__main__":

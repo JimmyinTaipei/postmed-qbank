@@ -1,4 +1,4 @@
-// 只屬於這台裝置、不同步的偏好（外觀、圖片反相、裝置代號）。存 localStorage，可同步讀取。
+// 只屬於這台裝置、不同步的偏好（外觀、圖片反相、裝置名稱、哪些科目離線下載）。存 localStorage，可同步讀取。
 // 會同步的設定（例如上次的出題條件）走 personal.ts 的 settings。
 
 import { useSyncExternalStore } from "react";
@@ -39,7 +39,7 @@ export const prefs = {
   setFigInvert(on: boolean) {
     write("pmq.figInvert", on ? "1" : "0");
   },
-  /** 裝置代號：第一次開啟時產生（規格書 §8）。 */
+  /** 裝置代號：第一次開啟時產生（規格書 §8），設定頁可改成「iPad」「Mac」。寫進每一筆作答的 device 欄位。 */
   device(): string {
     let d = read("pmq.device");
     if (!d) {
@@ -47,6 +47,17 @@ export const prefs = {
       write("pmq.device", d);
     }
     return d;
+  },
+  setDevice(name: string) {
+    const v = name.trim().slice(0, 40);
+    if (v) write("pmq.device", v);
+  },
+  /** 這一科的題目是否整科下載到裝置（離線可做）。預設開。 */
+  offline(subject: string): boolean {
+    return read("pmq.offline." + subject) !== "0";
+  },
+  setOffline(subject: string, on: boolean) {
+    write("pmq.offline." + subject, on ? "1" : "0");
   },
   subscribe(fn: () => void) {
     listeners.add(fn);
@@ -56,6 +67,12 @@ export const prefs = {
 
 export function useThemePref(): ThemePref {
   return useSyncExternalStore(prefs.subscribe, prefs.theme);
+}
+export function useDeviceName(): string {
+  return useSyncExternalStore(prefs.subscribe, prefs.device);
+}
+export function useOfflinePref(subject: string): boolean {
+  return useSyncExternalStore(prefs.subscribe, () => prefs.offline(subject));
 }
 export function useFigInvert(): boolean {
   return useSyncExternalStore(prefs.subscribe, prefs.figInvert);

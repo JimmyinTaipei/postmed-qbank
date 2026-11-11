@@ -6,7 +6,7 @@ import { content } from "./content";
 import { db } from "./db";
 import { buildContext, chapterLabel, type FilterContext } from "./filter";
 import { settings } from "./personal";
-import type { Attempt, FlagKind, ItemKey, Question, Session, SubjectId, SyncState } from "./types";
+import type { Attempt, FlagKind, ItemKey, Question, Session, SubjectId } from "./types";
 import { keyId } from "./types";
 
 export interface Loadable<T> {
@@ -143,10 +143,6 @@ export function useSetting<T>(key: string, fallback: T): [T, (v: T) => void, boo
   return [row?.v ?? fallback, set, row !== undefined];
 }
 
-/** 同步狀態。1A 固定是「只存在這台裝置」；1B 換成真的狀態。 */
-export function useSyncState(): SyncState {
-  return { kind: "local" };
-}
 
 /** 有某種標記的題目（錯題本、星號、存疑清單），最近標的在前。 */
 export function useFlagged(kind: FlagKind): { id: string; at: number }[] | undefined {

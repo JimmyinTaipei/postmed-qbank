@@ -8,3 +8,8 @@ __pycache__/
 !/app/fixtures/README.md
 !/app/fixtures/CASES.md
 dist/
+
+# 第 1B 階段：本機 wrangler dev 的測試資料與測試用密碼
+worker/.wrangler/
+worker/.dev.vars
+.wrangler/

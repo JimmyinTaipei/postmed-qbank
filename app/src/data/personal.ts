@@ -1,16 +1,22 @@
-// 個人資料的寫入與查詢（規格書 §4.6、§5）。第 1A 階段只寫本機 IndexedDB。
-// 1B：在每個寫入後把列放進待送佇列（db.outbox）並觸發同步；函式簽名不變，畫面不用改。
+// 個人資料的寫入與查詢（規格書 §4.6、§5）。
+// 每個寫入都在同一個交易裡把列放進待送佇列（enqueue），交易完成後 kick() 觸發同步（sync.ts）。
+// 函式簽名與 1A 相同，畫面不用改。
 
 import { ulid } from "@/lib/ulid";
 import { db } from "./db";
 import { prefs } from "./prefs";
+import { enqueue, kick, resetCursor } from "./sync";
 import type { Attempt, FlagKind, ItemKey, Session, SessionMode } from "./types";
 
 const now = () => Date.now();
 
 export const flags = {
   async set(item: ItemKey, kind: FlagKind, value: boolean): Promise<void> {
-    await db.flag.put({ item, kind, value: value ? 1 : 0, updated_at: now() });
+    await db.transaction("rw", db.flag, db.outbox, async () => {
+      await db.flag.put({ item, kind, value: value ? 1 : 0, updated_at: now() });
+      await enqueue("flag", [item, kind]);
+    });
+    kick();
   },
 };
 
@@ -42,14 +48,17 @@ export const attempts = {
       created_at: now(),
       open: 1,
     };
-    await db.transaction("rw", db.attempt, db.flag, db.srs_state, async () => {
-      await db.attempt.add(row);
+    await db.transaction("rw", db.attempt, db.flag, db.srs_state, db.outbox, async () => {
+      await db.attempt.add(row); // 作答本身等封存（seal）後才放進佇列
       if (!input.correct) {
         await db.flag.put({ item: input.item, kind: "wrong", value: 1, updated_at: row.created_at });
+        await enqueue("flag", [input.item, "wrong"]);
         // 之前標過「粗心錯，不追蹤」的題目又答錯：恢復追蹤
-        await db.srs_state.where("item").equals(input.item).modify({ suspended: 0, updated_at: row.created_at });
+        const n = await db.srs_state.where("item").equals(input.item).modify({ suspended: 0, updated_at: row.created_at });
+        if (n) await enqueue("srs_state", input.item);
       }
     });
+    kick();
     return row;
   },
 
@@ -60,13 +69,21 @@ export const attempts = {
 
   /** 離開題目、結束一場、App 進背景時呼叫：封存所有未封存的作答。 */
   async seal(): Promise<void> {
-    await db.attempt.where("open").equals(1).modify({ open: 0 });
+    let n = 0;
+    await db.transaction("rw", db.attempt, db.outbox, async () => {
+      const ids = await db.attempt.where("open").equals(1).primaryKeys();
+      n = ids.length;
+      if (!n) return;
+      await db.attempt.where("open").equals(1).modify({ open: 0 });
+      for (const id of ids) await enqueue("attempt", id);
+    });
+    if (n) kick();
   },
 
   /** 粗心錯，不追蹤（規格書 §5.3）：不進錯題本、不進複習；作答紀錄仍是答錯。 */
   async markCareless(item: ItemKey): Promise<void> {
     const t = now();
-    await db.transaction("rw", db.flag, db.srs_state, async () => {
+    await db.transaction("rw", db.flag, db.srs_state, db.outbox, async () => {
       await db.flag.put({ item, kind: "wrong", value: 0, updated_at: t });
       const cur = await db.srs_state.get(item);
       await db.srs_state.put({
@@ -74,16 +91,22 @@ export const attempts = {
         suspended: 1,
         updated_at: t,
       });
+      await enqueue("flag", [item, "wrong"]);
+      await enqueue("srs_state", item);
     });
+    kick();
   },
 
   /** 取消「粗心錯」：放回錯題本並恢復追蹤。 */
   async undoCareless(item: ItemKey): Promise<void> {
     const t = now();
-    await db.transaction("rw", db.flag, db.srs_state, async () => {
+    await db.transaction("rw", db.flag, db.srs_state, db.outbox, async () => {
       await db.flag.put({ item, kind: "wrong", value: 1, updated_at: t });
-      await db.srs_state.where("item").equals(item).modify({ suspended: 0, updated_at: t });
+      await enqueue("flag", [item, "wrong"]);
+      const n = await db.srs_state.where("item").equals(item).modify({ suspended: 0, updated_at: t });
+      if (n) await enqueue("srs_state", item);
     });
+    kick();
   },
 };
 
@@ -104,7 +127,11 @@ export const sessions = {
       updated_at: t,
       deleted: 0,
     };
-    await db.session.add(row);
+    await db.transaction("rw", db.session, db.outbox, async () => {
+      await db.session.add(row);
+      await enqueue("session", row.id);
+    });
+    kick();
     return row;
   },
   async get(id: string): Promise<Session | null> {
@@ -112,7 +139,7 @@ export const sessions = {
     return s && !s.deleted ? s : null;
   },
   async setCursor(id: string, cursor: number): Promise<void> {
-    await db.session.update(id, { cursor, updated_at: now() });
+    await touchSession(id, { cursor });
   },
   async end(id: string): Promise<void> {
     const t = now();
@@ -122,11 +149,11 @@ export const sessions = {
     const rows = await db.attempt.where("session_id").equals(id).toArray();
     const latest = new Map(rows.sort((a, b) => a.created_at - b.created_at).map((a) => [a.item, a]));
     const right = [...latest.values()].filter((a) => a.correct).length;
-    await db.session.update(id, { ended_at: t, updated_at: t, score: s.items.length ? right / s.items.length : null });
+    await touchSession(id, { ended_at: t, score: s.items.length ? right / s.items.length : null }, t);
   },
   /** 捨棄一場（作答紀錄保留）。 */
   async remove(id: string): Promise<void> {
-    await db.session.update(id, { deleted: 1, updated_at: now() });
+    await touchSession(id, { deleted: 1 });
   },
 };
 
@@ -141,13 +168,34 @@ export const settings = {
     }
   },
   async set(key: string, value: unknown): Promise<void> {
-    await db.setting.put({ key, value: JSON.stringify(value), updated_at: now() });
+    const v = JSON.stringify(value);
+    const cur = await db.setting.get(key);
+    if (cur && cur.value === v) return; // 沒變就不寫、不同步
+    await db.transaction("rw", db.setting, db.outbox, async () => {
+      await db.setting.put({ key, value: v, updated_at: now() });
+      await enqueue("setting", key);
+    });
+    kick();
   },
 };
 
-/** 清掉這台裝置上的全部個人資料（設定頁；1B 之後雲端資料不受影響）。 */
-export async function wipeLocal(): Promise<void> {
-  await db.transaction("rw", db.tables, async () => {
-    for (const t of db.tables) await t.clear();
+async function touchSession(id: string, changes: Partial<Session>, t = now()): Promise<void> {
+  await db.transaction("rw", db.session, db.outbox, async () => {
+    const n = await db.session.update(id, { ...changes, updated_at: t });
+    if (n) await enqueue("session", id);
   });
+  kick();
+}
+
+/**
+ * 清掉這台裝置上的個人資料副本（設定頁）。雲端資料不受影響，下次同步會從雲端重新拉回來。
+ * 還沒送出的資料（待送佇列）會一起消失，所以畫面要先提醒。下載的題庫內容保留。
+ */
+export async function wipeLocal(): Promise<void> {
+  const keep = new Set(["cfile", "kv"]);
+  await db.transaction("rw", db.tables, async () => {
+    for (const t of db.tables) if (!keep.has(t.name)) await t.clear();
+  });
+  await resetCursor();
+  kick();
 }
