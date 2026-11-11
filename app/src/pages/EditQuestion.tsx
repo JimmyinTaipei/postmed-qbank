@@ -8,6 +8,7 @@ import { answerValue, FIELD_NAME, fieldValue, patches, useQuestion, useTaxonomy,
 import { Dialog, Sheet, useToast } from "@/ui/overlays";
 import { Button, Chip, EmptyState, Notice, Segmented, Select, Skeleton, Tabs, TextField } from "@/ui/primitives";
 import { MarkdownEditor } from "@/ui/templates";
+import { HighlightEdit } from "@/ui/content/Highlights";
 
 const Ctx = createContext<(id: string, field?: PatchField) => void>(() => {});
 
@@ -16,9 +17,17 @@ export const useEditor = () => useContext(Ctx);
 
 export function EditorProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState<{ id: string; field?: PatchField } | null>(null);
+  // 選字框的「編輯」：target "q:<題號>/<ques|idea|sol>" → 開那一題、那一欄
+  const editFromTarget = useMemo(
+    () => (target: string) => {
+      const m = /^q:([^/]+)\/(ques|idea|sol)$/.exec(target);
+      if (m) setOpen({ id: m[1], field: m[2] as PatchField });
+    },
+    [],
+  );
   return (
     <Ctx.Provider value={(id, field) => setOpen({ id, field })}>
-      {children}
+      <HighlightEdit.Provider value={editFromTarget}>{children}</HighlightEdit.Provider>
       {open && <EditQuestion key={open.id} id={open.id} initialField={open.field} onClose={() => setOpen(null)} />}
     </Ctx.Provider>
   );

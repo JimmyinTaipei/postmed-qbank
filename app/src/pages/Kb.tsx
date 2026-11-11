@@ -283,6 +283,15 @@ function headings(blocks: KbBlock[], out: { b: KbBlock; level: number; text: str
   return out;
 }
 
+function findBlock(blocks: KbBlock[], bid: string): KbBlock | null {
+  for (const b of blocks) {
+    if (b.bid === bid) return b;
+    const c = findBlock(b.children, bid);
+    if (c) return c;
+  }
+  return null;
+}
+
 function allBids(blocks: KbBlock[], out = new Set<string>()) {
   for (const b of blocks) {
     out.add(b.bid);
@@ -335,6 +344,15 @@ export function KbReaderPage() {
     const r = await fn();
     toast(r === "conflict" ? CONFLICT : SAVED);
     setTarget(null);
+  };
+
+  // 選字框的「編輯」：直接開這個區塊的編輯面板（和區塊選單的「編輯內容」同一套規則）
+  const editBlock = (bid: string) => {
+    const b = doc && findBlock(doc.blocks, bid);
+    if (!b) return;
+    const item = menu(b)[0];
+    if (item?.onSelect) item.onSelect();
+    else toast(item?.disabledReason ?? "這個區塊不能在網站上編輯");
   };
 
   const menu = (b: KbBlock): MenuItem[] => {
@@ -421,6 +439,7 @@ export function KbReaderPage() {
       subtitle={[subj?.name, group?.title].filter(Boolean).join("・") || undefined}
       back={subject ? `/kb?s=${subject}` : "/kb"}
       width="wide"
+      floatingActions
       actions={
         doc && (
           <>
@@ -465,7 +484,7 @@ export function KbReaderPage() {
             </Notice>
           )}
           {noteMode && <Notice icon="note">筆記模式：點區塊右邊的對話框，在那個區塊下面寫自己的筆記（會同步，不會改到 Mac 上的筆記檔）。</Notice>}
-          <KbHighlightLayer docKey={key!} root={article} list={hls} figs={doc.figs} version={version} />
+          <KbHighlightLayer docKey={key!} root={article} list={hls} figs={doc.figs} version={version} onEdit={editBlock} />
           {orphanNotes.length > 0 && (
             <details className="rounded-btn border border-line bg-card print:hidden">
               <summary className="flex min-h-(--tap) items-center gap-2 px-3 text-meta text-ink-muted">

@@ -251,6 +251,7 @@
 .md mark.hl-blue { background: var(--hl-blue); }
 .md mark.hl-purple { background: var(--hl-purple); }
 .md mark.hl-orange { background: var(--hl-orange); }
+.md mark.hl-none { background: transparent; color: inherit; }
 .md mark .katex { color: var(--paper-ink); }
 .md mark.hl-note {
   text-decoration: underline dotted var(--text-muted);
@@ -366,6 +367,10 @@
   display: block;
   max-width: 100%;
   height: auto;
+}
+/* 資料庫閱讀頁：只有圖的段落置中（2026-11-11 使用者要求） */
+.kb-article .md p.fig-row {
+  text-align: center;
 }
 /* 圖上標記（第 6B 階段）：疊在圖上，和圖同大小（.fig 的內距是 8px） */
 .md .fig {

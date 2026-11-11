@@ -274,15 +274,16 @@ export function EditPanel({ title, initial, figs, role = "sol", onClose, onSave,
 const HL = [["yellow", "黃", "bg-hl-yellow"], ["blue", "藍", "bg-hl-blue"], ["purple", "紫", "bg-hl-purple"], ["pink", "粉", "bg-hl-pink"], ["green", "綠", "bg-hl-green"], ["orange", "橘", "bg-hl-orange"]] as const;
 
 /** 螢光筆色票（選字後浮出）。 */
-export function HighlightPalette({ onPick, onNote }: { onPick: (color: (typeof HL)[number][0]) => void; onNote: () => void }) {
+export function HighlightPalette({ onPick, onNote, onEdit }: { onPick: (color: (typeof HL)[number][0]) => void; onNote: () => void; /** 編輯這段內容（題目的欄位、筆記的區塊） */ onEdit?: () => void }) {
   return (
-    <div role="toolbar" aria-label="螢光筆" className="inline-flex items-center gap-1 rounded-btn border border-line bg-card p-1 shadow-pop">
+    <div role="toolbar" aria-label="螢光筆" className="inline-flex max-w-[calc(100vw-16px)] flex-wrap items-center gap-1 rounded-btn border border-line bg-card p-1 shadow-pop">
       {HL.map(([id, name, cls]) => (
         <button key={id} type="button" aria-label={`${name}色螢光`} title={`${name}色螢光`} onClick={() => onPick(id)} className="flex size-(--tap) items-center justify-center rounded-chip hover:bg-hover">
           <span className={cx("size-6 rounded-full border border-line-strong", cls)} />
         </button>
       ))}
       <Button variant="ghost" icon="note" onClick={onNote}>加註</Button>
+      {onEdit && <Button variant="ghost" icon="edit" onClick={onEdit}>編輯</Button>}
     </div>
   );
 }

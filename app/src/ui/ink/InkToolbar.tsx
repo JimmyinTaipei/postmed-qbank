@@ -1,4 +1,4 @@
-// 手寫工具列（第 6 階段）：筆（八色、三種粗細）、螢光筆（六色）、橡皮擦（整筆）、復原、重做、清除。
+// 手寫工具列（第 6 階段）：筆（八色、三種粗細）、螢光筆（六色、三種粗細）、橡皮擦（整筆）、復原、重做、清除。
 // 手寫區與圖上標記共用。選的工具與顏色記在這台裝置（prefs.inkTool），兩處一起變。
 
 import { useState } from "react";
@@ -31,10 +31,14 @@ const SIZES: { px: number; name: string }[] = [
   { px: 2.6, name: "中" },
   { px: 4.2, name: "粗" },
 ];
-const HL_PX = 16;
+const HL_SIZES: { px: number; name: string }[] = [
+  { px: 9, name: "細" },
+  { px: 16, name: "中" },
+  { px: 26, name: "粗" },
+];
 
 export function brushOf(p: InkToolPref): InkBrush {
-  if (p.tool === "hl") return { tool: "hl", color: p.hl, px: HL_PX };
+  if (p.tool === "hl") return { tool: "hl", color: p.hl, px: HL_SIZES[p.hlSize]?.px ?? HL_SIZES[1].px };
   if (p.tool === "eraser") return { tool: "eraser", color: "", px: 0 };
   return { tool: "pen", color: p.pen, px: SIZES[p.size]?.px ?? SIZES[1].px };
 }
@@ -68,6 +72,31 @@ function Swatch({ color, name, selected, onPick }: { color: string; name: string
   );
 }
 
+/** 三種粗細。bar：螢光筆用橫條（該色）表示，筆用圓點 */
+function SizePicker({ label, value, onPick, dots, bar }: { label: string; value: number; onPick: (i: 0 | 1 | 2) => void; dots: { name: string; d: number }[]; bar?: string }) {
+  return (
+    <div role="group" aria-label={label} className="flex">
+      {dots.map((s, i) => (
+        <button
+          key={s.name}
+          type="button"
+          aria-label={s.name}
+          title={s.name}
+          aria-pressed={value === i}
+          onClick={() => onPick(i as 0 | 1 | 2)}
+          className={cx("inline-flex size-9 items-center justify-center rounded-btn", value === i ? "bg-blue-light" : "hover:bg-hover")}
+        >
+          {bar ? (
+            <span className="w-5 rounded-chip border border-line-strong" style={{ height: s.d, background: `var(--${bar})` }} />
+          ) : (
+            <span className="rounded-full bg-ink-strong" style={{ width: s.d, height: s.d }} />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function InkToolbar({ canUndo, canRedo, canClear, onUndo, onRedo, onClear, clearLabel, className, extra }: Props) {
   const p = useInkToolPref();
   const [confirm, setConfirm] = useState(false);
@@ -93,21 +122,7 @@ export function InkToolbar({ canUndo, canRedo, canClear, onUndo, onRedo, onClear
               <Swatch key={c.id} color={c.id} name={c.name} selected={p.pen === c.id} onPick={() => set({ pen: c.id })} />
             ))}
           </div>
-          <div role="group" aria-label="粗細" className="flex">
-            {SIZES.map((s, i) => (
-              <button
-                key={s.name}
-                type="button"
-                aria-label={s.name}
-                title={s.name}
-                aria-pressed={p.size === i}
-                onClick={() => set({ size: i as 0 | 1 | 2 })}
-                className={cx("inline-flex size-9 items-center justify-center rounded-btn", p.size === i ? "bg-blue-light" : "hover:bg-hover")}
-              >
-                <span className="rounded-full bg-ink-strong" style={{ width: s.px * 2 + 2, height: s.px * 2 + 2 }} />
-              </button>
-            ))}
-          </div>
+          <SizePicker label="粗細" value={p.size} onPick={(i) => set({ size: i })} dots={SIZES.map((s) => ({ name: s.name, d: s.px * 2 + 2 }))} />
         </>
       )}
       {p.tool === "hl" && (
@@ -115,6 +130,7 @@ export function InkToolbar({ canUndo, canRedo, canClear, onUndo, onRedo, onClear
           {HL_COLORS.map((c) => (
             <Swatch key={c.id} color={c.id} name={c.name} selected={p.hl === c.id} onPick={() => set({ hl: c.id })} />
           ))}
+          <SizePicker label="螢光筆粗細" value={p.hlSize} onPick={(i) => set({ hlSize: i })} bar={p.hl} dots={HL_SIZES.map((s) => ({ name: s.name, d: Math.round(s.px / 2) + 2 }))} />
         </div>
       )}
 

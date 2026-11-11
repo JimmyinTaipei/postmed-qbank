@@ -1,6 +1,6 @@
 // 導覽外殼：寬螢幕（≥ 1024px）是左側欄，窄螢幕是底部分頁列。兩邊是同一組項目、同一份程式（規格書 §2.5）。
 
-import type { ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useSyncState, type SyncState } from "@/data";
 import { Icon, type IconName } from "./icons";
@@ -90,11 +90,54 @@ interface PageProps {
   actions?: ReactNode;
   /** narrow：閱讀與表單（內文欄寬）；wide：清單、方格、圖表 */
   width?: "narrow" | "wide";
+  /** 往下捲、頁首離開畫面時，右上動作變成浮在右上角的膠囊（資料庫閱讀頁） */
+  floatingActions?: boolean;
   children: ReactNode;
 }
 
+/** 右上動作：floating 時，頁首捲出畫面就改成固定在右上角的膠囊。同一組元素搬位置，不複製（選單的狀態不會分家）。 */
+function Actions({ children, floating }: { children: ReactNode; floating?: boolean }) {
+  const slot = useRef<HTMLDivElement>(null);
+  const [out, setOut] = useState(false);
+  const [box, setBox] = useState<{ w: number; h: number; right: number } | null>(null);
+
+  useEffect(() => {
+    const el = slot.current;
+    if (!floating || !el) return;
+    const io = new IntersectionObserver(([e]) => setOut(!e.isIntersecting && e.boundingClientRect.top < 0), { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [floating]);
+
+  // 量原本位置：膠囊對齊原本的右緣；原位留同樣大小的空位，頁首不跳動
+  useLayoutEffect(() => {
+    if (!floating) return;
+    const measure = () => {
+      const el = slot.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setBox({ w: r.width, h: r.height, right: Math.max(12, document.documentElement.clientWidth - r.right) });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [floating, out]);
+
+  const float = floating && out;
+  return (
+    <div ref={slot} className="shrink-0" style={float && box ? { width: box.w, height: box.h } : undefined}>
+      <div
+        className={cx("flex items-center gap-1", float && "anim-rise fixed z-20 rounded-full border border-line bg-card px-1 shadow-pop print:hidden")}
+        style={float ? { top: "calc(env(safe-area-inset-top) + 8px)", right: box?.right ?? 12 } : undefined}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /** 每一頁最外層都用它：頁首（標題、返回、右上動作）＋固定的左右邊距與最大寬度。 */
-export function Page({ title, subtitle, back, actions, width = "narrow", children }: PageProps) {
+export function Page({ title, subtitle, back, actions, width = "narrow", floatingActions, children }: PageProps) {
   const nav = useNavigate();
   return (
     <div className={cx("mx-auto w-full", width === "narrow" ? "max-w-3xl" : "max-w-6xl")}>
@@ -109,7 +152,7 @@ export function Page({ title, subtitle, back, actions, width = "narrow", childre
             <h1 className="truncate text-display font-semibold text-ink-strong">{title}</h1>
             {subtitle && <p className="mt-0.5 truncate text-ui text-ink-muted">{subtitle}</p>}
           </div>
-          {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
+          {actions && <Actions floating={floatingActions}>{actions}</Actions>}
         </div>
       </header>
       <div className="px-safe space-y-6 pb-6 lg:px-8">{children}</div>

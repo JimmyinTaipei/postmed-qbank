@@ -168,7 +168,8 @@ export interface Note {
   seq?: number;
 }
 
-export type HighlightColor = "yellow" | "blue" | "purple" | "pink" | "green" | "orange";
+/** none：只有註記、沒有螢光（2026-11-11 起「加註」不預設上色），畫面上是虛線底線 */
+export type HighlightColor = "yellow" | "blue" | "purple" | "pink" | "green" | "orange" | "none";
 
 export interface Highlight {
   id: string;

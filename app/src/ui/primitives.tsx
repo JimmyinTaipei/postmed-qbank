@@ -278,7 +278,7 @@ export function Segmented<T extends string | number>({ label, options, value, on
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cx(
-              "min-h-[calc(var(--tap)-8px)] min-w-12 flex-1 rounded-chip px-3 text-ui whitespace-nowrap transition-colors duration-(--dur-fast)",
+              "min-h-[calc(var(--tap)-8px)] min-w-12 flex-auto rounded-chip px-3 text-ui whitespace-nowrap transition-colors duration-(--dur-fast)",
               on ? "bg-card font-semibold text-blue-deep ring-1 ring-line" : "text-ink hover:text-ink-strong",
             )}
           >

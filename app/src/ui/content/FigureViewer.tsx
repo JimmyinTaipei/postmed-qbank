@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { createPortal } from "react-dom";
 import { prefs, useFigInvert, useInkToolPref, usePencilOnFigures } from "@/data";
 import { Icon } from "../icons";
-import { Dialog } from "../overlays";
+import { Dialog, lockScroll } from "../overlays";
 import { Button, IconButton, cx } from "../primitives";
 import { useFigInk, type FigInkInfo } from "../ink/FigInk";
 import { InkLayer, InkStrokes } from "../ink/InkLayer";
@@ -194,11 +194,10 @@ function Viewer({ fig, onClose }: { fig: ViewerFig; onClose: () => void }) {
       e.stopPropagation();
     };
     window.addEventListener("keydown", key, true);
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockScroll();
     return () => {
       window.removeEventListener("keydown", key, true);
-      document.body.style.overflow = overflow;
+      unlock();
       prev?.focus?.();
     };
   }, [onClose, zoomTo]);

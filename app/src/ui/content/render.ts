@@ -110,6 +110,9 @@ export function renderMarkdown(text: string, o: RenderOptions): string {
   // 3. 白名單清理
   html = DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR, ALLOW_DATA_ATTR: false, ALLOWED_URI_REGEXP: /^https?:\/\//i });
 
+  // 3b. 只有圖的段落（一張或並排幾張）：標記起來，資料庫閱讀頁讓它置中
+  html = html.replace(/<p>((?:\s|<br>|@@[FG][0-9A-Za-z_.-]+@@)+)<\/p>/g, (all, inner: string) => (/@@[FG]/.test(inner) ? `<p class="fig-row">${inner}</p>` : all));
+
   // 4. 表格包一層可橫向捲動的容器；連結另開分頁
   html = html
     .replace(/<table>/g, '<div class="md-scroll" data-noswipe><table>')

@@ -60,12 +60,13 @@ export function Handwriting({ target, att }: Props) {
         <span className="min-w-0 flex-1">{has ? "手寫區（有內容）" : "手寫區"}</span>
         <Icon name="chevronDown" size={18} className="transition-transform duration-(--dur-fast) group-open:rotate-180" />
       </summary>
-      {open && rows && <Pages target={target} att={att} rows={rows} />}
+      {open && rows && <InkPages target={target} att={att} rows={rows} />}
     </details>
   );
 }
 
-function Pages({ target, att, rows }: { target: string; att?: string; rows: InkRow[] }) {
+/** 工具列＋一頁頁的紙＋加一頁。手寫區與螢光的手寫註記共用。toolbarClass：工具列黏住的位置（在面板裡捲動時不同）。 */
+export function InkPages({ target, att, rows, toolbarClass = "sticky top-[calc(env(safe-area-inset-top)+3.75rem)]" }: { target: string; att?: string; rows: InkRow[]; toolbarClass?: string }) {
   const pref = useInkToolPref();
   const brush = brushOf(pref);
   const used = rows.filter((r) => !r.deleted).map((r) => r.page);
@@ -80,7 +81,7 @@ function Pages({ target, att, rows }: { target: string; att?: string; rows: InkR
     <div data-noswipe="always" className="space-y-3 px-3 pb-3">
       <p className="text-meta text-ink-muted">用 Apple Pencil 或滑鼠寫；手指可以照常捲動。停筆 2 秒自動存，兩台裝置會同步。</p>
       <InkToolbar
-        className="sticky top-[calc(env(safe-area-inset-top)+3.75rem)] z-10 shadow-pop"
+        className={cx(toolbarClass, "z-10 shadow-pop")}
         canUndo={!!ed?.canUndo}
         canRedo={!!ed?.canRedo}
         canClear={!!ed?.strokes.length}

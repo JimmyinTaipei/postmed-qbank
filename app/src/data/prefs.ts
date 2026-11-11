@@ -110,8 +110,9 @@ export interface InkToolPref {
   pen: string; // "ink-blue"…
   size: 0 | 1 | 2; // 細、中、粗
   hl: string; // "hl-yellow"…
+  hlSize: 0 | 1 | 2; // 螢光筆：細、中、粗（2026-11-11 加）
 }
-export const INK_TOOL_DEFAULT: InkToolPref = { tool: "pen", pen: "ink-blue", size: 1, hl: "hl-yellow" };
+export const INK_TOOL_DEFAULT: InkToolPref = { tool: "pen", pen: "ink-blue", size: 1, hl: "hl-yellow", hlSize: 1 };
 
 let inkToolRaw: string | null = null;
 let inkToolSnap: InkToolPref = INK_TOOL_DEFAULT;

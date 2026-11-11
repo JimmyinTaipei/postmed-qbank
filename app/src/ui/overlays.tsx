@@ -8,7 +8,23 @@ import { Button, IconButton, cx } from "./primitives";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-function useModal(ref: RefObject<HTMLElement | null>, onClose: () => void, lockScroll = true) {
+// 鎖住背景捲動：用計數，不用「關閉時還原成開啟前的值」。
+// 兩個浮層同時關掉時（例如面板裡的確認框按了刪除，面板也跟著關），還原的順序不一定，
+// 後還原的會把「鎖住」寫回去，整個 App 就捲不動了（2026-11-11 使用者回報：刪除螢光後頁面不能捲動）。
+let scrollLocks = 0;
+export function lockScroll(): () => void {
+  scrollLocks++;
+  document.body.style.overflow = "hidden";
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    scrollLocks = Math.max(0, scrollLocks - 1);
+    if (!scrollLocks) document.body.style.overflow = "";
+  };
+}
+
+function useModal(ref: RefObject<HTMLElement | null>, onClose: () => void, lock = true) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -34,11 +50,10 @@ function useModal(ref: RefObject<HTMLElement | null>, onClose: () => void, lockS
       }
     };
     el.addEventListener("keydown", key);
-    const overflow = document.body.style.overflow;
-    if (lockScroll) document.body.style.overflow = "hidden";
+    const unlock = lock ? lockScroll() : null;
     return () => {
       el.removeEventListener("keydown", key);
-      if (lockScroll) document.body.style.overflow = overflow;
+      unlock?.();
       prev?.focus?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

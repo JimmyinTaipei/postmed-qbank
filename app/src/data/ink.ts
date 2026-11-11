@@ -85,6 +85,12 @@ export const ink = {
     await ink.remove(row);
   },
 
+  /** 這個對象有沒有（沒刪掉的）筆跡 */
+  async has(target: string): Promise<boolean> {
+    const rows = await db.ink.where("target").equals(target).toArray();
+    return rows.some((r) => !r.deleted);
+  },
+
   /** 清除一個對象的所有頁（手寫區的「清空」只清一頁，用 save 空白）。 */
   async clearTarget(target: string): Promise<void> {
     const rows = await db.ink.where("target").equals(target).toArray();
