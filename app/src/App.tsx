@@ -15,7 +15,7 @@ import { QuestionPage } from "./pages/QuestionPage";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
 import { More } from "./pages/More";
-import { KbIndex, KbReaderPage } from "./pages/Templates";
+import { KbDraftPage, KbIndex, KbReaderPage } from "./pages/Kb";
 import { PatchesPage } from "./pages/Patches";
 import { EditorProvider } from "./pages/EditQuestion";
 import { ReviewPage } from "./pages/Review";
@@ -55,6 +55,7 @@ export function App() {
               <Route path="/q/:id" element={<QuestionPage />} />
               <Route path="/review" element={<ReviewPage />} />
               <Route path="/kb" element={<KbIndex />} />
+              <Route path="/kb/new/:id" element={<KbDraftPage />} />
               <Route path="/kb/:subject/:doc" element={<KbReaderPage />} />
               <Route path="/more" element={<More />} />
               <Route path="/wrong" element={<WrongBookPage />} />

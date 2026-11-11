@@ -14,7 +14,7 @@ import { db } from "./db";
 import { Offline, request, ServerError } from "./net";
 import { prefs } from "./prefs";
 import { sha256 } from "@/lib/sha256";
-import type { ContentInfo, IndexRow, KbDoc, Question, SubjectId, Taxonomy } from "./types";
+import type { ContentInfo, IndexRow, KbCatalog, KbDoc, KbRelated, Question, SubjectId, Taxonomy } from "./types";
 
 export interface Manifest {
   version: number;
@@ -26,6 +26,9 @@ export interface Manifest {
     index: Record<string, string>;
     packs: Record<string, string>;
     kb?: Record<string, string>;
+    /** 資料庫目錄、題目 → 相關筆記（第 4 階段） */
+    kbcat?: string;
+    kbrel?: string;
     sample?: string;
     cases?: string;
   };
@@ -117,15 +120,22 @@ async function fetchManifest(): Promise<Stored> {
   return { h: await hashText(text), m: JSON.parse(text) as Manifest };
 }
 
-/** 一版內容至少要有的檔：目錄、各科索引、筆記、特殊情況表。包是按需或依「離線下載」設定下載。 */
+/** 一版內容至少要有的檔：目錄、各科索引、資料庫目錄與相關筆記對照、特殊情況表。
+ *  題目包與筆記是按需或依「離線下載」設定下載（舊的樣本內容包沒有資料庫目錄，筆記仍算必要）。 */
 function essentials(m: Manifest): string[] {
   const f = m.files;
-  return [f.taxonomy, ...Object.values(f.index), ...Object.values(f.kb ?? {}), ...(f.cases ? [f.cases] : []), ...(f.sample ? [f.sample] : [])];
+  const kb = f.kbcat ? [f.kbcat, ...(f.kbrel ? [f.kbrel] : [])] : Object.values(f.kb ?? {});
+  return [f.taxonomy, ...Object.values(f.index), ...kb, ...(f.cases ? [f.cases] : []), ...(f.sample ? [f.sample] : [])];
+}
+
+/** 某一科的題目包與筆記（離線下載的單位）。 */
+function subjectFiles(m: Manifest): [string, string][] {
+  return [...Object.entries(m.files.packs), ...Object.entries(m.files.kb ?? {})].map(([k, v]) => [k.split("/")[0], v]);
 }
 
 function wantedPacks(m: Manifest): string[] {
-  return Object.entries(m.files.packs)
-    .filter(([pack]) => prefs.offline(pack.split("/")[0]))
+  return subjectFiles(m)
+    .filter(([s]) => prefs.offline(s))
     .map(([, k]) => k);
 }
 
@@ -235,7 +245,7 @@ async function fetchOffline(m: Manifest): Promise<void> {
 
 /** 刪掉新版不再引用的檔（舊版的包、索引）。 */
 async function gc(m: Manifest): Promise<void> {
-  const keep = new Set([...essentials(m), ...Object.values(m.files.packs)]);
+  const keep = new Set([...essentials(m), ...Object.values(m.files.packs), ...Object.values(m.files.kb ?? {})]);
   const drop: string[] = [];
   await db.cfile.each((f) => {
     if (!keep.has(f.key)) drop.push(f.key);
@@ -251,8 +261,7 @@ async function refreshSubjectStatus(): Promise<void> {
   const out: ContentStatus["subjects"] = {};
   const sizes = new Map<string, number>();
   await db.cfile.each((f) => sizes.set(f.key, f.bytes));
-  for (const [pack, key] of Object.entries(m.files.packs)) {
-    const s = pack.split("/")[0];
+  for (const [s, key] of subjectFiles(m)) {
     const e = (out[s] ??= { have: 0, total: 0, bytes: 0 });
     e.total++;
     if (sizes.has(key)) {
@@ -271,8 +280,8 @@ export async function setOffline(subject: SubjectId, on: boolean): Promise<void>
   if (on) {
     await fetchOffline(m).catch(() => undefined);
   } else {
-    const keys = Object.entries(m.files.packs)
-      .filter(([pack]) => pack.split("/")[0] === subject)
+    const keys = subjectFiles(m)
+      .filter(([s]) => s === subject)
       .map(([, k]) => k);
     for (const k of keys) mem.delete(k);
     await db.cfile.bulkDelete(keys);
@@ -352,10 +361,34 @@ export const content = {
     return byId.get(id) ?? "missing";
   },
 
-  async kb(key: string): Promise<KbDoc> {
+  /** 一份筆記；不在這版內容包裡回 null。 */
+  async kb(key: string): Promise<KbDoc | null> {
     const f = (await manifest()).files.kb?.[key];
-    if (!f) throw new Error(`內容包裡沒有筆記 ${key}`);
+    if (!f) return null;
     return file<KbDoc>(f);
+  },
+
+  /** 資料庫目錄。舊的內容包沒有目錄檔時，用筆記本身湊一份。 */
+  async kbCatalog(): Promise<KbCatalog> {
+    const m = await manifest();
+    if (m.files.kbcat) return file<KbCatalog>(m.files.kbcat);
+    const tax = await content.taxonomy();
+    const docs = await Promise.all(Object.keys(m.files.kb ?? {}).map((k) => content.kb(k)));
+    const subjects: KbCatalog["subjects"] = [];
+    for (const d of docs) {
+      if (!d) continue;
+      let s = subjects.find((x) => x.id === d.subject);
+      if (!s) subjects.push((s = { id: d.subject, name: tax.subjects.find((x) => x.id === d.subject)?.name ?? d.subject, imported: true, groups: [{ id: "_", title: "筆記", docs: [] }] }));
+      s.groups[0].docs.push({ key: `${d.subject}/${d.doc}`, title: d.title, file: d.file, counts: {}, sections: [] });
+    }
+    return { subjects };
+  },
+
+  /** 引用這一題的筆記段落。 */
+  async kbRelated(qid: string): Promise<KbRelated[]> {
+    const m = await manifest();
+    if (!m.files.kbrel) return [];
+    return (await file<Record<string, KbRelated[]>>(m.files.kbrel))[qid] ?? [];
   },
 
   /** 某一科全部的內容包鍵（搜尋用）。 */

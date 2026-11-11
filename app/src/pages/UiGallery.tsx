@@ -8,13 +8,14 @@ import { QuestionView, useAnswerFlow } from "@/ui/content/QuestionView";
 import { Markdown } from "@/ui/content/Markdown";
 import { SourceBadges } from "@/ui/content/SourceBadges";
 import { Icon, ICON_NAMES } from "@/ui/icons";
-import { Dialog, Menu, Sheet, useToast } from "@/ui/overlays";
+import { Dialog, Menu, Sheet, useToast, type MenuItem } from "@/ui/overlays";
 import {
   Badge, Button, Card, Checkbox, Chip, EmptyState, FilterGroup, IconButton, LinkButton, ListCard, ListRow, Notice, OptionRow, ProgressBar,
   SectionTitle, Segmented, Skeleton, Select, Spinner, Stat, Switch, Tabs, TextField, type OptionState,
 } from "@/ui/primitives";
 import { Page, SyncStatus } from "@/ui/shell";
-import { BarList, ChartCard, ColumnChart, EditPanel, ExamTimerBar, HighlightPalette, ReviewCard, SearchBar } from "@/ui/templates";
+import { BarList, ChartCard, ColumnChart, EditPanel, ExamTimerBar, HighlightPalette, KbBlocks, ReviewCard, SearchBar, type KbBlockMark } from "@/ui/templates";
+import type { KbDoc } from "@/data";
 
 // ---------- 淺色／深色並排 ----------
 
@@ -166,6 +167,34 @@ const MD_SAMPLE = "題幹文字 17px、行高 1.6。行內公式 $E=mc^2$、化�
 
 const OPTION_STATES: [OptionState, string][] = [["idle", "未選"], ["selected", "已選（複選送出前）"], ["correct", "選了、答對"], ["incorrect", "選了、答錯"], ["missed", "沒選到的正解"], ["dimmed", "作答後的其他選項"]];
 const SYNC_STATES: SyncState[] = [{ kind: "local" }, { kind: "synced", at: 0 }, { kind: "pending", count: 12 }, { kind: "syncing" }, { kind: "offline", count: 3 }, { kind: "error", message: "伺服器回 500" }];
+
+// 資料庫閱讀頁的區塊樹（筆記模式開著：每個區塊右邊有「寫筆記」；第一個列點下面有一則區塊筆記；出處一個對得到、一個對不到）
+const KB_DEMO: KbDoc = {
+  doc: "demo", key: "BCH/demo", subject: "BCH", title: "示範筆記", file: "02_學習筆記/示範.md", figs: [],
+  refs: [{ bid: "aaaaaaaaaaa2", text: "中興-115-42", qid: "NCHU-115-42" }, { bid: "aaaaaaaaaaa2", text: "高醫-99-01", qid: null }],
+  blocks: [
+    { bid: "aaaaaaaaaaa0", type: "heading", level: 2, md: "## 一、PDH complex", children: [
+      { bid: "aaaaaaaaaaa1", type: "list_item", md: "**Product inhibition**：Acetyl-CoA、NADH 抑制 PDH", children: [
+        { bid: "aaaaaaaaaaa2", type: "list_item", md: "PDK 磷酸化 → 失活（中興-115-42、高醫-99-01）", children: [] },
+      ] },
+      { bid: "aaaaaaaaaaa3", type: "list_item", ordered: true, num: 1, md: "有序列點 $E = mc^2$", children: [] },
+      { bid: "aaaaaaaaaaa4", type: "table", md: "| Enzyme | 代號 |\n| :--- | :---: |\n| Pyruvate DeH | E1 |", children: [] },
+    ] },
+  ],
+};
+const KB_DEMO_NOTES = new Map([["aaaaaaaaaaa1", { body_md: "我的區塊筆記：記得 **Ca²⁺** 也會活化 PDP。" }]]);
+// 修訂標記：改過待寫回、已寫回待發佈、刪除待寫回、衝突
+const KB_DEMO_MARKS = new Map<string, KbBlockMark[]>([
+  ["aaaaaaaaaaa1", [{ state: "pending", kind: "md" }]],
+  ["aaaaaaaaaaa2", [{ state: "written", kind: "md" }]],
+  ["aaaaaaaaaaa3", [{ state: "pending", kind: "delete" }]],
+  ["aaaaaaaaaaa4", [{ state: "conflict", kind: "md" }]],
+]);
+const KB_DEMO_MENU = (): MenuItem[] => [
+  { label: "編輯內容", icon: "edit" },
+  { label: "在下面插入列點", icon: "plus" },
+  { label: "刪除這個區塊", icon: "trash", danger: true },
+];
 
 export default function UiGallery() {
   const toast = useToast();
@@ -327,6 +356,16 @@ export default function UiGallery() {
           <Card className="p-4"><Markdown text={MD_SAMPLE} /></Card>
           <div className="flex flex-wrap items-center gap-2"><SourceBadges q={stress} /></div>
           <HighlightPalette onPick={() => {}} onNote={() => {}} />
+        </Pair>
+        <Pair>
+          <Card className="p-4">
+            <KbBlocks doc={KB_DEMO} openDepth={3} editing={false} editMenu={KB_DEMO_MENU} notes={KB_DEMO_NOTES} noteMode onNote={() => {}} />
+          </Card>
+        </Pair>
+        <Pair>
+          <Card className="p-4">
+            <KbBlocks doc={KB_DEMO} openDepth={3} editing editMenu={KB_DEMO_MENU} marks={KB_DEMO_MARKS} />
+          </Card>
         </Pair>
       </Group>
 

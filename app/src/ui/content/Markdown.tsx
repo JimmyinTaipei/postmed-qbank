@@ -36,7 +36,17 @@ export const Markdown = memo(function Markdown({ text, figs, role = "q", tight, 
       return true;
     };
     const click = (e: MouseEvent) => {
-      if (openFig(e.target)) e.stopPropagation(); // 圖在選項裡時，點圖是放大，不是選這個選項
+      if (openFig(e.target)) {
+        e.stopPropagation(); // 圖在選項裡時，點圖是放大，不是選這個選項
+        return;
+      }
+      // 站內連結（筆記之間的連結 /kb/…）：不重新載入整頁
+      const a = (e.target as HTMLElement | null)?.closest?.<HTMLAnchorElement>("a[href^='/']");
+      if (a && el.contains(a) && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+        e.preventDefault();
+        window.history.pushState({}, "", a.getAttribute("href")!);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }
     };
     const key = (e: KeyboardEvent) => {
       if ((e.key === "Enter" || e.key === " ") && (e.target as HTMLElement).classList?.contains("fig") && openFig(e.target)) {

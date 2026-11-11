@@ -28,6 +28,7 @@ class Config:
         self.site_url = os.environ.get("PMQ_URL") or data.get("site", {}).get("url", "")
         self.migrations = PROJECT / "worker/migrations"
         self.sample = data.get("sample", {})
+        self.kb = data.get("kb", {})
         self.project = PROJECT
         self.reports = PROJECT / "reports"
         self.schema = PROJECT / "schema"

@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { answerText, attempts, isChoice, isMulti, judge, notes, qKey, splitQuestion, useCareless, useNote, type Attempt, type FieldMark, type Question } from "@/data";
+import { answerText, attempts, isChoice, isMulti, judge, notes, qKey, splitQuestion, useCareless, useKbRelated, useNote, type Attempt, type FieldMark, type Question } from "@/data";
 import { Icon, type IconName } from "../icons";
 import { useToast } from "../overlays";
 import { Badge, Button, Notice, OptionRow, Segmented, cx, type OptionState } from "../primitives";
@@ -306,6 +306,8 @@ function Solution({ q }: { q: Question }) {
         </Section>
       )}
 
+      <RelatedNotes id={q.id} />
+
       {/* 第 3 階段：個人筆記；第 6 階段：手寫 */}
       <div className="space-y-2">
         <NoteBox q={q} />
@@ -337,6 +339,26 @@ function PatchBadge({ q }: { q: Question }) {
         {MARK_BADGE[m].text}
       </Badge>
     </Link>
+  );
+}
+
+/** 相關筆記（規格書 §9.4）：哪些講義筆記的段落在句尾引用了這一題。點了跳到那個段落。 */
+function RelatedNotes({ id }: { id: string }) {
+  const rel = useKbRelated(id).data;
+  if (!rel?.length) return null;
+  return (
+    <Section title="相關筆記" icon="book">
+      <ul className="space-y-1">
+        {rel.map((r) => (
+          <li key={r.key + r.bid}>
+            <Link to={`/kb/${r.key.split("/").map(encodeURIComponent).join("/")}#b-${r.bid}`} className="flex min-h-(--tap) flex-col justify-center rounded-btn px-2 py-1 no-underline hover:bg-hover">
+              <span className="text-ui text-blue-deep">{[r.title, ...r.path].join(" › ")}</span>
+              {r.text && <span className="line-clamp-2 text-meta text-ink-muted">{r.text}</span>}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Section>
   );
 }
 

@@ -17,7 +17,7 @@ from pathlib import Path
 from .build import dumps
 from .check import run_check
 from .remote import Remote
-from .sample import build_kb_docs, pick_cases
+from .sample import pick_cases
 
 CTYPE = {"json": "application/json; charset=utf-8", "svg": "image/svg+xml", "png": "image/png", "jpg": "image/jpeg",
          "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}
@@ -45,8 +45,10 @@ def build_bundle(cfg, c):
     for q in c.questions:
         packs.setdefault(q["pack"], []).append(c.public(q))
     files["packs"] = {p: add(f"pack/{p}", {"pack": p, "questions": qs}) for p, qs in sorted(packs.items())}
-    kb_docs = build_kb_docs(cfg, c)
+    kb_docs = c.kb_docs            # run_check 已經建好（kb.build_kb）
     files["kb"] = {k: add(f"kb/{k}", d) for k, d in sorted(kb_docs.items())}
+    files["kbcat"] = add("kbcat", c.kb_catalog)
+    files["kbrel"] = add("kbrel", c.kb_related)
     files["cases"] = add("cases", {"cases": pick_cases(c)})
 
     pub = c.assets.published()
@@ -94,7 +96,7 @@ def publish(cfg, url, subject=None, dry_run=False, workers=6):
         files["packs"] = keep(cur["files"]["packs"], files["packs"])
         files["kb"] = keep(cur["files"].get("kb", {}), files["kb"])
         counts = {**cur.get("counts", {}), subject: counts[subject]}
-        wanted = set(files["index"].values()) | set(files["packs"].values()) | set(files["kb"].values()) | {files["taxonomy"], files["cases"]}
+        wanted = set(files["index"].values()) | set(files["packs"].values()) | set(files["kb"].values()) | {files["taxonomy"], files["cases"], files["kbcat"], files["kbrel"]}
         blobs = {k: v for k, v in blobs.items() if k in wanted}
         assets = {k: p for k, p in assets.items()}
 

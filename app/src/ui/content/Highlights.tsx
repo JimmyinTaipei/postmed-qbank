@@ -4,7 +4,7 @@
 // （KaTeX 給螢幕報讀器的隱藏 MathML 不算）。內容被修訂後：位置上的字還是 quote → 原地；否則找全部出現 quote 的地方，
 // 取前後文最像的那一個；找不到 → 進「失聯的螢光」清單（不刪）。
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type RefObject } from "react";
 import { highlights, useHighlights, type Fig, type Highlight, type HighlightColor } from "@/data";
 import { Icon } from "../icons";
 import { Dialog, Sheet } from "../overlays";
@@ -254,5 +254,163 @@ function HighlightSheet({ h, figs, onClose }: { h: Highlight; figs?: Fig[]; onCl
         </Dialog>
       )}
     </Sheet>
+  );
+}
+
+// ---------- 筆記（資料庫閱讀頁）的螢光 ----------
+//
+// 整份筆記共用一層：每個區塊自己的文字放在 [data-hl-bid] 的容器裡（不含子區塊），
+// 螢光的 target 是 "kb:<key>#<bid>"，start／end 以那個區塊的文字算。
+// 筆記改版後重新定位（規格書 §9.4）：先找原本的區塊，再找同一個標題底下的區塊，再找全文；
+// 換了區塊就把 target 改過去。都找不到 → 「失聯的螢光」，不刪。
+
+function blockTexts(scope: ParentNode): { bid: string; el: HTMLElement }[] {
+  return Array.from(scope.querySelectorAll<HTMLElement>("[data-hl-bid]")).map((el) => ({ bid: el.dataset.hlBid!, el }));
+}
+
+function bestIn(cands: { bid: string; el: HTMLElement }[], h: Highlight): { bid: string; el: HTMLElement; at: [number, number]; score: number } | null {
+  let best: { bid: string; el: HTMLElement; at: [number, number]; score: number } | null = null;
+  for (const c of cands) {
+    const { text } = textIndex(c.el);
+    for (let i = text.indexOf(h.quote); i >= 0; i = text.indexOf(h.quote, i + 1)) {
+      const s = commonSuffix(text.slice(Math.max(0, i - CTX), i), h.prefix) + commonPrefix(text.slice(i + h.quote.length, i + h.quote.length + CTX), h.suffix);
+      if (!best || s > best.score) best = { bid: c.bid, el: c.el, at: [i, i + h.quote.length], score: s };
+    }
+  }
+  return best;
+}
+
+/** 換到別的區塊時，前後文至少要有幾個字對得上；否則當成失聯（原文被刪掉、別處剛好有同樣的字）。 */
+const MIN_CONTEXT = 3;
+const near = <T extends { score: number }>(hit: T | null): T | null => (hit && hit.score >= MIN_CONTEXT ? hit : null);
+
+interface LayerProps {
+  /** "BCH/2-3_PDH…" */
+  docKey: string;
+  root: RefObject<HTMLElement | null>;
+  list: Highlight[] | undefined;
+  figs?: Fig[];
+  /** 區塊樹重新畫過（筆記載入、套上修訂、換了展開層數）時換一個新值，讓螢光重新包上去 */
+  version: unknown;
+}
+
+/** 筆記閱讀頁的螢光層：包螢光、選字浮出色票、點螢光開註記面板、失聯清單。 */
+export function KbHighlightLayer({ docKey, root, list, figs, version }: LayerProps) {
+  const [orphans, setOrphans] = useState<Highlight[]>([]);
+  const [pick, setPick] = useState<{ bid: string; s: number; e: number; quote: string; prefix: string; suffix: string; x: number; y: number } | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const prefix = `kb:${docKey}#`;
+
+  // 用 useEffect 而不是 useLayoutEffect：螢光層排在文章前面，同一次提交裡 layout effect 會比文章的 ref 先執行，
+  // 第一次載入時拿到的 root 是空的（2026-11-11 實測：一進頁面螢光不出現）
+  useEffect(() => {
+    const el = root.current;
+    if (!el || !list) return;
+    unwrap(el);
+    const lost: Highlight[] = [];
+    const all = blockTexts(el);
+    for (const h of list) {
+      const bid = h.target.slice(prefix.length);
+      const own = all.find((c) => c.bid === bid);
+      let hit: { bid: string; el: HTMLElement; at: [number, number] } | null = null;
+      if (own) {
+        const at = locate(textIndex(own.el).text, h);
+        if (at) hit = { ...own, at };
+      }
+      if (!hit && own) {
+        // 同一個標題底下
+        const section = own.el.closest("details");
+        if (section) hit = near(bestIn(blockTexts(section), h));
+      }
+      if (!hit) hit = near(bestIn(all, h));
+      if (!hit) {
+        lost.push(h);
+        continue;
+      }
+      wrap(textIndex(hit.el).pieces, hit.at[0], hit.at[1], h);
+      if (hit.bid !== bid) void highlights.update(h.id, { target: prefix + hit.bid, start: hit.at[0], end: hit.at[1] });
+      else if (hit.at[0] !== h.start) void highlights.update(h.id, { start: hit.at[0], end: hit.at[1] });
+    }
+    setOrphans(lost);
+  }, [list, version, root, prefix]);
+
+  const check = useCallback(() => {
+    const el = root.current;
+    const sel = window.getSelection();
+    if (!el || !sel || sel.rangeCount === 0 || sel.isCollapsed) return setPick(null);
+    const r = sel.getRangeAt(0);
+    const startNode = r.startContainer.nodeType === Node.TEXT_NODE ? r.startContainer.parentElement : (r.startContainer as Element);
+    const block = startNode?.closest<HTMLElement>("[data-hl-bid]");
+    if (!block || !el.contains(block)) return setPick(null);
+    const { text: t, pieces } = textIndex(block);
+    const s = offsetOf(pieces, r.startContainer, r.startOffset, block);
+    // 跨區塊的選取：只標到這個區塊的結尾
+    const e = block.contains(r.endContainer) ? offsetOf(pieces, r.endContainer, r.endOffset, block) : t.length;
+    if (s === null || e === null || e <= s || !t.slice(s, e).trim()) return setPick(null);
+    const rect = r.getBoundingClientRect();
+    setPick({ bid: block.dataset.hlBid!, s, e, quote: t.slice(s, e), prefix: t.slice(Math.max(0, s - CTX), s), suffix: t.slice(e, e + CTX), x: rect.left + rect.width / 2, y: rect.bottom });
+  }, [root]);
+
+  useEffect(() => {
+    let timer = 0;
+    const onSel = () => {
+      clearTimeout(timer);
+      timer = window.setTimeout(check, 250);
+    };
+    document.addEventListener("selectionchange", onSel);
+    const el = root.current;
+    const onClick = (e: globalThis.MouseEvent) => {
+      const m = (e.target as HTMLElement).closest<HTMLElement>("mark[data-hl]");
+      if (!m || !window.getSelection()?.isCollapsed) return;
+      e.stopPropagation();
+      setOpen(m.dataset.hl ?? null);
+    };
+    el?.addEventListener("click", onClick);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("selectionchange", onSel);
+      el?.removeEventListener("click", onClick);
+    };
+  }, [check, root, version]);
+
+  const add = async (color: HighlightColor, note: boolean) => {
+    if (!pick) return;
+    const id = await highlights.add({ target: prefix + pick.bid, quote: pick.quote, prefix: pick.prefix, suffix: pick.suffix, start: pick.s, end: pick.e, color });
+    window.getSelection()?.removeAllRanges();
+    setPick(null);
+    if (note) setOpen(id);
+  };
+
+  const current = open ? (list ?? []).find((h) => h.id === open) : undefined;
+  return (
+    <>
+      {pick && (
+        <div className="fixed z-40 print:hidden" style={{ left: Math.max(8, Math.min(pick.x - 196, window.innerWidth - 400)), top: Math.min(pick.y + 10, window.innerHeight - 72) }} onPointerDown={(e) => e.preventDefault()}>
+          <HighlightPalette onPick={(c) => void add(c, false)} onNote={() => void add("yellow", true)} />
+        </div>
+      )}
+      {orphans.length > 0 && <OrphanList orphans={orphans} />}
+      {current && <HighlightSheet h={current} figs={figs} onClose={() => setOpen(null)} />}
+    </>
+  );
+}
+
+function OrphanList({ orphans }: { orphans: Highlight[] }) {
+  return (
+    <details className="rounded-btn border border-line bg-card print:hidden">
+      <summary className="flex min-h-(--tap) items-center gap-2 px-3 text-meta text-ink-muted">
+        <Icon name="alert" size={16} />
+        失聯的螢光（{orphans.length}）：筆記改過，原本標的字找不到了
+      </summary>
+      <ul className="space-y-2 px-3 pb-3">
+        {orphans.map((h) => (
+          <li key={h.id} className="flex items-start gap-2 text-ui">
+            <span className={cx("min-w-0 flex-1 rounded-chip px-1 text-paper-ink", BG[h.color])}>{h.quote}</span>
+            {h.comment_md && <span className="min-w-0 flex-1 text-ink-muted">{h.comment_md}</span>}
+            <Button variant="ghost" icon="trash" onClick={() => void highlights.remove(h.id)}>刪除</Button>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

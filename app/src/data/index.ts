@@ -6,6 +6,7 @@ export { content, setOffline, useContentStatus, type ContentStatus } from "./con
 export { attempts, exam, flags, sessions, settings, wipeLocal, wrongBook, type ExamPicks } from "./personal";
 export { srs, type ReviewQueue } from "./srs";
 export { patches, notes, highlights, applyPatches, answerValue, fieldValue, fieldHash, markOf, patchNote, isWritten, FIELD_NAME, type AnswerValue } from "./patches";
+export { kbPatches, applyKbPatches, useKbPatches, useKbDrafts, useKbDraft, draftName, isNewBid, kbTarget, KB_EDITABLE, KB_DELETABLE, KB_BAD_NAME, type KbMark, type KbOverlay } from "./kbPatches";
 export { DEFAULT_SRS, ratingOf, startOfDay, localDay } from "./srs-core";
 export { prefs, useDeviceName, useFigInvert, useOfflinePref, useShowUnverified, useThemePref } from "./prefs";
 export { startSync, syncNow, useSyncDetail, useSyncState } from "./sync";

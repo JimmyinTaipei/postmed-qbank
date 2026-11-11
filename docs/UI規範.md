@@ -84,8 +84,8 @@
 | 複習卡片 | `ReviewCard`（翻面、四顆評分鈕） | `/dev/ui`（題目的複習改用刷題畫面；卡片在第 5 階段用） | 5 |
 | 原卷方格、模擬考計時列 | `PaperGrid`、`ExamTimerBar`（`remainingS = null` 時是不計時、顯示已用時間） | `/papers`、模擬考畫面 | 2（完成） |
 | 圖表卡 | `ChartCard`、`BarList`、`ColumnChart`、`HeatTable`（`rowName` 給列的顯示名稱） | `/stats` `/analysis` | 2（完成） |
-| 資料庫閱讀頁 | `KbBlocks`（收合、編輯鈕）、`HighlightPalette` | `/kb` `/kb/:subject/:doc` | 4 |
-| 編輯面板 | `EditPanel`／`MarkdownEditor`（原始碼＋即時預覽＋貼上轉換） | 題目編輯（`pages/EditQuestion.tsx`，已接）、閱讀頁的編輯模式 | 3（完成）、4 |
+| 資料庫閱讀頁 | `KbBlocks`（收合；編輯模式下每個區塊一個 ✎ `Menu`，項目由頁面用 `editMenu(b)` 給；`marks` 顯示修訂標記「已修訂／新增／刪除・待寫回／已寫回・待發佈／衝突／修訂待處理」，刪除待寫回的區塊加 `.kb-deleted` 淡化＋刪除線）、`HighlightPalette`、`KbHighlightLayer` | `/kb` `/kb/:subject/:doc` `/kb/new/:id`（網站上新增的筆記） | 4（完成） |
+| 編輯面板 | `EditPanel`／`MarkdownEditor`（原始碼＋即時預覽＋貼上轉換） | 題目編輯（`pages/EditQuestion.tsx`）、筆記閱讀頁的編輯區塊／插入列點、新筆記草稿頁 | 3、4（完成） |
 | 個人筆記區、手寫區外框 | `QuestionView` 最下面兩個收合區 | 任何一題作答後 | 3（筆記完成）、6 |
 | 各種狀態 | `EmptyState`、`Skeleton`、`Notice`、`SyncStatus` | `/dev/ui`「狀態」 | — |
 

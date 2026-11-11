@@ -90,6 +90,18 @@ def run_check(cfg, with_math=True, answers_file=None):
         math_fail, math_stats = mathcheck.run(items, cfg)
 
     note_link_stats(cfg, rep)
+
+    # ---- 資料庫（講義筆記，第 4 階段）----
+    from .kb import build_kb, count_blocks
+    c.kb_docs, c.kb_catalog, c.kb_related = build_kb(cfg, c)
+    kb_fail = 0
+    for key, d in c.kb_docs.items():
+        errs = list(v["kb"].iter_errors(d))
+        if errs:
+            kb_fail += 1
+            rep.error("筆記 JSON Schema 不過", doc=key, message="; ".join(f"{'/'.join(map(str, e.path))}: {e.message}" for e in errs[:3]))
+    kb_rows = [{"key": k, "file": d["file"], **count_blocks(d["blocks"]), "refs": len(d["refs"]), "refs_unmapped": sum(1 for r in d["refs"] if not r["qid"])}
+               for k, d in c.kb_docs.items()]
     c.cache.save()
     elapsed = time.time() - t0
     result = {
@@ -106,6 +118,8 @@ def run_check(cfg, with_math=True, answers_file=None):
                    "svg": sum(1 for i in pub.values() if i["ext"] == "svg"),
                    "raster": sum(1 for i in pub.values() if i["ext"] != "svg")},
         "math": {"stats": math_stats, "failures": math_fail},
+        "kb": {"docs": kb_rows, "schema_failed": kb_fail, "related_questions": len(c.kb_related),
+               "outline": {s["id"]: [g["title"] for g in s["groups"]] for s in c.kb_catalog["subjects"] if not s["imported"]}},
         "chapters": len(c.chapters),
         "sources": len(c.sources),
     }

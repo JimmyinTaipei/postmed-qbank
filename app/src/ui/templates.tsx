@@ -3,12 +3,12 @@
 
 import { useId, useMemo, useRef, useState, type ClipboardEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import type { Fig, KbBlock, KbDoc } from "@/data";
+import type { Fig, FieldMark, KbBlock, KbDoc } from "@/data";
 import { Markdown } from "./content/Markdown";
 import { pasteText } from "./content/paste";
 import { Icon } from "./icons";
-import { Sheet } from "./overlays";
-import { Button, Card, IconButton, ProgressBar, TextField, cx } from "./primitives";
+import { Menu, Sheet, type MenuItem } from "./overlays";
+import { Badge, Button, Card, IconButton, ProgressBar, TextField, cx } from "./primitives";
 
 // ---------- 清單頁：搜尋列 ----------
 
@@ -287,22 +287,38 @@ export function HighlightPalette({ onPick, onNote }: { onPick: (color: (typeof H
   );
 }
 
+/** 區塊上的修訂標記（資料層的 KbMark 去掉修訂本身）。 */
+export interface KbBlockMark {
+  state: FieldMark;
+  kind: "md" | "insert" | "delete";
+}
+
 interface KbProps {
   doc: KbDoc;
   /** 預設展開到第幾層標題（1 起）；Infinity = 全部 */
   openDepth: number;
   editing: boolean;
-  onEdit: (b: KbBlock) => void;
+  /** 編輯模式下每個區塊 ✎ 選單的項目（改、插入列點、刪除…） */
+  editMenu: (b: KbBlock) => MenuItem[];
+  /** bid → 修訂標記（待寫回、待發佈、衝突…）；刪除待寫回的區塊淡化加刪除線 */
+  marks?: Map<string, KbBlockMark[]>;
+  /** 區塊筆記：bid → Markdown */
+  notes?: Map<string, { body_md: string }>;
+  /** 筆記模式：每個區塊右邊出現「寫筆記」 */
+  noteMode?: boolean;
+  onNote?: (b: KbBlock) => void;
 }
 
-/** 筆記的區塊樹：標題與有子項的列點都可收合；編輯模式下每個區塊右邊有 ✎。 */
-export function KbBlocks({ doc, openDepth, editing, onEdit }: KbProps) {
+/** 筆記的區塊樹：標題與有子項的列點都可收合；編輯模式下每個區塊右邊有 ✎ 選單、筆記模式下有 💬。
+ *  每個區塊自己的文字包在 [data-hl-bid] 裡（螢光層用），整個區塊有 id="b-<bid>"（相關筆記的連結跳到這裡）。
+ *  收合只是藏起來（hidden），文字仍在頁面上，螢光才找得到。 */
+export function KbBlocks({ doc, ...rest }: KbProps) {
   const refs = useMemo(() => {
     const m = new Map<string, KbDoc["refs"]>();
     for (const r of doc.refs) m.set(r.bid, [...(m.get(r.bid) ?? []), r]);
     return m;
   }, [doc]);
-  return <BlockList blocks={doc.blocks} doc={doc} refs={refs} openDepth={openDepth} editing={editing} onEdit={onEdit} />;
+  return <BlockList blocks={doc.blocks} doc={doc} refs={refs} {...rest} />;
 }
 
 type Shared = Omit<KbProps, "doc"> & { doc: KbDoc; refs: Map<string, KbDoc["refs"]> };
@@ -312,7 +328,7 @@ function BlockList({ blocks, ...s }: { blocks: KbBlock[] } & Shared) {
   const groups: (KbBlock | KbBlock[])[] = [];
   for (const b of blocks) {
     const last = groups[groups.length - 1];
-    if (b.type === "list_item" && Array.isArray(last)) last.push(b);
+    if (b.type === "list_item" && Array.isArray(last) && last[0].ordered === b.ordered) last.push(b);
     else groups.push(b.type === "list_item" ? [b] : b);
   }
   return (
@@ -320,7 +336,8 @@ function BlockList({ blocks, ...s }: { blocks: KbBlock[] } & Shared) {
       {groups.map((g, i) =>
         Array.isArray(g) ? (
           <ul key={i} className="space-y-0.5">
-            {g.map((b) => <ListItem key={b.bid} b={b} {...s} />)}
+            {/* 有序列點的編號照 Markdown：從第一項的數字往下數（與 Typora 相同） */}
+            {g.map((b, k) => <ListItem key={b.bid} b={b} n={(g[0].num ?? 1) + k} {...s} />)}
           </ul>
         ) : (
           <Block key={g.bid} b={g} {...s} />
@@ -330,14 +347,64 @@ function BlockList({ blocks, ...s }: { blocks: KbBlock[] } & Shared) {
   );
 }
 
-function EditHandle({ b, editing, onEdit }: { b: KbBlock; editing: boolean; onEdit: (b: KbBlock) => void }) {
-  if (!editing) return null;
+function Handles({ b, s }: { b: KbBlock; s: Shared }) {
+  if (s.editing)
+    return (
+      <span className="-my-1 text-blue-deep print:hidden">
+        <Menu label="編輯這個區塊" items={s.editMenu(b)}>
+          <Icon name="edit" size={18} />
+        </Menu>
+      </span>
+    );
+  if (s.noteMode && s.onNote)
+    return (
+      <IconButton label={s.notes?.has(b.bid) ? "編輯這個區塊的筆記" : "在這個區塊寫筆記"} className="-my-1 text-blue-deep print:hidden" onClick={() => s.onNote!(b)}>
+        <Icon name="note" size={18} />
+      </IconButton>
+    );
+  return null;
+}
+
+/** 區塊下方的個人筆記。 */
+function BlockNote({ b, s }: { b: KbBlock; s: Shared }) {
+  const n = s.notes?.get(b.bid);
+  if (!n) return null;
   return (
-    <IconButton label="編輯這個區塊" className="-my-1 text-blue-deep" onClick={() => onEdit(b)}>
-      <Icon name="edit" size={18} />
-    </IconButton>
+    <div className="mt-1 flex items-start gap-2 rounded-btn border border-line bg-hover px-3 py-2">
+      <Icon name="note" size={16} className="mt-1 shrink-0 text-blue-deep" />
+      <div className="min-w-0 flex-1 text-ui">
+        <Markdown text={n.body_md} figs={s.doc.figs} role="kb" tight />
+      </div>
+      {s.onNote && (
+        <IconButton label="編輯這則筆記" className="-my-1 print:hidden" onClick={() => s.onNote!(b)}>
+          <Icon name="edit" size={16} />
+        </IconButton>
+      )}
+    </div>
   );
 }
+
+const MARK_TEXT: Record<KbBlockMark["kind"], string> = { md: "已修訂", insert: "新增", delete: "刪除" };
+
+/** 區塊旁的修訂標記。 */
+function Marks({ list }: { list?: KbBlockMark[] }) {
+  if (!list?.length) return null;
+  return (
+    <span className="mt-1 flex flex-wrap gap-1.5 print:hidden">
+      {list.map((m, i) =>
+        m.state === "conflict" ? (
+          <Badge key={i} tone="incorrect" icon="alert">{MARK_TEXT[m.kind]}・衝突</Badge>
+        ) : m.state === "stale" ? (
+          <Badge key={i} tone="warning" icon="alert">{MARK_TEXT[m.kind]}・修訂待處理</Badge>
+        ) : (
+          <Badge key={i} tone={m.state === "written" ? "blue" : "warning"} icon="edit">{MARK_TEXT[m.kind]}・{m.state === "written" ? "已寫回・待發佈" : "待寫回"}</Badge>
+        ),
+      )}
+    </span>
+  );
+}
+
+const isDeleted = (list?: KbBlockMark[]) => !!list?.some((m) => m.kind === "delete" && (m.state === "pending" || m.state === "written"));
 
 function RefChips({ refs }: { refs?: KbDoc["refs"] }) {
   if (!refs?.length) return null;
@@ -347,7 +414,7 @@ function RefChips({ refs }: { refs?: KbDoc["refs"] }) {
         r.qid ? (
           <Link key={i} to={`/q/${encodeURIComponent(r.qid)}`} className="inline-flex min-h-7 items-center rounded-chip bg-blue-light px-2 text-meta text-blue-ink no-underline">{r.text}</Link>
         ) : (
-          <span key={i} className="inline-flex min-h-7 items-center rounded-chip bg-hover px-2 text-meta text-ink-muted">{r.text}</span>
+          <span key={i} title="題庫裡找不到這一題" className="inline-flex min-h-7 items-center rounded-chip bg-hover px-2 text-meta text-ink-muted">{r.text}</span>
         ),
       )}
     </span>
@@ -355,30 +422,34 @@ function RefChips({ refs }: { refs?: KbDoc["refs"] }) {
 }
 
 // 句尾的考古題出處已經另外做成連結，從內文拿掉避免重複
-const stripRefs = (md: string, refs?: KbDoc["refs"]) => (refs?.length ? md.replace(/[（(][^（()）]*\d{2,3}-\d+[^（()）]*[）)]\s*$/, "") : md);
+const stripRefs = (md: string, refs?: KbDoc["refs"]) => (refs?.length ? md.replace(/[（(][^（()）]*[一-鿿]{2}-\d{2,3}-\d+[^（()）]*[）)]\s*$/, "") : md);
 
-function ListItem({ b, ...s }: { b: KbBlock } & Shared) {
+function ListItem({ b, n, ...s }: { b: KbBlock; n: number } & Shared) {
   const [open, setOpen] = useState(true);
   const kids = b.children;
   const r = s.refs.get(b.bid);
+  const m = s.marks?.get(b.bid);
   return (
-    <li>
+    <li id={`b-${b.bid}`} className={cx("kb-block", isDeleted(m) && "kb-deleted")}>
       <div className="flex items-start gap-1">
         {kids.length ? (
-          <button type="button" aria-expanded={open} aria-label={open ? "收合子項" : "展開子項"} onClick={() => setOpen((v) => !v)} className="flex h-7 w-6 shrink-0 items-center justify-center rounded-chip text-ink-muted hover:bg-hover">
+          <button type="button" aria-expanded={open} aria-label={open ? "收合子項" : "展開子項"} onClick={() => setOpen((v) => !v)} className="flex h-7 min-w-6 shrink-0 items-center justify-center rounded-chip text-ink-muted hover:bg-hover print:hidden">
             <Icon name="chevronRight" size={15} className={cx("transition-transform duration-(--dur-fast)", open && "rotate-90")} />
           </button>
-        ) : (
-          <span className="flex h-7 w-6 shrink-0 items-center justify-center text-ink-muted" aria-hidden="true">•</span>
-        )}
+        ) : null}
+        <span className={cx("h-7 min-w-6 shrink-0 items-center justify-center text-ink-muted", kids.length ? "hidden print:flex" : "flex")} aria-hidden="true">{b.ordered ? `${n}.` : "•"}</span>
         <div className="min-w-0 flex-1">
-          <Markdown text={stripRefs(b.md, r)} figs={s.doc.figs} role="kb" tight />
+          <div data-hl-bid={b.bid}>
+            <Markdown text={stripRefs(b.md, r)} figs={s.doc.figs} role="kb" tight />
+          </div>
+          <Marks list={m} />
           <RefChips refs={r} />
+          <BlockNote b={b} s={s} />
         </div>
-        <EditHandle b={b} editing={s.editing} onEdit={s.onEdit} />
+        <Handles b={b} s={s} />
       </div>
-      {open && kids.length > 0 && (
-        <div className="ml-3 border-l border-line pl-3">
+      {kids.length > 0 && (
+        <div hidden={!open} className="ml-3 border-l border-line pl-3 print:block">
           <BlockList blocks={kids} {...s} />
         </div>
       )}
@@ -387,35 +458,56 @@ function ListItem({ b, ...s }: { b: KbBlock } & Shared) {
 }
 
 function Block({ b, ...s }: { b: KbBlock } & Shared) {
-  if (b.type === "html" || /^\s*<style/.test(b.md)) return null; // Typora 的列印設定，網站上不顯示
-  if (b.type === "rule") return <hr className="my-4 border-line" />;
+  if (b.type === "html" || /^\s*<style/.test(b.md)) {
+    // Typora 的列印設定、分頁符號：網站上不顯示；分頁符號在列印時照樣分頁
+    return /page-break-before/.test(b.md) ? <div className="hidden print:block print:break-before-page" aria-hidden="true" /> : null;
+  }
+  if (b.type === "rule") return <hr id={`b-${b.bid}`} className="my-4 border-line" />;
   if (b.type === "heading") {
     const level = b.level ?? 2;
     const H = `h${Math.min(6, Math.max(2, level))}` as "h2";
     const text = b.md.replace(/^#+\s*/, "");
     if (level === 1) return <BlockList blocks={b.children} {...s} />; // 文件標題已在頁首
+    const m = s.marks?.get(b.bid);
     return (
-      <details open={level <= s.openDepth} className="group/h">
+      <details id={`b-${b.bid}`} open={level <= s.openDepth} className="kb-block group/h">
         <summary className={cx("flex min-h-(--tap) items-center gap-2 rounded-btn hover:bg-hover", level === 2 ? "mt-4 border-b border-line" : "mt-2")}>
-          <Icon name="chevronRight" size={18} className="text-ink-muted transition-transform duration-(--dur-fast) group-open/h:rotate-90" />
+          <Icon name="chevronRight" size={18} className="text-ink-muted transition-transform duration-(--dur-fast) group-open/h:rotate-90 print:hidden" />
           <H className={cx("min-w-0 flex-1 font-semibold text-ink-strong", level === 2 ? "text-title" : "text-body")}>
-            <Markdown text={text} tight className={level === 2 ? "text-title!" : undefined} />
+            <span data-hl-bid={b.bid} className="block">
+              <Markdown text={text} tight className={level === 2 ? "text-title!" : undefined} />
+            </span>
           </H>
-          <span onClick={(e) => e.preventDefault()}><EditHandle b={b} editing={s.editing} onEdit={s.onEdit} /></span>
+          <span onClick={(e) => e.preventDefault()}><Handles b={b} s={s} /></span>
         </summary>
         <div className="space-y-2 py-2 pl-1.5">
+          <Marks list={m} />
+          <BlockNote b={b} s={s} />
           <BlockList blocks={b.children} {...s} />
         </div>
       </details>
     );
   }
+  const r = s.refs.get(b.bid);
+  const m = s.marks?.get(b.bid);
   return (
-    <div className="flex items-start gap-1">
-      <div className="min-w-0 flex-1">
-        <Markdown text={stripRefs(b.md, s.refs.get(b.bid))} figs={s.doc.figs} role="kb" />
-        <RefChips refs={s.refs.get(b.bid)} />
+    <div id={`b-${b.bid}`} className={cx("kb-block", isDeleted(m) && "kb-deleted")}>
+      <div className="flex items-start gap-1">
+        <div className="min-w-0 flex-1">
+          <div data-hl-bid={b.bid}>
+            <Markdown text={stripRefs(b.md, r)} figs={s.doc.figs} role="kb" />
+          </div>
+          <Marks list={m} />
+          <RefChips refs={r} />
+          <BlockNote b={b} s={s} />
+        </div>
+        <Handles b={b} s={s} />
       </div>
-      <EditHandle b={b} editing={s.editing} onEdit={s.onEdit} />
+      {b.children.length > 0 && (
+        <div className="ml-3 space-y-2 border-l border-line pl-3">
+          <BlockList blocks={b.children} {...s} />
+        </div>
+      )}
     </div>
   );
 }

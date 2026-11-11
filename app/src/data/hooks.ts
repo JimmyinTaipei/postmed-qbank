@@ -43,6 +43,8 @@ export const useContentInfo = () => useAsync(() => content.info(), []);
 export const useTaxonomy = () => useAsync(() => content.taxonomy(), []);
 export const useBodyIds = () => useAsync(() => content.bodyIds(), []);
 export const useKb = (key: string | undefined) => useAsync(() => (key ? content.kb(key) : Promise.resolve(undefined)), [key]);
+export const useKbCatalog = () => useAsync(() => content.kbCatalog(), []);
+export const useKbRelated = (qid: string | undefined) => useAsync(() => (qid ? content.kbRelated(qid) : Promise.resolve([])), [qid]);
 
 /** 題目本文：undefined 載入中；null 沒有這一題；"missing" 本文不在裝置上。 */
 export function useQuestion(id: string | undefined): Loadable<Question | null | "missing"> {
@@ -74,6 +76,21 @@ export function useNote(target: string): Note | null | undefined {
 /** 某個區塊（"q:ID/sol"…）上的螢光。 */
 export function useHighlights(target: string): Highlight[] | undefined {
   return useLiveQuery(async () => (await db.highlight.where("target").equals(target).toArray()).filter((h) => !h.deleted).sort((a, b) => a.start - b.start), [target]);
+}
+
+/** 一份筆記上全部的螢光（target 是 "kb:<key>#<bid>"）。 */
+export function useKbHighlights(key: string | undefined): Highlight[] | undefined {
+  return useLiveQuery(async () => (key ? (await db.highlight.where("target").startsWith(`kb:${key}#`).toArray()).filter((h) => !h.deleted) : []), [key]);
+}
+
+/** 一份筆記上全部的區塊筆記：bid → 筆記。 */
+export function useKbNotes(key: string | undefined): Map<string, Note> | undefined {
+  return useLiveQuery(async () => {
+    const m = new Map<string, Note>();
+    if (!key) return m;
+    for (const n of await db.note.where("target").startsWith(`kb:${key}#`).toArray()) if (!n.deleted) m.set(n.target.slice(key.length + 4), n);
+    return m;
+  }, [key]);
 }
 
 /** 某一科的篩選環境（索引＋章節樹）。 */

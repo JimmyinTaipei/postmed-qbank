@@ -201,11 +201,42 @@ def write_report(cfg, c, r):
     add(_list(W.get("note_absolute_path", []), ["file", "target"], ["筆記", "絕對路徑（請改成相對路徑）"]))
     add("")
 
+    kb = r.get("kb")
+    if kb:
+        add("## 9. 資料庫（講義筆記）")
+        add("")
+        refs = sum(d["refs"] for d in kb["docs"])
+        un = sum(d["refs_unmapped"] for d in kb["docs"])
+        add(f"筆記 {len(kb['docs'])} 份（JSON Schema 不過 {kb['schema_failed']}）；考古題出處 {refs} 個，對到題目 {refs - un}、**對不到 {un}**；被筆記引用的題目 {kb['related_questions']} 題。")
+        add("只建章節目錄的科目：" + "；".join(f"{s} {len(v)} 章" for s, v in kb["outline"].items()) + "。")
+        add("")
+        cols = ["heading", "list_item", "paragraph", "table", "table_group", "figure", "math", "code", "quote"]
+        add(_table([[d["key"], *[d.get(c, 0) for c in cols], d["refs"], d["refs_unmapped"]] for d in kb["docs"]],
+                   ["筆記", "標題", "列點", "段落", "表格", "表格群組", "圖", "公式", "程式碼", "引言", "出處", "對不到"]))
+        add("")
+        add("**對不到題目的出處**（筆記寫錯題號，或題庫沒有這一題）")
+        add("")
+        add(_list(W.get("kb_ref_unmapped", []), ["doc", "text"], ["筆記", "出處"]))
+        add("")
+        add("**筆記的圖：絕對路徑（請改成相對路徑）／讀不到**")
+        add("")
+        add(_list(W.get("kb_absolute_image", []) + W.get("kb_image_missing", []), ["doc", "src", "path"], ["筆記", "絕對路徑", "讀不到的檔"]))
+        add("")
+        add("**筆記之間的連結對不到**")
+        add("")
+        add(_list(W.get("kb_link_unresolved", []), ["doc", "link"], ["筆記", "連結"]))
+        add("")
+        add("**沒有被任何區塊涵蓋的行**（轉接器漏讀；應該是 0）")
+        add("")
+        add(_list(W.get("kb_lines_uncovered", []), ["doc", "missing", "overlap"], ["筆記", "漏掉的行（前 10）", "重疊的行"]))
+        add("")
+
     add("## 10. 其他警告")
     add("")
     shown = {"option_parse_failed", "answer_key_not_in_options", "status_unmapped", "biochem_answer_special", "biochem_answer_unparsed",
              "xchap_not_in_tree", "fig_registered_not_referenced", "fig_not_approved", "fig_not_in_registry", "fig_approved_without_svg",
-             "svg_font_not_whitelisted", "svg_over_500kb", "duplicate_identical", "note_absolute_path"}
+             "svg_font_not_whitelisted", "svg_over_500kb", "duplicate_identical", "note_absolute_path",
+             "kb_ref_unmapped", "kb_absolute_image", "kb_image_missing", "kb_link_unresolved", "kb_lines_uncovered"}
     rest = {k: v for k, v in W.items() if k not in shown}
     if not rest:
         add("（無）")

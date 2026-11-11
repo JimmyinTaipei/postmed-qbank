@@ -14,12 +14,12 @@ import { ulid } from "@/lib/ulid";
 import { db } from "./db";
 import { prefs } from "./prefs";
 import { enqueue, kick } from "./sync";
-import type { ContentPatch, FieldMark, Highlight, HighlightColor, Note, PatchField, PatchInfo, PatchNote, Question } from "./types";
+import type { ContentPatch, FieldMark, Highlight, HighlightColor, KbPatchField, Note, PatchField, PatchInfo, PatchNote, Question } from "./types";
 
 const now = () => Date.now();
 const OPEN: ContentPatch["status"][] = ["pending", "conflict"];
 
-export const FIELD_NAME: Record<PatchField, string> = {
+export const FIELD_NAME: Record<PatchField | KbPatchField, string> = {
   ques: "題幹與選項",
   idea: "思路",
   sol: "詳解",
@@ -27,6 +27,11 @@ export const FIELD_NAME: Record<PatchField, string> = {
   chap: "章節",
   tags: "標籤",
   human_verified: "已確認",
+  md: "筆記區塊",
+  insert_after: "插入列點",
+  insert_child: "插入子列點",
+  delete: "刪除區塊",
+  create: "新增筆記",
 };
 
 export type AnswerValue = Pick<Question["answer"], "mode" | "keys" | "text">;
@@ -87,7 +92,7 @@ export function markOf(p: ContentPatch, q: Question): FieldMark | null {
   if (p.status !== "pending") return null;
   if (p.field === "human_verified" && q.sol_meta.human_verified) return null; // 已發佈
   const n = patchNote(p);
-  const h = fieldHash(q, p.field);
+  const h = fieldHash(q, p.field as PatchField);
   // 已寫回主檔：主檔就是這個內容，照修訂顯示（已發佈、等 pmq 標 merged 時不再加標記）
   if (isWritten(p)) return h === n.wh && p.field !== "human_verified" ? null : "written";
   // 寫回過、之後又改（主檔是我們上一版）或衝突時選了「保留我的版本」：內容包落後是正常的，照修訂顯示
@@ -136,8 +141,8 @@ export function applyPatches(base: Question, rows: ContentPatch[]): Question {
   const latest = new Map<PatchField, ContentPatch>();
   for (const p of rows) {
     if (!OPEN.includes(p.status)) continue;
-    const cur = latest.get(p.field);
-    if (!cur || p.created_at > cur.created_at) latest.set(p.field, p);
+    const cur = latest.get(p.field as PatchField);
+    if (!cur || p.created_at > cur.created_at) latest.set(p.field as PatchField, p);
   }
   for (const [field, p] of latest) {
     const m = markOf(p, base);
@@ -155,7 +160,7 @@ export function applyPatches(base: Question, rows: ContentPatch[]): Question {
   return q;
 }
 
-async function put(p: ContentPatch): Promise<void> {
+export async function put(p: ContentPatch): Promise<void> {
   await db.transaction("rw", db.content_patch, db.outbox, async () => {
     await db.content_patch.put(p);
     await enqueue("content_patch", p.id);
@@ -163,7 +168,7 @@ async function put(p: ContentPatch): Promise<void> {
   kick();
 }
 
-async function openPatch(target: string, field: PatchField): Promise<ContentPatch | undefined> {
+export async function openPatch(target: string, field: PatchField | KbPatchField): Promise<ContentPatch | undefined> {
   const rows = await db.content_patch.where("target").equals(target).toArray();
   return rows.filter((p) => p.field === field && OPEN.includes(p.status)).sort((a, b) => b.created_at - a.created_at)[0];
 }
@@ -248,7 +253,7 @@ export const highlights = {
     await highlights.put(row);
     return row.id;
   },
-  async update(id: string, patch: Partial<Pick<Highlight, "color" | "comment_md" | "start" | "end">>): Promise<void> {
+  async update(id: string, patch: Partial<Pick<Highlight, "color" | "comment_md" | "start" | "end" | "target">>): Promise<void> {
     const cur = await db.highlight.get(id);
     if (!cur) return;
     await highlights.put({ ...cur, ...patch, updated_at: Math.max(now(), cur.updated_at + 1) });

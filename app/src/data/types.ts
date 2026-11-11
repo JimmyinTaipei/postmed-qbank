@@ -118,12 +118,14 @@ export interface Question {
 // ---------- 修訂佇列（規格書 §4.6 content_patch、§7.3、§8） ----------
 
 export type PatchField = "ques" | "idea" | "sol" | "answer" | "chap" | "tags" | "human_verified";
+/** 筆記（資料庫）的修訂：target 是 "kb:<key>#<bid>"（create 是 "kbnew:<科目>/<檔名>"）。寫回見 pmq 的 kb_patches.py。 */
+export type KbPatchField = "md" | "insert_after" | "insert_child" | "delete" | "create";
 export type PatchStatus = "pending" | "merged" | "conflict" | "rejected";
 
 export interface ContentPatch {
   id: string; // ULID
-  target: string; // "q:PHY-007836"
-  field: PatchField;
+  target: string; // "q:PHY-007836"｜"kb:BCH/2-3_PDH#0123456789ab"｜"kbnew:BCH/新筆記"
+  field: PatchField | KbPatchField;
   base_h: string; // 改之前內容包裡該欄位的雜湊
   value: string; // 新內容（answer、tags 是 JSON）
   status: PatchStatus;
@@ -143,6 +145,7 @@ export interface PatchNote {
   reason?: string;
   resolved?: "mine" | "theirs";
   merged?: number;
+  bf?: string; // 筆記：寫回之前整份檔的雜湊（pmq 判斷線上是不是新版用）
 }
 
 /** 這一題在畫面上的修訂狀態：pending 待寫回｜written 已寫回、待發佈｜stale 修訂待處理（內容包已經變了）｜conflict 衝突 */
@@ -184,21 +187,58 @@ export interface Highlight {
 
 export interface KbBlock {
   bid: string;
-  type: "heading" | "list_item" | "paragraph" | "table" | "table_group" | "figure" | "math" | "quote" | "rule" | "html";
+  type: "heading" | "list_item" | "paragraph" | "table" | "table_group" | "figure" | "math" | "quote" | "rule" | "html" | "code";
   level?: number;
   ordered?: boolean;
+  /** 有序列點的編號 */
+  num?: number;
   md: string;
+  /** 主檔行範圍 [起, 訖)，0 起 */
+  lines?: [number, number];
   children: KbBlock[];
 }
 
 export interface KbDoc {
   doc: string;
+  /** "BCH/2-3_PDH_TCA_and_Glyoxylate_Cycle" */
+  key?: string;
   subject: SubjectId;
   title: string;
   file: string;
   blocks: KbBlock[];
   figs: Fig[];
   refs: { bid: string; text: string; qid: string | null }[];
+  /** 主檔原文（匯出 .md 用） */
+  src?: string;
+}
+
+/** 資料庫目錄（c/kbcat）：科目 → 群組（B1 基礎篇、Ch01 生命的研究…）→ 筆記。 */
+export interface KbCatalog {
+  subjects: {
+    id: string;
+    name: string;
+    /** false = 只有章節目錄、還沒有內容（生物、化學、英文） */
+    imported: boolean;
+    groups: { id: string; title: string; docs: KbCatalogDoc[] }[];
+  }[];
+}
+export interface KbCatalogDoc {
+  key: string;
+  title: string;
+  file: string;
+  counts: Partial<Record<KbBlock["type"], number>>;
+  /** 第二層標題 */
+  sections: string[];
+}
+
+/** 題目 → 引用它的筆記段落（c/kbrel）。 */
+export interface KbRelated {
+  key: string;
+  bid: string;
+  title: string;
+  /** 文件標題以下的標題路徑 */
+  path: string[];
+  text: string;
 }
 
 export interface ContentInfo {

@@ -20,6 +20,18 @@ cache      = "~/Library/Caches/postmed-qbank"
 kb_biochem = "02_生化/B2_代謝篇/2-3_PDH_TCA_and_Glyoxylate_Cycle.md"
 kb_physics = "03_物理/2_電磁學/Ch12動電學.md"
 
+[kb]
+# 資料庫（講義筆記，規格書 §9.4、搬遷步驟 9）。路徑相對 notes。_archive、pdf 資料夾一律不匯入。
+# 匯入內容：每個子資料夾是一個群組（B1_基礎篇…）；直接放在這層的 .md 歸到「總論」
+BCH = ["02_生化"]
+PHY = ["03_物理"]
+# 不匯入的檔（相對 notes）
+exclude = ["02_生化/00_待確認清單.md", "03_物理/特訓班_章節配對表.md"]
+# 只建章節目錄（資料夾名稱當章節名）
+BIO = "01_生物"
+CHE = "04_化學"
+ENG = "05_英文"
+
 [site]
 # 第一次部署後，把 workers.dev 網址填在這裡（docs/部署步驟.md）。也可用環境變數 PMQ_URL 或 --url 覆寫。
 url = ""

@@ -477,3 +477,72 @@
   padding-left: max(1rem, env(safe-area-inset-left, 0px));
   padding-right: max(1rem, env(safe-area-inset-right, 0px));
 }
+
+/* ---------- 資料庫閱讀頁（第 4 階段） ---------- */
+
+/* 從題目的「相關筆記」或目錄跳過來：那個區塊閃一下 */
+.kb-flash {
+  border-radius: var(--r-btn);
+  outline: 2px solid var(--blue-accent);
+  outline-offset: 4px;
+  transition: outline-color var(--dur-slow) ease-out;
+}
+
+/* 網站上刪除、還沒寫回的區塊：淡化加刪除線（文字仍在，螢光照樣找得到） */
+.kb-deleted [data-hl-bid] {
+  opacity: 0.55;
+  text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
+}
+@media print {
+  .kb-deleted {
+    display: none;
+  }
+}
+
+/* 列印（筆記閱讀頁「列印或存成 PDF」）：只留內容，收合的全部展開，寬表格不裁切 */
+@media print {
+  @page {
+    margin: 14mm 12mm;
+  }
+  aside,
+  nav,
+  .print\:hidden,
+  header button,
+  header [role="button"] {
+    display: none !important;
+  }
+  body,
+  main,
+  .bg-page {
+    background: var(--paper) !important;
+  }
+  .lg\:pl-60 {
+    padding-left: 0 !important;
+  }
+  main {
+    padding-bottom: 0 !important;
+  }
+  .kb-article {
+    border: 0 !important;
+    padding: 0 !important;
+  }
+  .kb-article details > :not(summary),
+  .kb-article [hidden] {
+    display: block !important;
+  }
+  .md .md-scroll {
+    overflow: visible !important;
+  }
+  .md table {
+    font-size: 0.85em;
+  }
+  .md .md-scroll,
+  .fig {
+    break-inside: avoid-page;
+  }
+  .fig img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+}

@@ -97,7 +97,10 @@ class ContentGit:
         return r
 
     def rel(self, path):
-        return str(Path(path).relative_to(self.cfg.root))
+        try:
+            return str(Path(path).relative_to(self.cfg.root))
+        except ValueError:          # 一邊是 resolve 過的路徑（/private/var… 與 /var…）
+            return str(Path(path).resolve().relative_to(Path(self.cfg.root).resolve()))
 
     def dirty(self, path):
         return self.run("status", "--porcelain", "--", self.rel(path)).stdout.strip()
@@ -133,18 +136,18 @@ def segments(raw, spans):
 
 
 def fig_map(segs, subject):
-    """fid → 換回主檔時要用的東西。物理：連結目標（保留使用者改的 alt）；生化：整個 <img> 標籤。"""
+    """fid → 換回主檔時要用的東西。物理：連結目標（保留使用者改的 alt）；生化：整個 <img> 標籤；
+    筆記（KB）：Markdown 圖用連結目標、<img> 用整個標籤。"""
     out = {}
     for sg in segs:
         m = FIG_LINK.fullmatch(sg["rep"])
         if not m:
             continue
-        if subject == "PHY":
-            lm = MD_LINK.fullmatch(sg["orig"])
-            if lm:
-                target = lm.group(3)
-                out[m.group(2)] = ("target", f"<{target}>" if target else lm.group(4))
-        else:
+        lm = MD_LINK.fullmatch(sg["orig"]) if subject != "BCH" else None
+        if lm:
+            target = lm.group(3)
+            out[m.group(2)] = ("target", f"<{target}>" if target else lm.group(4))
+        elif subject != "PHY":
             out[m.group(2)] = ("tag", sg["orig"])
     return out
 
@@ -513,6 +516,24 @@ def _short(pid):
     return pid[-8:]
 
 
+def _is_kb(p):
+    return p["target"].startswith(("kb:", "kbnew:"))
+
+
+def _target_label(p):
+    t = p["target"]
+    if t.startswith("q:"):
+        return t[2:]
+    if t.startswith("kb:"):
+        return t[3:].rsplit("#", 1)[0]
+    return t.split(":", 1)[-1]
+
+
+def _field_name(field):
+    from .kb_patches import FIELD_NAME as KB
+    return FIELD_NAME.get(field) or KB.get(field, field)
+
+
 def list_patches(cfg, url, show_all=False):
     remote = Remote(url)
     ps = remote._req("GET", "/api/admin/patches" + ("?status=all" if show_all else ""))["patches"]
@@ -524,7 +545,7 @@ def list_patches(cfg, url, show_all=False):
         state = {"pending": "已寫回・待發佈" if n.get("written") and n.get("wv") == sha1(p["value"]) else "待寫回",
                  "conflict": "衝突", "merged": "已合併", "rejected": "已放棄"}[p["status"]]
         when = time.strftime("%m-%d %H:%M", time.localtime(p["created_at"] / 1000))
-        print(f"{_short(p['id'])}  {state:<8} {p['target'][2:]:<16} {FIELD_NAME.get(p['field'], p['field']):<6} {p['device']:<10} {when}")
+        print(f"{_short(p['id'])}  {state:<8} {_target_label(p):<16} {_field_name(p['field']):<6} {p['device']:<10} {when}")
         if p["status"] == "conflict" and n.get("reason"):
             print(f"          原因：{n['reason']}")
     print(f"共 {len(ps)} 筆。寫回：bin/pmq patches pull；處理衝突：bin/pmq patches resolve <ID 末 8 碼> --mine｜--theirs")
@@ -534,22 +555,35 @@ def list_patches(cfg, url, show_all=False):
 def pull(cfg, url, dry_run=False):
     remote = Remote(url)
     ps = remote._req("GET", "/api/admin/patches?status=pending")["patches"]
-    todo, skipped = [], []
+    todo, kb_todo, skipped = [], [], []
     for p in ps:
         n = _note(p)
         if n.get("written") and n.get("wv") == sha1(p["value"]):
             continue                      # 已寫回、內容沒再改：等 publish 改 merged
+        if _is_kb(p):
+            kb_todo.append(p)             # 筆記（資料庫）：kb_patches.py
+            continue
         if not _qid(p):
-            skipped.append(p)             # 筆記區塊、圖：第 4、7 階段
+            skipped.append(p)             # 圖：第 7 階段
             continue
         todo.append(p)
     if skipped:
-        print(f"略過 {len(skipped)} 筆非題目的修訂（筆記與圖的寫回在之後的階段）。")
-    if not todo:
+        print(f"略過 {len(skipped)} 筆圖的修訂（圖的寫回在第 7 階段）。")
+    if not todo and not kb_todo:
         print("沒有待寫回的修訂。")
         return 0
 
+    from .kb_patches import Conflict, KbWriter, parse_target, process
     w = Writer(cfg)
+    kw = KbWriter(cfg, w.git, w.cache, w.report) if kb_todo else None
+    if kw:
+        kw.note_own([q for q in ps if _is_kb(q)])
+    kb_loc = {}
+    for p in kb_todo:
+        try:
+            kb_loc[p["id"]] = kw.new_path(p["target"])[2] if p["field"] == "create" else kw.locate(parse_target(p["target"])[0])
+        except Refuse as e:
+            kb_loc[p["id"]] = e
     located = {}
     for p in todo:
         qid = _qid(p)
@@ -559,7 +593,8 @@ def pull(cfg, url, dry_run=False):
             located[qid] = w.locate(qid)
         except Refuse as e:
             located[qid] = e
-    dirty = sorted({w.git.rel(v[1]) for v in located.values() if not isinstance(v, Refuse) and w.git.dirty(v[1])})
+    dirty = sorted({w.git.rel(v[1]) for v in located.values() if not isinstance(v, Refuse) and w.git.dirty(v[1])}
+                   | {w.git.rel(v) for v in kb_loc.values() if not isinstance(v, Refuse) and w.git.dirty(v)})
     if dirty:
         print("✗ 下列主檔有還沒 commit 的變更，為了不蓋掉你在 Mac 上的修改，這次什麼都不寫：")
         for d in dirty:
@@ -626,15 +661,39 @@ def pull(cfg, url, dry_run=False):
             if not res["ok"]:
                 print(f"  ⚠ {_short(p['id'])} 在網站上剛又被改過，狀態沒有更新；下次 pull 會再處理。")
 
+    for p in sorted(kb_todo, key=lambda x: x["created_at"]):
+        n = _note(p)
+        label = _target_label(p)
+        try:
+            if isinstance(kb_loc[p["id"]], Refuse):
+                raise kb_loc[p["id"]]
+            upd, res = process(kw, p, n, dry_run, print)
+            if res:
+                written.append((p, res[0], res[1]))
+        except Conflict as e:
+            upd = {"status": "conflict", "note": {"conflict": {"theirs": e.theirs, "theirs_h": e.theirs_h, "at": int(time.time() * 1000)},
+                                                  "reason": str(e)}} if e.theirs_h else {"status": "conflict", "note": {"reason": str(e), "at": int(time.time() * 1000)}}
+            conflicts.append((p, label, str(e)))
+        except Refuse as e:
+            upd = {"status": "conflict", "note": {"reason": str(e), "at": int(time.time() * 1000)}}
+            conflicts.append((p, label, str(e)))
+        except Exception as e:  # noqa: BLE001 — 同題目：這筆不動，其他照常
+            upd = None
+            errors.append((p, label, f"{type(e).__name__}: {e}"))
+        if upd and not dry_run:
+            res = remote._req("POST", "/api/admin/patches", {"updates": [dict(upd, id=p["id"], expect=p["updated_at"])]})["results"][0]
+            if not res["ok"]:
+                print(f"  ⚠ {_short(p['id'])} 在網站上剛又被改過，狀態沒有更新；下次 pull 會再處理。")
+
     for p, label, why in errors:
-        print(f"⚠ {label} {FIELD_NAME.get(p['field'], p['field'])}（{_short(p['id'])}）處理時出錯，這筆沒有寫、狀態沒改：{why}")
+        print(f"⚠ {label} {_field_name(p['field'])}（{_short(p['id'])}）處理時出錯，這筆沒有寫、狀態沒改：{why}")
     if dry_run:
         print("--dry-run：沒有寫入任何檔案。")
         return 1 if errors else 0
     for p, label, sha in written:
-        print(f"✓ {label} {FIELD_NAME.get(p['field'], p['field'])}  commit {sha}")
+        print(f"✓ {label} {_field_name(p['field'])}  commit {sha}")
     for p, label, why in conflicts:
-        print(f"✗ {label} {FIELD_NAME.get(p['field'], p['field'])}：{why}（網站的修訂佇列頁可看兩個版本；bin/pmq patches resolve {_short(p['id'])} --mine｜--theirs）")
+        print(f"✗ {label} {_field_name(p['field'])}：{why}（網站的修訂佇列頁可看兩個版本；bin/pmq patches resolve {_short(p['id'])} --mine｜--theirs）")
     print(f"寫回 {len(written)} 筆、衝突 {len(conflicts)} 筆。網站上要顯示新內容請接著 bin/pmq publish。")
     if bch_ids:
         print("這次改到的生化題（03_分章題庫/ 沒有動，要不要手動同步到分章檔由你決定）：")
@@ -671,8 +730,15 @@ def mark_merged(c, remote, subject=None):
     ps = remote._req("GET", "/api/admin/patches?status=pending")["patches"]
     by_id = {q["id"]: q for q in c.questions}
     ups = []
+    from .kb_patches import merged_ok
     for p in ps:
         n = _note(p)
+        if _is_kb(p):
+            subj = (p["target"].split(":", 1)[1]).split("/", 1)[0]
+            if n.get("written") and n.get("wv") == sha1(p["value"]) and (not subject or subj == subject) \
+                    and merged_ok(p, n, getattr(c, "kb_docs", {}) or {}):
+                ups.append({"id": p["id"], "status": "merged", "note": dict(n, merged=int(time.time() * 1000)), "expect": p["updated_at"]})
+            continue
         qid = _qid(p)
         q = by_id.get(qid) if qid else None
         if not q or not n.get("written") or (subject and q["subject"] != subject):
