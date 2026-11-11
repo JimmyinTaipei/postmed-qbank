@@ -15,7 +15,9 @@ import { QuestionPage } from "./pages/QuestionPage";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
 import { More } from "./pages/More";
-import { KbIndex, KbReaderPage, PatchesTemplate } from "./pages/Templates";
+import { KbIndex, KbReaderPage } from "./pages/Templates";
+import { PatchesPage } from "./pages/Patches";
+import { EditorProvider } from "./pages/EditQuestion";
 import { ReviewPage } from "./pages/Review";
 import { PapersPage } from "./pages/Papers";
 import { StatsPage } from "./pages/Stats";
@@ -42,6 +44,7 @@ export function App() {
     <BrowserRouter>
       <ToastProvider>
         <FigureViewerProvider>
+          <EditorProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/s/:sessionId" element={<SessionPlayer />} />
@@ -59,7 +62,7 @@ export function App() {
               <Route path="/papers" element={<PapersPage />} />
               <Route path="/stats" element={<StatsPage />} />
               <Route path="/analysis" element={<AnalysisPage />} />
-              <Route path="/patches" element={<PatchesTemplate />} />
+              <Route path="/patches" element={<PatchesPage />} />
               <Route path="/settings" element={<Settings />} />
               <Route
                 path="/dev/ui"
@@ -72,6 +75,7 @@ export function App() {
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
+          </EditorProvider>
         </FigureViewerProvider>
       </ToastProvider>
     </BrowserRouter>

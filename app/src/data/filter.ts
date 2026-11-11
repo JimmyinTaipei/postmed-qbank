@@ -8,6 +8,8 @@ export interface StatusSets {
   wrongEver: Set<string>;
   star: Set<string>;
   doubt: Set<string>;
+  /** 網站上標了「已確認」、還沒發佈成內容包的題目（修訂佇列裡的 human_verified） */
+  verified?: Set<string>;
 }
 
 export const STATUS_KEYS: { id: StatusKey; name: string }[] = [
@@ -22,9 +24,9 @@ export const STATUS_KEYS: { id: StatusKey; name: string }[] = [
 function hasStatus(st: StatusSets | undefined, r: IndexRow, k: StatusKey): boolean {
   switch (k) {
     case "verified":
-      return r.human_verified;
+      return r.human_verified || !!st?.verified?.has(r.id);
     case "unverified":
-      return !r.human_verified;
+      return !r.human_verified && !st?.verified?.has(r.id);
     case "new":
       return !st?.done.has(r.id);
     case "wrong":

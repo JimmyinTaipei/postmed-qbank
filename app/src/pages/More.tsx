@@ -1,6 +1,6 @@
 // 更多：主導覽放不下的頁面。
 
-import { useFlagCount } from "@/data";
+import { useFlagCount, useOpenPatchCount } from "@/data";
 import { Icon, type IconName } from "@/ui/icons";
 import { Badge, ListCard, ListRow, SectionTitle } from "@/ui/primitives";
 import { Page } from "@/ui/shell";
@@ -24,7 +24,7 @@ const GROUPS: { title: string; items: { to: string; label: string; meta: string;
   {
     title: "其他",
     items: [
-      { to: "/patches", label: "修訂佇列", meta: "在網站上改過、待寫回主檔的內容", icon: "edit", stage: "第 3 階段" },
+      { to: "/patches", label: "修訂佇列", meta: "在網站上改過、待寫回主檔的內容", icon: "edit" },
       { to: "/settings", label: "設定", meta: "外觀、資料", icon: "sliders" },
     ],
   },
@@ -32,6 +32,7 @@ const GROUPS: { title: string; items: { to: string; label: string; meta: string;
 
 export function More() {
   const wrong = useFlagCount("wrong");
+  const openPatches = useOpenPatchCount();
   return (
     <Page title="更多">
       {GROUPS.map((g) => (
@@ -40,7 +41,7 @@ export function More() {
           <ListCard>
             {g.items.map((it) => (
               <li key={it.to}>
-                <ListRow to={it.to} title={it.label} meta={it.meta} leading={<Icon name={it.icon} size={20} />} trailing={it.to === "/wrong" && wrong ? <Badge tone="incorrect">{wrong}</Badge> : it.stage ? <Badge>{it.stage}</Badge> : undefined} />
+                <ListRow to={it.to} title={it.label} meta={it.meta} leading={<Icon name={it.icon} size={20} />} trailing={it.to === "/wrong" && wrong ? <Badge tone="incorrect">{wrong}</Badge> : it.to === "/patches" && openPatches ? <Badge tone="warning">{openPatches}</Badge> : it.stage ? <Badge>{it.stage}</Badge> : undefined} />
               </li>
             ))}
           </ListCard>

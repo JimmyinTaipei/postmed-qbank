@@ -125,3 +125,48 @@ export async function usage(c: Context<App>): Promise<Response> {
   const total = Object.values(prefixes).reduce((s, e) => s + e.bytes, 0);
   return c.json({ d1_bytes: d1Bytes, r2_bytes: total, r2: prefixes });
 }
+
+// ---------- 修訂佇列（規格書 §7.3；pmq patches list／pull／resolve 用） ----------
+
+const PATCH_COLS = ["id", "target", "field", "base_h", "value", "status", "note", "device", "created_at", "updated_at"];
+const PATCH_STATUS = new Set(["pending", "merged", "conflict", "rejected"]);
+
+/** GET /api/admin/patches?status=pending,conflict（預設這兩種；all＝全部） */
+export async function listPatches(c: Context<App>): Promise<Response> {
+  const want = (c.req.query("status") ?? "pending,conflict").split(",").filter((s) => s === "all" || PATCH_STATUS.has(s));
+  const sql = want.includes("all")
+    ? `SELECT ${PATCH_COLS.join(", ")} FROM content_patch ORDER BY created_at`
+    : `SELECT ${PATCH_COLS.join(", ")} FROM content_patch WHERE status IN (${want.map(() => "?").join(", ") || "''"}) ORDER BY created_at`;
+  const { results } = await c.env.DB.prepare(sql).bind(...(want.includes("all") ? [] : want)).all();
+  return c.json({ patches: results });
+}
+
+/**
+ * POST /api/admin/patches {updates:[{id, status, note, base_h?, expect}]}
+ * expect＝pmq 讀到的 updated_at；裝置在這之後又改過（updated_at 不同）就不覆寫，回報 stale，
+ * 避免把使用者剛存的新修訂蓋掉。寫入時 updated_at 取「現在」與「原值＋1」較大者，裝置下次同步就會拿到。
+ */
+export async function updatePatches(c: Context<App>): Promise<Response> {
+  const body = await c.req.json<{ updates?: unknown }>().catch(() => ({}) as { updates?: unknown });
+  if (!Array.isArray(body.updates)) return c.json({ error: "bad_request" }, 400);
+  const out: { id: string; ok: boolean; reason?: string }[] = [];
+  for (const u of body.updates as Record<string, unknown>[]) {
+    const id = String(u?.id ?? "");
+    const status = String(u?.status ?? "");
+    if (!id || !PATCH_STATUS.has(status)) {
+      out.push({ id, ok: false, reason: "bad_update" });
+      continue;
+    }
+    const note = u.note === null || u.note === undefined ? null : typeof u.note === "string" ? u.note : JSON.stringify(u.note);
+    const baseH = typeof u.base_h === "string" ? u.base_h : null;
+    const expect = typeof u.expect === "number" ? u.expect : null;
+    const r = await c.env.DB.prepare(
+      `UPDATE content_patch SET status = ?, note = ?, base_h = coalesce(?, base_h), device = 'pmq',
+         updated_at = max(updated_at + 1, ?) WHERE id = ? AND (? IS NULL OR updated_at = ?)`,
+    )
+      .bind(status, note, baseH, Date.now(), id, expect, expect)
+      .run();
+    out.push(r.meta.changes ? { id, ok: true } : { id, ok: false, reason: "stale_or_missing" });
+  }
+  return c.json({ results: out });
+}

@@ -56,6 +56,7 @@
 | `Checkbox` `Switch` `Chip` | primitives.tsx | 勾選（可帶題數、可部分選取）、開關、可複選的小選項 |
 | `FilterGroup` | primitives.tsx | 一組可收合的篩選條件，右邊顯示已選摘要 |
 | `TextField` | primitives.tsx | 文字輸入，`label` 必填（要隱藏用 `hideLabel`），錯誤用 `error` |
+| `Select` | primitives.tsx | 下拉選單（選項太多、不適合 `Segmented` 時，例如章節）。外觀同 `TextField` |
 | `ProgressBar` `Spinner` `Skeleton` | primitives.tsx | 進度；按鈕內的等待；內容形狀已知時的載入 |
 | `EmptyState` | primitives.tsx | 空白、錯誤（`tone="error"`）、尚未開放 |
 | `Notice` | primitives.tsx | 頁面內的提示條（說明、警示、錯誤） |
@@ -70,6 +71,8 @@
 | `QuestionView` + `useAnswerFlow` | content/QuestionView.tsx | 一題的顯示與作答流程。刷題畫面與單題頁共用 |
 | `SourceBadges` | content/SourceBadges.tsx | 答案與詳解的來源。不顯示「未確認」 |
 | `FigureViewerProvider` | content/FigureViewer.tsx | 全螢幕圖片檢視器；`Markdown` 裡的圖點了會自動開 |
+| `HighlightableMarkdown` | content/Highlights.tsx | 可以畫螢光、加註的 `Markdown`（題幹、思路、詳解）。給 `target`（`q:<ID>/sol`） |
+| `MarkdownEditor` | templates.tsx | Markdown 原始碼＋即時預覽；貼上 AI 回覆自動轉 Markdown（`content/paste.ts`）。所有可編輯的 Markdown 都用它 |
 
 ## 4. 頁面樣板（`app/src/ui/templates.tsx`、`app/src/pages/Templates.tsx`）
 
@@ -77,13 +80,13 @@
 
 | 樣板 | 元件 | 示範頁 | 接功能的階段 |
 |---|---|---|---|
-| 清單頁＋搜尋列 | `SearchBar`、`ListCard`、`ListRow` | `/wrong` `/browse`（已接）、`/patches` | 2（完成）、3 |
+| 清單頁＋搜尋列 | `SearchBar`、`ListCard`、`ListRow` | `/wrong` `/browse` `/patches`（已接） | 2、3（完成） |
 | 複習卡片 | `ReviewCard`（翻面、四顆評分鈕） | `/dev/ui`（題目的複習改用刷題畫面；卡片在第 5 階段用） | 5 |
 | 原卷方格、模擬考計時列 | `PaperGrid`、`ExamTimerBar`（`remainingS = null` 時是不計時、顯示已用時間） | `/papers`、模擬考畫面 | 2（完成） |
 | 圖表卡 | `ChartCard`、`BarList`、`ColumnChart`、`HeatTable`（`rowName` 給列的顯示名稱） | `/stats` `/analysis` | 2（完成） |
 | 資料庫閱讀頁 | `KbBlocks`（收合、編輯鈕）、`HighlightPalette` | `/kb` `/kb/:subject/:doc` | 4 |
-| 編輯面板 | `EditPanel`（原始碼＋即時預覽） | 閱讀頁的編輯模式、`/dev/ui` | 3、4 |
-| 個人筆記區、手寫區外框 | `QuestionView` 最下面兩個收合區 | 任何一題作答後 | 3、6 |
+| 編輯面板 | `EditPanel`／`MarkdownEditor`（原始碼＋即時預覽＋貼上轉換） | 題目編輯（`pages/EditQuestion.tsx`，已接）、閱讀頁的編輯模式 | 3（完成）、4 |
+| 個人筆記區、手寫區外框 | `QuestionView` 最下面兩個收合區 | 任何一題作答後 | 3（筆記完成）、6 |
 | 各種狀態 | `EmptyState`、`Skeleton`、`Notice`、`SyncStatus` | `/dev/ui`「狀態」 | — |
 
 ## 5. 新畫面怎麼組

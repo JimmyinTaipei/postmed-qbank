@@ -19,8 +19,9 @@
 | `srs-core.ts` | 間隔複習的純函式（ts-fsrs 包裝、評分換算、重播、錯題離開規則）；測試 `srs-core.test.ts`（`node --experimental-strip-types --test`） |
 | `srs.ts` | 排程的資料操作：`applyAttempts`（封存時呼叫）、`reviewQueue`、`dueForecast`、`srs.add／remove／rebuild` |
 | `search.ts`、`search.worker.ts` | 搜尋：背景執行緒直接讀 IndexedDB 的內容包，逐題比對 |
+| `patches.ts` | 第 3 階段：修訂佇列（`patches.save／markVerified／keepMine／discard`、疊加 `applyPatches`、欄位雜湊 `fieldHash`——與 pmq 的 `patches.field_h` 同一套）、個人筆記 `notes`、螢光 `highlights` |
 
-同步哪些表、用什麼規則合併，寫在 `schema/ts/sync-tables.ts`（Worker 與 App 共用）：`attempt`、`review_log` 只增不改；`session`、`srs_state`、`flag`、`setting` 以時間較新的為準。要同步新的表，在那裡加一筆，Worker 與 App 都會跟著改。
+同步哪些表、用什麼規則合併，寫在 `schema/ts/sync-tables.ts`（Worker 與 App 共用）：`attempt`、`review_log` 只增不改；`session`、`srs_state`、`flag`、`setting` 以時間較新的為準。第 3 階段加了 `note`、`highlight`、`content_patch`（都是較新者勝；`content_patch` 的 `status`／`note` 由 pmq 透過管理 API 改）。要同步新的表，在那裡加一筆，Worker 與 App 都會跟著改。
 
 ## 幾個要知道的約定
 
@@ -32,3 +33,5 @@
 - **設定分兩種**：`settings`（Dexie 的 `setting` 表，會同步，例如上次的出題條件 `practice.last`）與 `prefs`（localStorage，不同步）。
 - **樣本**：正式內容沒有樣本模式，`bodyIds()` 回 `null`。`/dev/ui` 的「特殊情況題目」用發佈時一起產生的 `cases` 檔（`pmq publish` 呼叫 `sample.pick_cases`），不再讀 `app/fixtures/`。
 - **內容網址**：`/c/…`、`/a/…` 由 Worker 從 R2 提供（要登入）。本機開發：`cd worker && pnpm dev`（需要 `worker/.dev.vars`），App 的 `pnpm dev` 會把 `/api`、`/c/`、`/a/` 轉給它（`PMQ_WORKER` 可改位址）。
+- **修訂（第 3 階段）**：`useQuestion()` 回傳的題目已經套上修訂（`q.patch` 有各欄位的狀態與內容包原版 `q.patch.base`）。存修訂一定用內容包原版算 `base_h`（`patches.save(q.patch?.base ?? q, …)`）。同一題同一欄位只有一筆進行中的修訂，再改就改同一筆。顯示規則：已寫回主檔或「保留我的版本」→ 照修訂顯示；沒寫回、而內容包那一段已經變了 → 顯示內容包、標「修訂待處理」；衝突 → 顯示內容包、標「修訂有衝突」。搜尋、出題篩選用的是內容包（修訂要 `pmq publish` 後才進索引）。
+- **螢光的位置**：以畫面上看得到的字算（KaTeX 的隱藏 MathML 不算），所以內容的 Markdown 改了、渲染結果沒變時螢光不會動。

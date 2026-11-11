@@ -4,7 +4,7 @@
 // 第 1B 階段（版本 2）加了：cfile（下載到裝置的內容包檔案）、kv（同步游標、目前的 manifest 等本機狀態）。
 
 import Dexie, { type Table } from "dexie";
-import type { Attempt, Flag, ReviewLog, Session, Setting, SrsState } from "./types";
+import type { Attempt, ContentPatch, Flag, Highlight, Note, ReviewLog, Session, Setting, SrsState } from "./types";
 export type { SrsState } from "./types";
 
 /** 待送佇列的一筆：哪張表的哪一列（主鍵）。送出時才讀那一列目前的值，同一列改很多次只送最後一次。 */
@@ -36,6 +36,9 @@ class PmqDB extends Dexie {
   setting!: Table<Setting, string>;
   srs_state!: Table<SrsState, string>;
   review_log!: Table<ReviewLog, string>;
+  note!: Table<Note, string>;
+  highlight!: Table<Highlight, string>;
+  content_patch!: Table<ContentPatch, string>;
   outbox!: Table<OutboxEntry, number>;
   cfile!: Table<ContentFile, string>;
   kv!: Table<Kv, string>;

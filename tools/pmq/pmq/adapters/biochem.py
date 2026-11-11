@@ -8,13 +8,13 @@ from pathlib import Path
 
 from ..labels import biochem_label
 from ..textutil import math_ranges, parse_options, sha1
-from .common import ALT_ATTR, HTML_IMG, MD_LINK, SRC_ATTR, WIDTH_ATTR, attr, link_target
+from .common import ALT_ATTR, HTML_IMG, MD_LINK, SRC_ATTR, WIDTH_ATTR, attr, link_target, sub_spans
 from ..figs import CM_TO_PX
 
 FOLDER_KIND = {"01_後西醫": "postmed_w", "02_後中醫": "postmed_c", "03_後獸醫": "postmed_v",
                "04_私醫": "private_med", "05_醫事國考": "national"}
-KEYS = ("ID", "source", "chap", "xchap", "ques", "ans", "sol")
-KEY_LINE = re.compile(r"^(ID|source|chap|xchap|ques|ans|sol):[ \t]?(.*)$")
+KEYS = ("ID", "source", "chap", "xchap", "ques", "ans", "sol", "verified")
+KEY_LINE = re.compile(r"^(ID|source|chap|xchap|ques|ans|sol|verified):[ \t]?(.*)$")
 ID_RE = re.compile(r"^[A-Z]+-[0-9A-Za-z-]+$")
 
 
@@ -112,7 +112,7 @@ class BiochemAdapter:
             b["lines"] = lines
         return blocks
 
-    def _rewrite(self, qid, text, base, figs, role):
+    def _rewrite(self, qid, text, base, figs, role, collect=None, key=None):
         ranges = math_ranges(text)
 
         def html(m):
@@ -151,7 +151,12 @@ class BiochemAdapter:
             self.report.count("link_folder", self.cfg.rel_folder(path))
             self.report.warn("biochem_md_link", id=qid, target=target)
             return m.group(2)
-        return MD_LINK.sub(md, HTML_IMG.sub(html, text))
+        mid, spans = sub_spans(HTML_IMG, html, text)
+        out, spans2 = sub_spans(MD_LINK, md, mid)
+        if collect is not None:
+            # 第二輪（相對連結 → 純文字）的位置是對第一輪結果算的；這種欄位不寫回（極少，見 patches.py）
+            collect[key] = None if spans2 else spans
+        return out
 
     def _question(self, folder, path, block):
         f = block["fields"]
@@ -166,8 +171,10 @@ class BiochemAdapter:
         stem = path.stem
         paper = f"第{session}次" if session else (stem.split("_", 2)[2] if stem.count("_") >= 2 else None)
         figs = []
-        ques = self._rewrite(qid, f.get("ques", "").rstrip(), path.parent, figs, "q")
-        sol = self._rewrite(qid, f.get("sol", "").rstrip(), path.parent, figs, "sol")
+        self.last_spans = {}
+        ques = self._rewrite(qid, f.get("ques", "").rstrip(), path.parent, figs, "q", self.last_spans, "ques")
+        sol = self._rewrite(qid, f.get("sol", "").rstrip(), path.parent, figs, "sol", self.last_spans, "sol")
+        verified = f.get("verified", "").strip()
         parsed = parse_options(ques)
         letters = [o[0] for o in parsed["opt"]] if parsed else []
         raw_ans = f.get("ans", "").strip()
@@ -216,7 +223,7 @@ class BiochemAdapter:
             "idea": "",
             "sol": sol,
             "teacher": [],
-            "sol_meta": {"origin": "ai", "model": None, "human_verified": False, "verified_at": None,
+            "sol_meta": {"origin": "ai", "model": None, "human_verified": bool(verified), "verified_at": verified or None,
                          "issues": [], "state": None, "raw": None},
             "figs": figs,
             "extraction": None,

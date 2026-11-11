@@ -514,6 +514,33 @@ export function TextField({ label, hint, error, hideLabel, leading, className, i
   );
 }
 
+/** 下拉選單（選項多、不適合 Segmented 時；例如章節）。外觀與 TextField 相同。 */
+export function Select({ label, value, onChange, options, hint, className }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; hint?: string; className?: string }) {
+  const id = useId();
+  return (
+    <div className={className}>
+      <label htmlFor={id} className="mb-1.5 block text-ui font-medium text-ink-strong">
+        {label}
+      </label>
+      <div className="relative">
+        <select id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-describedby={hint ? `${id}-hint` : undefined} className="min-h-(--tap) w-full appearance-none rounded-btn border border-line-strong bg-card pr-10 pl-3 text-base text-ink-strong">
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <Icon name="chevronDown" size={18} className="pointer-events-none absolute inset-y-0 right-3 my-auto text-ink-muted" />
+      </div>
+      {hint && (
+        <p id={`${id}-hint`} className="mt-1.5 text-meta text-ink-muted">
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** 大數字＋說明（今日頁、結束頁、統計）。 */
 export function Stat({ value, label, hint }: { value: ReactNode; label: string; hint?: ReactNode }) {
   return (

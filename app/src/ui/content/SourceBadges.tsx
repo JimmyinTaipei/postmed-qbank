@@ -1,7 +1,8 @@
 // 來源徽章（規格書 §4.4、§5.1）：答案與詳解各是誰給的。
-// 不顯示「未確認」——每一題都未確認，顯示了等於沒有資訊；只有 human_verified 才多一個「已確認」。
+// 預設不顯示「未確認」——每一題都未確認，顯示了等於沒有資訊；只有 human_verified 才多一個「已確認」。
+// 設定頁「顯示未確認」打開時才顯示。
 
-import type { Question } from "@/data";
+import { useShowUnverified, type Question } from "@/data";
 import { Badge } from "../primitives";
 
 const TRUST: Record<Question["answer"]["trust"], string> = {
@@ -20,6 +21,7 @@ const ORIGIN: Record<Question["sol_meta"]["origin"], string> = {
 };
 
 export function SourceBadges({ q }: { q: Question }) {
+  const showUnverified = useShowUnverified(); // 設定頁可打開（§4.4）
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <Badge tone={q.answer.trust === "pending" ? "warning" : "neutral"}>{TRUST[q.answer.trust]}</Badge>
@@ -29,6 +31,7 @@ export function SourceBadges({ q }: { q: Question }) {
           已確認
         </Badge>
       )}
+      {!q.sol_meta.human_verified && showUnverified && <Badge>未確認</Badge>}
     </span>
   );
 }

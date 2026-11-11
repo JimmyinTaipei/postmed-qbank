@@ -237,6 +237,20 @@
   border-radius: 2px;
   padding: 0 0.1em;
 }
+/* 螢光筆（第 3 階段）：mark.hl 由 Highlights.tsx 包上去；有註記的多一條底線 */
+.md mark.hl {
+  padding: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+.md mark.hl-yellow { background: var(--hl-yellow); }
+.md mark.hl-green { background: var(--hl-green); }
+.md mark.hl-pink { background: var(--hl-pink); }
+.md mark.hl-blue { background: var(--hl-blue); }
+.md mark.hl-note {
+  text-decoration: underline dotted var(--text-muted);
+  text-underline-offset: 0.2em;
+}
 .md code {
   font-family: var(--font-code);
   font-size: 0.9em;

@@ -135,6 +135,8 @@ def publish(cfg, url, subject=None, dry_run=False, workers=6):
         b = (base.get(s) or {}).get("questions_unique", (base.get(s) or {}).get("questions"))
         print(f"  {s} {n:,} 題" + (f"（基準 {b:,}{'，相同' if b == n else '，不同！'}）" if b is not None else ""))
     c.cache.save()
+    from .patches import mark_merged
+    mark_merged(c, remote, subject=subject)
     return usage(cfg, url, remote=remote)
 
 

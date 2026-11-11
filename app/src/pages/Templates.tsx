@@ -7,38 +7,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { content, useAsync, useContentInfo, useKb, useTaxonomy, type KbBlock } from "@/data";
 import { Icon } from "@/ui/icons";
 import { useToast } from "@/ui/overlays";
-import { Badge, Button, Card, EmptyState, IconButton, ListCard, ListRow, Notice, Segmented, Skeleton } from "@/ui/primitives";
+import { Button, Card, EmptyState, IconButton, ListCard, ListRow, Notice, Segmented, Skeleton } from "@/ui/primitives";
 import { Page, TemplateNotice } from "@/ui/shell";
 import { EditPanel, HighlightPalette, KbBlocks } from "@/ui/templates";
-
-const Title = ({ label, id }: { label: string; id: string }) => (
-  <>
-    {label}
-    <span className="mx-1 text-ink-muted">｜</span>
-    <span className="text-ink-muted">{id}</span>
-  </>
-);
-
-export function PatchesTemplate() {
-  const demo = [
-    { id: "PHY-007836", label: "特訓班2 正課班作業十四 Q5", field: "詳解", state: "pending" as const, at: "10 分鐘前・iPad" },
-    { id: "KMU-115-01", label: "高醫 115 01", field: "答案（C → D）", state: "conflict" as const, at: "昨天・iPad" },
-    { id: "PHY-000917", label: "高醫 109 37", field: "題幹與選項", state: "merged" as const, at: "3 天前・Mac" },
-  ];
-  const badge = { pending: <Badge tone="warning">待寫回</Badge>, conflict: <Badge tone="incorrect" icon="alert">衝突</Badge>, merged: <Badge tone="correct" icon="check">已合併</Badge> };
-  return (
-    <Page title="修訂佇列" subtitle="在網站上改過、還沒寫回 Mac 主檔的內容" back="/more">
-      <TemplateNotice stage="第 3 階段" />
-      <ListCard label="修訂">
-        {demo.map((d) => (
-          <li key={d.id}>
-            <ListRow onClick={() => {}} title={<Title label={d.label} id={d.id} />} meta={`${d.field}・${d.at}`} trailing={badge[d.state]} />
-          </li>
-        ))}
-      </ListCard>
-    </Page>
-  );
-}
 
 // ---------- 資料庫（第 4 階段） ----------
 

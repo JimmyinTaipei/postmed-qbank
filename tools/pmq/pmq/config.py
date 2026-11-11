@@ -8,7 +8,9 @@ PROJECT = Path(__file__).resolve().parents[3]
 
 
 class Config:
-    def __init__(self, path=TOML):
+    def __init__(self, path=None):
+        # PMQ_CONFIG：測試用的另一份設定（例如指向暫存資料夾裡的主檔副本）；平常不設
+        path = path or os.environ.get("PMQ_CONFIG") or TOML
         data = tomllib.loads(Path(path).read_text("utf-8"))
         p = data["paths"]
         exp = lambda v: Path(os.path.expanduser(v))

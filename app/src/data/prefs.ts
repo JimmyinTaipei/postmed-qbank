@@ -52,6 +52,13 @@ export const prefs = {
     const v = name.trim().slice(0, 40);
     if (v) write("pmq.device", v);
   },
+  /** 是否顯示「未確認」徽章（規格書 §4.4；預設不顯示） */
+  showUnverified(): boolean {
+    return read("pmq.showUnverified") === "1";
+  },
+  setShowUnverified(on: boolean) {
+    write("pmq.showUnverified", on ? "1" : "0");
+  },
   /** 這一科的題目是否整科下載到裝置（離線可做）。預設開。 */
   offline(subject: string): boolean {
     return read("pmq.offline." + subject) !== "0";
@@ -76,4 +83,7 @@ export function useOfflinePref(subject: string): boolean {
 }
 export function useFigInvert(): boolean {
   return useSyncExternalStore(prefs.subscribe, prefs.figInvert);
+}
+export function useShowUnverified(): boolean {
+  return useSyncExternalStore(prefs.subscribe, prefs.showUnverified);
 }

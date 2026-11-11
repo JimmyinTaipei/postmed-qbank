@@ -37,6 +37,21 @@ def load_yaml(text):
     return yaml.load(text, Loader=UniqueKeyLoader)
 
 
+def sub_spans(regex, fn, text):
+    """Like regex.sub(fn, text), but also returns [(start, end, replacement)] for every match that changed
+    (positions in the input). pmq patches pull uses it to map edited web text back to the master's bytes."""
+    out, spans, last = [], [], 0
+    for m in regex.finditer(text):
+        rep = fn(m)
+        out.append(text[last:m.start()])
+        out.append(rep)
+        if rep != m.group(0):
+            spans.append((m.start(), m.end(), rep))
+        last = m.end()
+    out.append(text[last:])
+    return "".join(out), spans
+
+
 def attr(regex, tag):
     m = regex.search(tag)
     return m.group(1)[1:-1] if m else None

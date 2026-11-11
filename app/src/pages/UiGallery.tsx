@@ -11,7 +11,7 @@ import { Icon, ICON_NAMES } from "@/ui/icons";
 import { Dialog, Menu, Sheet, useToast } from "@/ui/overlays";
 import {
   Badge, Button, Card, Checkbox, Chip, EmptyState, FilterGroup, IconButton, LinkButton, ListCard, ListRow, Notice, OptionRow, ProgressBar,
-  SectionTitle, Segmented, Skeleton, Spinner, Stat, Switch, Tabs, TextField, type OptionState,
+  SectionTitle, Segmented, Skeleton, Select, Spinner, Stat, Switch, Tabs, TextField, type OptionState,
 } from "@/ui/primitives";
 import { Page, SyncStatus } from "@/ui/shell";
 import { BarList, ChartCard, ColumnChart, EditPanel, ExamTimerBar, HighlightPalette, ReviewCard, SearchBar } from "@/ui/templates";
@@ -279,6 +279,7 @@ export default function UiGallery() {
           </div>
           <TextField label="文字欄位" hint="輸入框字級 16px，iOS 聚焦時不會放大頁面" placeholder="請輸入" />
           <TextField label="有錯誤的欄位" defaultValue="abc" error="密碼不對，還可以再試 3 次" />
+          <Select label="下拉選單（章節等選項多的時候）" value="PHY:Ch10" onChange={() => {}} options={[{ value: "PHY:Ch09", label: "Ch09　靜電學" }, { value: "PHY:Ch10", label: "Ch10　電位能與電位" }]} hint="外觀與文字欄位相同" />
           <SearchBar value={search} onChange={setSearch} placeholder="題號或來源" />
         </Pair>
       </Group>
@@ -306,7 +307,7 @@ export default function UiGallery() {
         </div>
         {dialog && <Dialog title="捨棄這個題組？" onClose={() => setDialog(false)} actions={<><Button variant="ghost" onClick={() => setDialog(false)}>保留</Button><Button variant="danger" onClick={() => setDialog(false)}>捨棄</Button></>}>已經作答的紀錄會留著。</Dialog>}
         {sheet && <Sheet title="面板標題" onClose={() => setSheet(false)} footer={<Button variant="primary" onClick={() => setSheet(false)}>完成</Button>}><div className="space-y-3 p-4">{Array.from({ length: 12 }, (_, i) => <p key={i} className="text-ui">面板內容自己捲動，不帶動背後的頁面。第 {i + 1} 段。</p>)}</div></Sheet>}
-        {edit && <EditPanel title="編輯詳解" initial={MD_SAMPLE} onClose={() => setEdit(false)} saveDisabledReason="儲存在第 3 階段開放" />}
+        {edit && <EditPanel title="編輯詳解（展示）" initial={MD_SAMPLE} onClose={() => setEdit(false)} saveDisabledReason="展示頁不會存檔；貼上 AI 回覆可測試自動轉換" />}
       </Group>
 
       <Group title="狀態" note="載入用骨架（形狀已知）或轉圈（按鈕內）；空白與錯誤都要說明發生什麼事、接下來能做什麼。">

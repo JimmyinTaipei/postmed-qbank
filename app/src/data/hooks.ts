@@ -7,7 +7,8 @@ import { db } from "./db";
 import { buildContext, chapterLabel, type FilterContext, type StatusSets } from "./filter";
 import { exam, settings, type ExamPicks } from "./personal";
 import { dueForecast, reviewQueue, srsConfig, srsKey, type ReviewQueue } from "./srs";
-import type { Attempt, FlagKind, ItemKey, Question, Session, SrsConfig, SrsState, SubjectId } from "./types";
+import { applyPatches, isWritten, noteId } from "./patches";
+import type { Attempt, ContentPatch, FlagKind, Highlight, ItemKey, Note, Question, Session, SrsConfig, SrsState, SubjectId } from "./types";
 import { keyId } from "./types";
 
 export interface Loadable<T> {
@@ -45,7 +46,34 @@ export const useKb = (key: string | undefined) => useAsync(() => (key ? content.
 
 /** 題目本文：undefined 載入中；null 沒有這一題；"missing" 本文不在裝置上。 */
 export function useQuestion(id: string | undefined): Loadable<Question | null | "missing"> {
-  return useAsync(() => (id ? content.question(id) : Promise.resolve(null)), [id]);
+  const base = useAsync(() => (id ? content.question(id) : Promise.resolve(null)), [id]);
+  // 套上修訂佇列（規格書 §8）：修訂一存檔，畫面立刻顯示新內容
+  const rows = useLiveQuery(() => (id ? db.content_patch.where("target").equals(`q:${id}`).toArray() : Promise.resolve([] as ContentPatch[])), [id]);
+  const data = useMemo(() => (base.data && typeof base.data === "object" ? (rows ? applyPatches(base.data, rows) : undefined) : base.data), [base.data, rows]);
+  return { ...base, data, loading: base.loading || (!!base.data && !rows) };
+}
+
+/** 修訂佇列全部（新的在前）。 */
+export function usePatches(): ContentPatch[] | undefined {
+  return useLiveQuery(async () => (await db.content_patch.toArray()).sort((a, b) => b.updated_at - a.updated_at));
+}
+
+/** 待寫回與衝突的筆數（更多頁的徽章）。 */
+export function useOpenPatchCount(): number | undefined {
+  return useLiveQuery(() => db.content_patch.where("status").anyOf("pending", "conflict").filter((p) => !isWritten(p) || p.status === "conflict").count());
+}
+
+/** 一題的個人筆記；undefined 載入中、null 沒有。 */
+export function useNote(target: string): Note | null | undefined {
+  return useLiveQuery(async () => {
+    const n = await db.note.get(noteId(target));
+    return n && !n.deleted ? n : null;
+  }, [target]);
+}
+
+/** 某個區塊（"q:ID/sol"…）上的螢光。 */
+export function useHighlights(target: string): Highlight[] | undefined {
+  return useLiveQuery(async () => (await db.highlight.where("target").equals(target).toArray()).filter((h) => !h.deleted).sort((a, b) => a.start - b.start), [target]);
 }
 
 /** 某一科的篩選環境（索引＋章節樹）。 */
@@ -146,7 +174,11 @@ export function useStatusSets(): StatusSets | undefined {
       if (f.kind === "star") star.add(keyId(f.item));
       else if (f.kind === "doubt") doubt.add(keyId(f.item));
     });
-    return { done, wrongEver, star, doubt };
+    const verified = new Set<string>();
+    await db.content_patch.where("status").anyOf("pending", "merged").each((p) => {
+      if (p.field === "human_verified" && p.target.startsWith("q:")) verified.add(keyId(p.target));
+    });
+    return { done, wrongEver, star, doubt, verified };
   });
 }
 

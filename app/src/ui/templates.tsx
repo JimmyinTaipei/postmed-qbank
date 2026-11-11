@@ -1,10 +1,11 @@
 // 頁面樣板（規格書 §13.4）：第 2 階段以後的頁面從這裡的元件開始接功能，不重新設計版面。
 // 這裡只有版面與互動，沒有資料邏輯；資料由頁面傳進來。
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, type ClipboardEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { Fig, KbBlock, KbDoc } from "@/data";
 import { Markdown } from "./content/Markdown";
+import { pasteText } from "./content/paste";
 import { Icon } from "./icons";
 import { Sheet } from "./overlays";
 import { Button, Card, IconButton, ProgressBar, TextField, cx } from "./primitives";
@@ -211,7 +212,40 @@ export function HeatTable({ rows, cols, value, rowLabel, rowName = (r) => r }: {
 // ---------- 編輯面板 ----------
 
 /** 編輯一段內容：上面（寬螢幕是左邊）Markdown 原始碼，下面（右邊）即時預覽。 */
-export function EditPanel({ title, initial, figs, role = "sol", onClose, onSave, saveDisabledReason }: { title: string; initial: string; figs?: Fig[]; role?: Fig["role"]; onClose: () => void; onSave?: (md: string) => void; saveDisabledReason?: string }) {
+/** Markdown 原始碼＋即時預覽。貼上帶格式的 AI 回覆時自動轉成 Markdown（規格書 §9.4）。 */
+export function MarkdownEditor({ value, onChange, figs, role = "sol", label = "Markdown 原始碼", minRows }: { value: string; onChange: (v: string) => void; figs?: Fig[]; role?: Fig["role"]; label?: string; minRows?: "short" }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const id = useId();
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const md = pasteText(e.clipboardData);
+    if (md === null) return;
+    e.preventDefault();
+    const el = e.currentTarget;
+    const a = el.selectionStart;
+    const next = el.value.slice(0, a) + md + el.value.slice(el.selectionEnd);
+    onChange(next);
+    requestAnimationFrame(() => {
+      ref.current?.setSelectionRange(a + md.length, a + md.length);
+    });
+  };
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <div>
+        <label htmlFor={id} className="mb-1.5 block text-meta font-medium text-ink-muted">{label}</label>
+        <textarea ref={ref} id={id} data-autofocus value={value} onChange={(e) => onChange(e.target.value)} onPaste={onPaste} spellCheck={false} autoCapitalize="none" autoCorrect="off" className={cx("block w-full resize-y rounded-btn border border-line-strong bg-card p-3 font-mono leading-relaxed", minRows === "short" ? "min-h-40" : "min-h-72 lg:min-h-[60dvh]")} />
+        <p className="mt-1.5 text-meta text-ink-muted">從 ChatGPT、Claude 網頁複製的回答，貼上時會自動轉成 Markdown（公式變成 $…$）。</p>
+      </div>
+      <div>
+        <div className="mb-1.5 text-meta font-medium text-ink-muted">預覽</div>
+        <div className="min-h-24 rounded-btn border border-line p-3" aria-live="polite">
+          <Markdown text={value} figs={figs} role={role} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function EditPanel({ title, initial, figs, role = "sol", onClose, onSave, saveDisabledReason, notice }: { title: string; initial: string; figs?: Fig[]; role?: Fig["role"]; onClose: () => void; onSave?: (md: string) => void; saveDisabledReason?: string; notice?: ReactNode }) {
   const [text, setText] = useState(initial);
   return (
     <Sheet
@@ -226,17 +260,9 @@ export function EditPanel({ title, initial, figs, role = "sol", onClose, onSave,
         </>
       }
     >
-      <div className="grid gap-4 p-4 lg:grid-cols-2">
-        <div>
-          <label htmlFor="edit-src" className="mb-1.5 block text-meta font-medium text-ink-muted">Markdown 原始碼</label>
-          <textarea id="edit-src" data-autofocus value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} autoCapitalize="none" autoCorrect="off" className="block min-h-72 w-full resize-y rounded-btn border border-line-strong bg-card p-3 font-mono leading-relaxed lg:min-h-[60dvh]" />
-        </div>
-        <div>
-          <div className="mb-1.5 text-meta font-medium text-ink-muted">預覽</div>
-          <div className="min-h-24 rounded-btn border border-line p-3" aria-live="polite">
-            <Markdown text={text} figs={figs} role={role} />
-          </div>
-        </div>
+      <div className="space-y-4 p-4">
+        {notice}
+        <MarkdownEditor value={text} onChange={setText} figs={figs} role={role} />
       </div>
     </Sheet>
   );

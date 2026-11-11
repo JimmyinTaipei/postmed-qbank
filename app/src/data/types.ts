@@ -111,6 +111,75 @@ export interface Question {
   };
   figs: Fig[];
   h: { ques: string; idea: string; sol: string };
+  /** 只在裝置上：套了修訂佇列之後才有（patches.ts 的 applyPatches）。 */
+  patch?: PatchInfo;
+}
+
+// ---------- 修訂佇列（規格書 §4.6 content_patch、§7.3、§8） ----------
+
+export type PatchField = "ques" | "idea" | "sol" | "answer" | "chap" | "tags" | "human_verified";
+export type PatchStatus = "pending" | "merged" | "conflict" | "rejected";
+
+export interface ContentPatch {
+  id: string; // ULID
+  target: string; // "q:PHY-007836"
+  field: PatchField;
+  base_h: string; // 改之前內容包裡該欄位的雜湊
+  value: string; // 新內容（answer、tags 是 JSON）
+  status: PatchStatus;
+  note: string | null; // JSON（PatchNote），pmq 寫
+  device: string;
+  created_at: number;
+  updated_at: number;
+  seq?: number;
+}
+
+/** pmq 寫在 content_patch.note 的資訊。 */
+export interface PatchNote {
+  written?: string; // 寫回主檔的 commit
+  wh?: string; // 寫回後該欄位的雜湊
+  wv?: string; // 寫回時 value 的雜湊（之後又改過就不同）
+  conflict?: { theirs: string; theirs_h: string; at: number }; // 主檔目前的版本
+  reason?: string;
+  resolved?: "mine" | "theirs";
+  merged?: number;
+}
+
+/** 這一題在畫面上的修訂狀態：pending 待寫回｜written 已寫回、待發佈｜stale 修訂待處理（內容包已經變了）｜conflict 衝突 */
+export type FieldMark = "pending" | "written" | "stale" | "conflict";
+
+export interface PatchInfo {
+  marks: Partial<Record<PatchField, FieldMark>>;
+  /** 答案曾在網站上修訂過（含已合併的） */
+  answerRevised: boolean;
+  /** 套修訂之前的內容包版本（編輯器算 base_h 用） */
+  base: Question;
+}
+
+export interface Note {
+  id: string; // "n:" + target（同一個對象只有一則，兩台裝置離線各寫也只會合併成一筆）
+  target: string; // "q:PHY-…"
+  body_md: string;
+  updated_at: number;
+  deleted: 0 | 1;
+  seq?: number;
+}
+
+export type HighlightColor = "yellow" | "green" | "pink" | "blue";
+
+export interface Highlight {
+  id: string;
+  target: string; // "q:PHY-…/ques"｜"q:PHY-…/sol"｜"q:PHY-…/idea"
+  quote: string;
+  prefix: string;
+  suffix: string;
+  start: number;
+  end: number;
+  color: HighlightColor;
+  comment_md: string | null;
+  updated_at: number;
+  deleted: 0 | 1;
+  seq?: number;
 }
 
 export interface KbBlock {

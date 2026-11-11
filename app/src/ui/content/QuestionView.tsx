@@ -3,11 +3,13 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { answerText, attempts, isChoice, isMulti, judge, qKey, splitQuestion, useCareless, type Attempt, type Question } from "@/data";
+import { answerText, attempts, isChoice, isMulti, judge, notes, qKey, splitQuestion, useCareless, useNote, type Attempt, type FieldMark, type Question } from "@/data";
 import { Icon, type IconName } from "../icons";
 import { useToast } from "../overlays";
 import { Badge, Button, Notice, OptionRow, Segmented, cx, type OptionState } from "../primitives";
+import { HighlightableMarkdown } from "./Highlights";
 import { Markdown } from "./Markdown";
+import { MarkdownEditor } from "../templates";
 import { SourceBadges } from "./SourceBadges";
 
 export type Phase = "choose" | "multi" | "self" | "revealed" | "done";
@@ -138,11 +140,12 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys }: Props) {
           <span className="font-normal text-ink-muted">{q.id}</span>
         </h2>
         {chapter && <span className="text-meta text-ink-muted">{chapter}</span>}
+        <PatchBadge q={q} />
       </header>
 
       {parts ? (
         <>
-          <Markdown text={parts.stem} figs={q.figs} role="q" />
+          <HighlightableMarkdown target={`q:${q.id}/ques`} text={parts.stem} figs={q.figs} role="q" />
           {multi && !done && <p className="text-meta text-ink-muted">複選題：選好所有答案後按「送出」。</p>}
           <div role={multi ? "group" : "radiogroup"} aria-label="選項" className="space-y-2">
             {parts.options.map((o) => (
@@ -155,7 +158,7 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys }: Props) {
         </>
       ) : (
         <>
-          <Markdown text={q.ques} figs={q.figs} role="q" />
+          <HighlightableMarkdown target={`q:${q.id}/ques`} text={q.ques} figs={q.figs} role="q" />
           {flow.phase === "self" && <p className="text-meta text-ink-muted">這題要自己對答案：想好後按「顯示答案」，再標記對或錯。</p>}
         </>
       )}
@@ -230,6 +233,7 @@ function Result({ q, flow, attempt }: { q: Question; flow: AnswerFlow; attempt: 
             {q.answer.keys.length ? <span className="font-semibold">{ans}</span> : <Markdown text={ans} figs={q.figs} role="sol" tight />}
           </div>
         )}
+        {q.patch?.answerRevised && <Badge tone="warning" icon="edit">答案曾修訂</Badge>}
         <span className="ml-auto">
           <SourceBadges q={q} />
         </span>
@@ -272,10 +276,10 @@ function Solution({ q }: { q: Question }) {
     <div className="space-y-4">
       {q.idea.trim() && (
         <Section title="思路">
-          <Markdown text={q.idea} figs={q.figs} role="sol" />
+          <HighlightableMarkdown target={`q:${q.id}/idea`} text={q.idea} figs={q.figs} role="sol" />
         </Section>
       )}
-      <Section title="詳解">{q.sol.trim() ? <Markdown text={q.sol} figs={q.figs} role="sol" /> : <p className="text-ui text-ink-muted">這題還沒有詳解。</p>}</Section>
+      <Section title="詳解">{q.sol.trim() ? <HighlightableMarkdown target={`q:${q.id}/sol`} text={q.sol} figs={q.figs} role="sol" /> : <p className="text-ui text-ink-muted">這題還沒有詳解。</p>}</Section>
 
       {q.teacher.length > 0 && (
         <div className="space-y-2">
@@ -302,11 +306,9 @@ function Solution({ q }: { q: Question }) {
         </Section>
       )}
 
-      {/* 之後的階段在這兩個外框裡接功能（第 3 階段：個人筆記；第 6 階段：手寫） */}
+      {/* 第 3 階段：個人筆記；第 6 階段：手寫 */}
       <div className="space-y-2">
-        <Fold title="我的筆記" icon="note">
-          <p className="text-ui text-ink-muted">個人筆記在第 3 階段開放：可寫 Markdown 與公式，兩台裝置同步。</p>
-        </Fold>
+        <NoteBox q={q} />
         <Fold title="手寫區" icon="pencil">
           <div data-noswipe className="flex h-40 items-center justify-center rounded-btn border border-dashed border-line-strong text-ui text-ink-muted">
             Apple Pencil 手寫在第 6 階段開放
@@ -314,5 +316,65 @@ function Solution({ q }: { q: Question }) {
         </Fold>
       </div>
     </div>
+  );
+}
+
+const MARK_BADGE: Record<FieldMark, { tone: "warning" | "blue" | "incorrect"; text: string }> = {
+  conflict: { tone: "incorrect", text: "修訂有衝突" },
+  stale: { tone: "warning", text: "修訂待處理" },
+  pending: { tone: "warning", text: "已修訂・待寫回" },
+  written: { tone: "blue", text: "已修訂・待發佈" },
+};
+
+/** 規格書 §8：已修訂・待寫回／修訂待處理。只看內容欄位（「已確認」由來源徽章顯示）。 */
+function PatchBadge({ q }: { q: Question }) {
+  const marks = Object.entries(q.patch?.marks ?? {}).filter(([f]) => f !== "human_verified").map(([, m]) => m);
+  const m = (["conflict", "stale", "pending", "written"] as FieldMark[]).find((k) => marks.includes(k));
+  if (!m) return null;
+  return (
+    <Link to="/patches" className="no-underline">
+      <Badge tone={MARK_BADGE[m].tone} icon={m === "conflict" || m === "stale" ? "alert" : "edit"}>
+        {MARK_BADGE[m].text}
+      </Badge>
+    </Link>
+  );
+}
+
+/** 我的筆記（規格書 §4.6 note）：一題一則 Markdown，會同步、會出現在「匯出全部」。 */
+function NoteBox({ q }: { q: Question }) {
+  const target = `q:${q.id}`;
+  const note = useNote(target);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState("");
+  const has = !!note?.body_md.trim();
+  const start = () => {
+    setText(note?.body_md ?? "");
+    setEditing(true);
+  };
+  return (
+    <Fold title={has ? "我的筆記（有內容）" : "我的筆記"} icon="note" defaultOpen={has}>
+      {editing ? (
+        <div className="space-y-3">
+          <MarkdownEditor value={text} onChange={setText} figs={q.figs} label="筆記（Markdown，可寫公式與表格）" minRows="short" />
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setEditing(false)}>取消</Button>
+            <Button variant="primary" onClick={() => { void notes.save(target, text); setEditing(false); }}>儲存筆記</Button>
+          </div>
+        </div>
+      ) : has ? (
+        <div className="space-y-2">
+          <Markdown text={note!.body_md} figs={q.figs} role="sol" />
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" icon="trash" onClick={() => void notes.remove(target)}>刪除</Button>
+            <Button variant="secondary" icon="edit" onClick={start}>編輯筆記</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="min-w-0 flex-1 text-ui text-ink-muted">寫下自己的理解、易錯點。可用 Markdown 與公式，兩台裝置會同步。</p>
+          <Button variant="secondary" icon="plus" onClick={start}>寫筆記</Button>
+        </div>
+      )}
+    </Fold>
   );
 }

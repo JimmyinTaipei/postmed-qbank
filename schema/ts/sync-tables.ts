@@ -60,6 +60,31 @@ export const SYNC_TABLES: SyncTable[] = [
     order: ["updated_at", "value"],
   },
   {
+    name: "note",
+    pk: ["id"],
+    cols: ["id", "target", "body_md", "updated_at", "deleted"],
+    json: [],
+    kind: "lww",
+    order: ["updated_at", "body_md"],
+  },
+  {
+    name: "highlight",
+    pk: ["id"],
+    cols: ["id", "target", "quote", "prefix", "suffix", "start", "end", "color", "comment_md", "updated_at", "deleted"],
+    json: [],
+    kind: "lww",
+    order: ["updated_at", "color"],
+  },
+  {
+    // 第 3 階段：修訂佇列。裝置建立與改值；pmq（管理 API）改 status 與 note。
+    name: "content_patch",
+    pk: ["id"],
+    cols: ["id", "target", "field", "base_h", "value", "status", "note", "device", "created_at", "updated_at"],
+    json: [],
+    kind: "lww",
+    order: ["updated_at", "device"],
+  },
+  {
     name: "setting",
     pk: ["key"],
     cols: ["key", "value", "updated_at"],

@@ -10,7 +10,7 @@ from urllib.parse import unquote
 
 from ..labels import source_label
 from ..textutil import math_ranges, parse_options, sha1
-from .common import MD_LINK, load_yaml, link_target
+from .common import MD_LINK, load_yaml, link_target, sub_spans
 
 FRONT = re.compile(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|$)", re.S)
 SECTION = re.compile(r"^## (ques|idea|sol)[ \t]*\r?\n", re.M)
@@ -176,7 +176,7 @@ class PhysicsAdapter:
         })
 
     # ---------- body rewriting ----------
-    def _rewrite(self, qid, section, text, base, figs, counts, teacher):
+    def _rewrite(self, qid, section, text, base, figs, counts, teacher, collect=None):
         ranges = math_ranges(text)
 
         def repl(m):
@@ -204,7 +204,10 @@ class PhysicsAdapter:
             self.report.count("link_kind", "其他相對連結→純文字")
             self.report.warn("link_other", id=qid, target=target)
             return label
-        return MD_LINK.sub(repl, text)
+        out, spans = sub_spans(MD_LINK, repl, text)
+        if collect is not None:
+            collect[section] = spans
+        return out
 
     # ---------- questions ----------
     def load(self):
@@ -252,7 +255,8 @@ class PhysicsAdapter:
         status = meta.get("status") or {}
 
         figs, counts, teacher = [], {"svg": 0, "png": 0, "text": 0}, _Ordered()
-        fields = {k: self._rewrite(qid, k, raw[k], path.parent, figs, counts, teacher) for k in ("ques", "idea", "sol")}
+        self.last_spans = {}
+        fields = {k: self._rewrite(qid, k, raw[k], path.parent, figs, counts, teacher, self.last_spans) for k in ("ques", "idea", "sol")}
         for o in meta.get("origin") or []:
             if o.get("transcript"):
                 teacher.add((path.parent / o["transcript"]).resolve())
@@ -314,6 +318,9 @@ class PhysicsAdapter:
         else:
             sol_origin = "ai"
         model = (meta.get("ai_solution") or {}).get("model") or r2.get("model")
+        # 使用者在網站上標「已確認」或修訂過答案／詳解（規格書 §4.4；pmq patches pull 寫入）
+        hr = meta.get("human_review") if isinstance(meta.get("human_review"), dict) else {}
+        hr_ok = hr.get("by") == "user"
         issues = []
         for i in status.get("issues") or []:
             if isinstance(i, dict):
@@ -374,7 +381,7 @@ class PhysicsAdapter:
             "teacher": teacher_blocks,
             "sol_meta": {
                 "origin": sol_origin, "model": model if sol_origin in ("ai", "mixed") else None,
-                "human_verified": False, "verified_at": None, "issues": issues, "state": state, "raw": raw_status,
+                "human_verified": hr_ok, "verified_at": str(hr.get("date")) if hr_ok else None, "issues": issues, "state": state, "raw": raw_status,
             },
             "figs": figs,
             "extraction": src.get("extraction"),

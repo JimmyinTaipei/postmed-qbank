@@ -2,6 +2,7 @@
 
 第 0 階段：check、check math、check answers、sample。
 第 1B 階段：publish、usage、backup pull、restore、auth hash。
+第 3 階段：patches list／pull／resolve。
 """
 import argparse
 import json
@@ -22,6 +23,15 @@ def main(argv=None):
     pub.add_argument("--subject", help="只發佈這一科（例如 PHY）；其他科沿用線上版本")
     pub.add_argument("--dry-run", action="store_true", help="只列出要上傳什麼，不上傳")
     pub.add_argument("--url", help="網站網址（預設讀 pmq.toml 的 [site] url）")
+    pa = sub.add_parser("patches", help="修訂佇列：list 看、pull 寫回主檔並 commit、resolve 處理衝突（規格書 §7.3）")
+    pa.add_argument("what", choices=["list", "pull", "resolve"])
+    pa.add_argument("id", nargs="?", help="resolve：修訂 ID（末 8 碼即可）")
+    pa.add_argument("--all", action="store_true", help="list：連已合併、已放棄的也列")
+    pa.add_argument("--dry-run", action="store_true", help="pull：只印出會怎麼改，不寫檔、不 commit、不回報")
+    rg = pa.add_mutually_exclusive_group()
+    rg.add_argument("--mine", action="store_true", help="resolve：用網站上的修訂蓋過主檔（下次 pull 寫回）")
+    rg.add_argument("--theirs", action="store_true", help="resolve：放棄網站上的修訂，保留主檔")
+    pa.add_argument("--url")
     us = sub.add_parser("usage", help="本專案 D1 大小與 R2 用量（規格書 §11-6）")
     us.add_argument("--url")
     bk = sub.add_parser("backup", help="pmq backup pull：下載個人資料整包")
@@ -69,6 +79,15 @@ def main(argv=None):
     if args.cmd == "publish":
         from .publish import publish
         return publish(cfg, url, subject=args.subject, dry_run=args.dry_run)
+    if args.cmd == "patches":
+        from . import patches
+        if args.what == "list":
+            return patches.list_patches(cfg, url, show_all=args.all)
+        if args.what == "pull":
+            return patches.pull(cfg, url, dry_run=args.dry_run)
+        if not args.id or not (args.mine or args.theirs):
+            ap.error("resolve 要給修訂 ID 與 --mine 或 --theirs")
+        return patches.resolve(cfg, url, args.id, mine=args.mine)
     if args.cmd == "usage":
         from .publish import usage
         return usage(cfg, url)
