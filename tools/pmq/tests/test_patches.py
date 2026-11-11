@@ -36,10 +36,18 @@ class Unrewrite(unittest.TestCase):
         self.assertEqual(self.back(V), RAW.replace("![原題圖1]", "![圖一]"))
 
     def test_moved_image(self):
-        V = self.R.replace("![原題圖1](fig:F0123456789)\n\n", "") + "\n![原題圖1](fig:F0123456789)\n"
-        out = self.back(V)
+        raw = "\n題幹看圖：\n\n![原題圖1](../../assets/原題圖/X/PHY-1_1.png)\n\n第二段文字。\n"
+        R, spans = rewrite(raw)
+        V = R.replace("![原題圖1](fig:F0123456789)\n\n", "") + "\n![原題圖1](fig:F0123456789)\n"
+        out = unrewrite(raw, spans, R, V, "PHY")
         self.assertIn("](../../assets/原題圖/X/PHY-1_1.png)", out)
         self.assertNotIn("fig:", out)
+
+    def test_moved_image_past_link_refused(self):
+        # 圖搬到有 PDF 連結的那一段後面：比對會把那一段當成「新打的字」，連結會不見 → 不寫
+        V = self.R.replace("![原題圖1](fig:F0123456789)\n\n", "") + "\n![原題圖1](fig:F0123456789)\n"
+        with self.assertRaises(Refuse):
+            self.back(V)
 
     def test_unknown_fig_refused(self):
         with self.assertRaises(Refuse):
@@ -48,6 +56,23 @@ class Unrewrite(unittest.TestCase):
     def test_pdf_link_kept_when_untouched(self):
         V = self.R.replace("第二段", "第三段")
         self.assertIn("[講義](../a.pdf#page=3)", self.back(V))
+
+    def test_edit_link_text_refused(self):
+        # 改到連結文字本身：主檔的 PDF 連結會變純文字 → 不寫
+        with self.assertRaises(Refuse):
+            self.back(self.R.replace("講義 p.3", "講義 p.4"))
+
+    def test_edit_next_to_link_ok(self):
+        V = self.R.replace("見 講義 p.3", "請見 講義 p.3，")
+        self.assertIn("請見 [講義](../a.pdf#page=3)，", self.back(V))
+
+    def test_hidden_link_deleted_refused(self):
+        # 網站上不顯示的圖（改寫成空字串）：包住它的那段被刪掉 → 不寫
+        raw = "甲。\n\n![圖](../x.png)\n\n乙。"
+        R, spans = sub_spans(MD_LINK, lambda m: "", raw)
+        self.assertEqual(unrewrite(raw, spans, R, R.replace("甲", "丙"), "PHY"), raw.replace("甲", "丙"))
+        with self.assertRaises(Refuse):
+            unrewrite(raw, spans, R, "甲，乙。", "PHY")
 
     def test_mismatch_refused(self):
         with self.assertRaises(Refuse):

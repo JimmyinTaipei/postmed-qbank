@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 
 from .adapters.biochem import FOLDER_KIND, KEY_LINE, BiochemAdapter
-from .adapters.common import MD_LINK, Assets, Report
+from .adapters.common import MD_LINK, Assets, Report, load_yaml
 from .adapters.physics import FRONT, SECTION, PhysicsAdapter
 from .cache import HashCache
 from .remote import Remote
@@ -170,6 +170,12 @@ def unrewrite(raw, spans, R, V, subject):
             out.append(R[p:i2])
         elif op in ("replace", "insert"):
             out.append(V[j1:j2])
+    # 沒被原樣換回的改寫紀錄：題圖還能靠 fig: 換回路徑；其他的（PDF／老師解析連結、網站上不顯示的圖）
+    # 在網站上看不到原本的連結，照寫會把主檔的連結悄悄變成純文字或整個消失 → 不寫。
+    lost = [sg for k, sg in enumerate(segs) if k not in done and not FIG_LINK.fullmatch(sg["rep"])]
+    if lost:
+        raise Refuse("這次修改碰到主檔裡的連結（" + "、".join(sg["orig"][:50] for sg in lost[:2])
+                     + "），自動寫回會把連結弄丟，請在 Mac 上手動改")
     text = "".join(out)
     figs = fig_map(segs, subject)
 
@@ -459,7 +465,35 @@ class Writer:
             nb = [x["raw"] for x in self.bch._blocks(new_text) if x["fields"].get("ID", "").strip() != qid]
             if ob != nb:
                 raise Refuse("寫回會動到同一份考卷的其他題，不寫回")
+            # 這一題的其他欄位（ans、chap、source…）也不能變
+            key = {"answer": "ans", "human_verified": "verified"}.get(field, field)
+            mine = [[{k: v for k, v in x["fields"].items() if k != key}
+                     for x in self.bch._blocks(t) if x["fields"].get("ID", "").strip() == qid] for t in (old_text, new_text)]
+            if mine[0] != mine[1]:
+                raise Refuse("寫回會動到這一題的其他欄位，不寫回")
+        else:
+            self._phy_guard(old_text, new_text, field)
         return new
+
+    def _phy_guard(self, old_text, new_text, field):
+        """物理：改正文就不能動 front matter；改 front matter 就不能動正文，也不能動別的鍵。"""
+        mo, mn = FRONT.match(old_text), FRONT.match(new_text)
+        if not mo or not mn:
+            raise Refuse("寫回後 front matter 讀不到，不寫回")
+        if field in TEXT_FIELDS:
+            if old_text[: mo.end()] != new_text[: mn.end()]:
+                raise Refuse("寫回後 front matter 也變了（不應該），不寫回")
+            return
+        if old_text[mo.end():] != new_text[mn.end():]:
+            raise Refuse("寫回後正文也變了（不應該），不寫回")
+        a, b = load_yaml(mo.group(1)) or {}, load_yaml(mn.group(1)) or {}
+        key = {"answer": "ans", "chap": "chap", "tags": "tag", "human_verified": "human_review"}[field]
+        if field == "answer":
+            rest = [{k: v for k, v in (d.get("ans") or {}).items() if k not in ("value", "mode")} for d in (a, b)]
+            if rest[0] != rest[1]:
+                raise Refuse("寫回後 ans 底下 value／mode 以外的內容也變了（不應該），不寫回")
+        if {k: v for k, v in a.items() if k != key} != {k: v for k, v in b.items() if k != key}:
+            raise Refuse("寫回後 front matter 的其他欄位也變了（不應該），不寫回")
 
 
 def _note(p):
@@ -533,7 +567,7 @@ def pull(cfg, url, dry_run=False):
         print("  請先看過並 commit（bin/cgit add … && bin/cgit commit），或放棄那些變更，再執行一次 pull。")
         return 1
 
-    written, conflicts, bch_ids = [], [], []
+    written, conflicts, bch_ids, errors = [], [], [], []
     for p in sorted(todo, key=lambda x: x["created_at"]):
         qid, field, n = _qid(p), p["field"], _note(p)
         loc = located[qid]
@@ -584,14 +618,19 @@ def pull(cfg, url, dry_run=False):
         except Refuse as e:
             upd = {"status": "conflict", "note": {"reason": str(e), "at": int(time.time() * 1000)}}
             conflicts.append((p, f"{qid}", str(e)))
+        except Exception as e:  # noqa: BLE001 — 主檔壞掉、修訂內容格式不對等：這筆不動（狀態也不改），其他筆照常處理
+            upd = None
+            errors.append((p, qid, f"{type(e).__name__}: {e}"))
         if upd and not dry_run:
             res = remote._req("POST", "/api/admin/patches", {"updates": [dict(upd, id=p["id"], expect=p["updated_at"])]})["results"][0]
             if not res["ok"]:
                 print(f"  ⚠ {_short(p['id'])} 在網站上剛又被改過，狀態沒有更新；下次 pull 會再處理。")
 
+    for p, label, why in errors:
+        print(f"⚠ {label} {FIELD_NAME.get(p['field'], p['field'])}（{_short(p['id'])}）處理時出錯，這筆沒有寫、狀態沒改：{why}")
     if dry_run:
         print("--dry-run：沒有寫入任何檔案。")
-        return 0
+        return 1 if errors else 0
     for p, label, sha in written:
         print(f"✓ {label} {FIELD_NAME.get(p['field'], p['field'])}  commit {sha}")
     for p, label, why in conflicts:
@@ -600,7 +639,7 @@ def pull(cfg, url, dry_run=False):
     if bch_ids:
         print("這次改到的生化題（03_分章題庫/ 沒有動，要不要手動同步到分章檔由你決定）：")
         print("   " + "、".join(dict.fromkeys(bch_ids)))
-    return 1 if conflicts else 0
+    return 1 if conflicts or errors else 0
 
 
 def resolve(cfg, url, pid, mine):
