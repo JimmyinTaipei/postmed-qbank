@@ -13,3 +13,6 @@ dist/
 worker/.wrangler/
 worker/.dev.vars
 .wrangler/
+
+# 第 5 階段：使用者放的 Anki 匯出檔（很大，不進 git）
+/Anki file/

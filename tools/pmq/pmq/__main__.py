@@ -3,6 +3,7 @@
 第 0 階段：check、check math、check answers、sample。
 第 1B 階段：publish、usage、backup pull、restore、auth hash。
 第 3 階段：patches list／pull／resolve。
+第 5 階段：anki inspect。
 """
 import argparse
 import json
@@ -46,6 +47,9 @@ def main(argv=None):
     au = sub.add_parser("auth", help="pmq auth hash：把密碼轉成 Worker 的 AUTH_HASH（只印雜湊，不存密碼）")
     au.add_argument("what", choices=["hash"])
     au.add_argument("--local", action="store_true", help="本機測試版用：不限密碼長度")
+    an = sub.add_parser("anki", help="pmq anki inspect：只讀檢查 Anki 匯出的 .apkg／.colpkg")
+    an.add_argument("what", choices=["inspect"])
+    an.add_argument("paths", nargs="+", help=".apkg／.colpkg 檔，或放這些檔的資料夾")
     args = ap.parse_args(argv)
     cfg = Config()
     cfg.reports.mkdir(parents=True, exist_ok=True)
@@ -71,6 +75,11 @@ def main(argv=None):
         print(md.split("\n## ", 2)[1] if "\n## " in md else md[:2000])
         print(f"報告：{cfg.reports / '驗證報告.md'}")
         return 1 if result["errors"] else 0
+    if args.cmd == "anki":
+        from .anki import run_inspect
+        out = run_inspect(cfg, args.paths)
+        print(f"報告：{out}")
+        return 0
     if args.cmd == "sample":
         from .sample import make_sample
         make_sample(cfg)
