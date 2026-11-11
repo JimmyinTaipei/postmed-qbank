@@ -34,7 +34,7 @@ ENG = "05_英文"
 
 [site]
 # 第一次部署後，把 workers.dev 網址填在這裡（docs/部署步驟.md）。也可用環境變數 PMQ_URL 或 --url 覆寫。
-url = ""
+url = "https://postmed-qbank.jimmyni312.workers.dev"
 
 [anki]
 # 第 5 階段：pmq anki import 預設匯入的牌組（含子牌組；2026-11-11 使用者決定，docs/第5階段_Anki檢查報告.md）。

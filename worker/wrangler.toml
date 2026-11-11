@@ -19,7 +19,7 @@ not_found_handling = "single-page-application"
 binding = "DB"
 database_name = "postmed-qbank"
 # 第一次部署前，照 docs/部署步驟.md 建立 D1 後，把印出來的 database_id 貼在這裡
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "6999cebd-ba64-4824-8959-d3a2d1aa156f"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
