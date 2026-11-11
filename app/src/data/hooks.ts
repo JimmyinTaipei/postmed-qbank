@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { content } from "./content";
 import { db } from "./db";
-import { buildContext, chapterLabel, type FilterContext } from "./filter";
-import { settings } from "./personal";
-import type { Attempt, FlagKind, ItemKey, Question, Session, SubjectId } from "./types";
+import { buildContext, chapterLabel, type FilterContext, type StatusSets } from "./filter";
+import { exam, settings, type ExamPicks } from "./personal";
+import { dueForecast, reviewQueue, srsConfig, srsKey, type ReviewQueue } from "./srs";
+import type { Attempt, FlagKind, ItemKey, Question, Session, SrsConfig, SrsState, SubjectId } from "./types";
 import { keyId } from "./types";
 
 export interface Loadable<T> {
@@ -100,9 +101,68 @@ export function useFlagCount(kind: FlagKind): number | undefined {
   return useLiveQuery(() => db.flag.where("kind").equals(kind).and((f) => f.value === 1).count(), [kind]);
 }
 
+/** 這題排程用的鍵（同題群組的代表題）。 */
+function useSrsKey(item: ItemKey | undefined): string | undefined {
+  return useAsync(async () => (item ? srsKey(keyId(item)) : undefined), [item]).data;
+}
+
+/** 這題的排程狀態：undefined 載入中；null 不在排程裡。 */
+export function useSrsState(item: ItemKey | undefined): SrsState | null | undefined {
+  const key = useSrsKey(item);
+  return useLiveQuery(async () => (key ? ((await db.srs_state.get(key)) ?? null) : undefined), [key]);
+}
+
 /** 這題是否被標成「粗心錯，不追蹤」。 */
 export function useCareless(item: ItemKey | undefined): boolean {
-  return useLiveQuery(async () => (item ? (await db.srs_state.get(item))?.suspended === 1 : false), [item]) ?? false;
+  return useSrsState(item)?.suspended === 1;
+}
+
+/** 今日複習（已套每日上限）。 */
+export function useReviewQueue(): ReviewQueue | undefined {
+  return useLiveQuery(() => reviewQueue());
+}
+
+export function useDueForecast(days: number): number[] | undefined {
+  return useLiveQuery(() => dueForecast(days), [days]);
+}
+
+export function useSrsConfig(): SrsConfig | undefined {
+  return useLiveQuery(() => srsConfig());
+}
+
+export function useStatusSets(): StatusSets | undefined {
+  return useLiveQuery(async () => {
+    const done = new Set<string>();
+    const wrongEver = new Set<string>();
+    await db.attempt.each((a) => {
+      const id = keyId(a.item);
+      done.add(id);
+      if (!a.correct) wrongEver.add(id);
+    });
+    const star = new Set<string>();
+    const doubt = new Set<string>();
+    await db.flag.each((f) => {
+      if (f.value !== 1) return;
+      if (f.kind === "star") star.add(keyId(f.item));
+      else if (f.kind === "doubt") doubt.add(keyId(f.item));
+    });
+    return { done, wrongEver, star, doubt };
+  });
+}
+
+/** 全部作答（統計頁）。 */
+export function useAllAttempts(): Attempt[] | undefined {
+  return useLiveQuery(() => db.attempt.toArray());
+}
+
+/** 已結束的場次（原卷方格的得分）。 */
+export function useEndedSessions(): Session[] | undefined {
+  return useLiveQuery(async () => (await db.session.toArray()).filter((s) => !s.deleted && s.ended_at));
+}
+
+/** 模擬考進行中的作答。 */
+export function useExamPicks(sessionId: string | undefined): ExamPicks | undefined {
+  return useLiveQuery(async () => (sessionId ? exam.get(sessionId) : undefined), [sessionId]);
 }
 
 export function useLastAttempt(item: ItemKey | undefined): Attempt | null | undefined {
@@ -156,4 +216,20 @@ export function useFlagged(kind: FlagKind): { id: string; at: number }[] | undef
 export function useChapterNames(): Map<string, string> {
   const tax = useTaxonomy().data;
   return useMemo(() => new Map((tax?.chapters ?? []).map((c) => [c.id, chapterLabel(c)])), [tax]);
+}
+
+/** 所有科目的篩選環境（統計、考題分析用）。 */
+export function useAllContexts(): Loadable<Map<SubjectId, FilterContext>> {
+  return useAsync(async () => {
+    const tax = await content.taxonomy();
+    const out = new Map<SubjectId, FilterContext>();
+    for (const s of tax.subjects) out.set(s.id, buildContext(tax, s.id, await content.index(s.id)));
+    return out;
+  }, []);
+}
+
+/** 章節節點往上算到「章」這一層：最上層（物理的分組、生化的書）下面那一層。 */
+export function chapterLevel(ctx: FilterContext, chap: string): string {
+  const up = ctx.chain.get(chap) ?? [chap];
+  return up.length >= 2 ? up[up.length - 2] : up[0];
 }

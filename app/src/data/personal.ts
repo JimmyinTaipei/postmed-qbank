@@ -3,10 +3,14 @@
 // 函式簽名與 1A 相同，畫面不用改。
 
 import { ulid } from "@/lib/ulid";
+import { content } from "./content";
 import { db } from "./db";
+import { judge } from "./question";
 import { prefs } from "./prefs";
+import { applyAttempts, srsKey } from "./srs";
 import { enqueue, kick, resetCursor } from "./sync";
 import type { Attempt, FlagKind, ItemKey, Session, SessionMode } from "./types";
+import { keyId } from "./types";
 
 const now = () => Date.now();
 
@@ -15,6 +19,31 @@ export const flags = {
     await db.transaction("rw", db.flag, db.outbox, async () => {
       await db.flag.put({ item, kind, value: value ? 1 : 0, updated_at: now() });
       await enqueue("flag", [item, kind]);
+    });
+    kick();
+  },
+};
+
+export const wrongBook = {
+  /** 「已掌握」：離開錯題本（flag.mastered = 1、flag.wrong = 0）。排程不變。 */
+  async master(item: ItemKey): Promise<void> {
+    const t = now();
+    await db.transaction("rw", db.flag, db.outbox, async () => {
+      await db.flag.put({ item, kind: "wrong", value: 0, updated_at: t });
+      await db.flag.put({ item, kind: "mastered", value: 1, updated_at: t });
+      await enqueue("flag", [item, "wrong"]);
+      await enqueue("flag", [item, "mastered"]);
+    });
+    kick();
+  },
+  /** 復原「已掌握」：放回錯題本。 */
+  async unmaster(item: ItemKey): Promise<void> {
+    const t = now();
+    await db.transaction("rw", db.flag, db.outbox, async () => {
+      await db.flag.put({ item, kind: "wrong", value: 1, updated_at: t });
+      await db.flag.put({ item, kind: "mastered", value: 0, updated_at: t });
+      await enqueue("flag", [item, "wrong"]);
+      await enqueue("flag", [item, "mastered"]);
     });
     kick();
   },
@@ -48,14 +77,15 @@ export const attempts = {
       created_at: now(),
       open: 1,
     };
+    const key = input.correct ? null : await srsKey(keyId(input.item));
     await db.transaction("rw", db.attempt, db.flag, db.srs_state, db.outbox, async () => {
       await db.attempt.add(row); // 作答本身等封存（seal）後才放進佇列
       if (!input.correct) {
         await db.flag.put({ item: input.item, kind: "wrong", value: 1, updated_at: row.created_at });
         await enqueue("flag", [input.item, "wrong"]);
         // 之前標過「粗心錯，不追蹤」的題目又答錯：恢復追蹤
-        const n = await db.srs_state.where("item").equals(input.item).modify({ suspended: 0, updated_at: row.created_at });
-        if (n) await enqueue("srs_state", input.item);
+        const n = await db.srs_state.where("item").equals(key!).modify({ suspended: 0, updated_at: row.created_at });
+        if (n) await enqueue("srs_state", key!);
       }
     });
     kick();
@@ -69,30 +99,33 @@ export const attempts = {
 
   /** 離開題目、結束一場、App 進背景時呼叫：封存所有未封存的作答。 */
   async seal(): Promise<void> {
-    let n = 0;
+    let sealed: Attempt[] = [];
     await db.transaction("rw", db.attempt, db.outbox, async () => {
-      const ids = await db.attempt.where("open").equals(1).primaryKeys();
-      n = ids.length;
-      if (!n) return;
+      sealed = await db.attempt.where("open").equals(1).toArray();
+      if (!sealed.length) return;
       await db.attempt.where("open").equals(1).modify({ open: 0 });
-      for (const id of ids) await enqueue("attempt", id);
+      for (const a of sealed) await enqueue("attempt", a.id);
     });
-    if (n) kick();
+    if (!sealed.length) return;
+    kick();
+    // 信心程度定案了：排進複習、檢查是否離開錯題本（規格書 §5.3、§5.4）
+    await applyAttempts(sealed.map((a) => ({ ...a, open: 0 })));
   },
 
   /** 粗心錯，不追蹤（規格書 §5.3）：不進錯題本、不進複習；作答紀錄仍是答錯。 */
   async markCareless(item: ItemKey): Promise<void> {
     const t = now();
+    const key = await srsKey(keyId(item));
     await db.transaction("rw", db.flag, db.srs_state, db.outbox, async () => {
       await db.flag.put({ item, kind: "wrong", value: 0, updated_at: t });
-      const cur = await db.srs_state.get(item);
+      const cur = await db.srs_state.get(key);
       await db.srs_state.put({
-        ...(cur ?? { item, due: t, stability: null, difficulty: null, reps: 0, lapses: 0, state: 0, last_review: null }),
+        ...(cur ?? { item: key, due: t, stability: null, difficulty: null, reps: 0, lapses: 0, state: 0, last_review: null }),
         suspended: 1,
         updated_at: t,
       });
       await enqueue("flag", [item, "wrong"]);
-      await enqueue("srs_state", item);
+      await enqueue("srs_state", key);
     });
     kick();
   },
@@ -100,18 +133,19 @@ export const attempts = {
   /** 取消「粗心錯」：放回錯題本並恢復追蹤。 */
   async undoCareless(item: ItemKey): Promise<void> {
     const t = now();
+    const key = await srsKey(keyId(item));
     await db.transaction("rw", db.flag, db.srs_state, db.outbox, async () => {
       await db.flag.put({ item, kind: "wrong", value: 1, updated_at: t });
       await enqueue("flag", [item, "wrong"]);
-      const n = await db.srs_state.where("item").equals(item).modify({ suspended: 0, updated_at: t });
-      if (n) await enqueue("srs_state", item);
+      const n = await db.srs_state.where("item").equals(key).modify({ suspended: 0, updated_at: t });
+      if (n) await enqueue("srs_state", key);
     });
     kick();
   },
 };
 
 export const sessions = {
-  async create(input: { mode: SessionMode; filter: Session["filter"]; items: string[] }): Promise<Session> {
+  async create(input: { mode: SessionMode; filter: Session["filter"]; items: string[]; timeLimitS?: number | null }): Promise<Session> {
     const t = now();
     const row: Session = {
       id: ulid(t),
@@ -121,7 +155,7 @@ export const sessions = {
       cursor: 0,
       started_at: t,
       ended_at: null,
-      time_limit_s: null,
+      time_limit_s: input.timeLimitS ?? null,
       score: null,
       device: prefs.device(),
       updated_at: t,
@@ -154,6 +188,45 @@ export const sessions = {
   /** 捨棄一場（作答紀錄保留）。 */
   async remove(id: string): Promise<void> {
     await touchSession(id, { deleted: 1 });
+  },
+};
+
+/** 模擬考的作答（交卷前不判對錯、不記 attempt）：存在會同步的 setting["exam.<場次>"]，換裝置也能續考。 */
+export interface ExamPicks {
+  picks: Record<string, string[]>; // 題目 ID → 選的字母
+  ms: Record<string, number>; // 題目 ID → 停留時間（交卷時寫進 attempt.elapsed_ms）
+}
+
+export const exam = {
+  key: (sessionId: string) => `exam.${sessionId}`,
+  async get(sessionId: string): Promise<ExamPicks> {
+    return (await settings.get<ExamPicks>(exam.key(sessionId))) ?? { picks: {}, ms: {} };
+  },
+  async pick(sessionId: string, id: string, chosen: string[]): Promise<void> {
+    const cur = await exam.get(sessionId);
+    const picks = { ...cur.picks };
+    if (chosen.length) picks[id] = chosen;
+    else delete picks[id];
+    await settings.set(exam.key(sessionId), { ...cur, picks });
+  },
+  async addTime(sessionId: string, id: string, ms: number): Promise<void> {
+    if (ms < 500) return;
+    const cur = await exam.get(sessionId);
+    await settings.set(exam.key(sessionId), { ...cur, ms: { ...cur.ms, [id]: Math.round((cur.ms[id] ?? 0) + ms) } });
+  },
+  /** 交卷：有作答的題目各記一筆 attempt（mode = exam）並判對錯，然後結束這一場。 */
+  async submit(sessionId: string): Promise<void> {
+    const s = await db.session.get(sessionId);
+    if (!s || s.ended_at) return;
+    const cur = await exam.get(sessionId);
+    for (const id of s.items) {
+      const chosen = cur.picks[id];
+      if (!chosen?.length) continue;
+      const q = await content.question(id).catch(() => null);
+      if (!q || q === "missing") continue;
+      await attempts.record({ item: `q:${id}`, sessionId, mode: "exam", chosen, correct: judge(q, chosen), elapsedMs: cur.ms[id] ?? 0, contentH: q.h.ques });
+    }
+    await sessions.end(sessionId);
   },
 };
 

@@ -1,6 +1,40 @@
 // 出題篩選：純函式，只吃索引列與章節樹（規格書 §5.2）。畫面與測試共用。
 
-import type { Chapter, FilterSpec, IndexRow, SubjectId, Taxonomy } from "./types";
+import type { Chapter, FilterSpec, IndexRow, StatusKey, SubjectId, Taxonomy } from "./types";
+
+/** 狀態條件用的個人資料（題目 ID 的集合）。沒給時狀態條件不生效。 */
+export interface StatusSets {
+  done: Set<string>;
+  wrongEver: Set<string>;
+  star: Set<string>;
+  doubt: Set<string>;
+}
+
+export const STATUS_KEYS: { id: StatusKey; name: string }[] = [
+  { id: "new", name: "沒做過" },
+  { id: "wrong", name: "做錯過" },
+  { id: "star", name: "有星號" },
+  { id: "doubt", name: "存疑" },
+  { id: "verified", name: "已確認" },
+  { id: "unverified", name: "未確認" },
+];
+
+function hasStatus(st: StatusSets | undefined, r: IndexRow, k: StatusKey): boolean {
+  switch (k) {
+    case "verified":
+      return r.human_verified;
+    case "unverified":
+      return !r.human_verified;
+    case "new":
+      return !st?.done.has(r.id);
+    case "wrong":
+      return !!st?.wrongEver.has(r.id);
+    case "star":
+      return !!st?.star.has(r.id);
+    case "doubt":
+      return !!st?.doubt.has(r.id);
+  }
+}
 
 export interface ChapterNode {
   id: string;
@@ -21,6 +55,12 @@ export interface FilterContext {
   kindName: Map<string, string>;
   kindGroup: Map<string, string>;
   kindOrder: string[];
+  status?: StatusSets;
+}
+
+/** 套上個人資料（狀態條件）。 */
+export function withStatus(ctx: FilterContext, status: StatusSets | undefined): FilterContext {
+  return status ? { ...ctx, status } : ctx;
 }
 
 export function chapterLabel(ch: Pick<Chapter, "id" | "title">): string {
@@ -74,7 +114,7 @@ export function buildContext(tax: Taxonomy, subject: SubjectId, rows: IndexRow[]
   };
 }
 
-type Facet = "kinds" | "schools" | "years" | "books" | "units" | "chapters";
+type Facet = "kinds" | "schools" | "years" | "books" | "units" | "chapters" | "status";
 
 /**
  * 各條件之間是「且」，同一條件內是「或」；沒勾任何項目 = 不限。
@@ -101,10 +141,12 @@ function test(ctx: FilterContext, f: FilterSpec, r: IndexRow, facet: Facet): boo
       const up = ctx.chain.get(r.chap);
       return !!up && up.some((id) => f.chapters.includes(id));
     }
+    case "status":
+      return !f.status?.length || f.status.some((k) => hasStatus(ctx.status, r, k));
   }
 }
 
-const FACETS: Facet[] = ["kinds", "schools", "years", "books", "units", "chapters"];
+const FACETS: Facet[] = ["kinds", "schools", "years", "books", "units", "chapters", "status"];
 
 export function matchRows(ctx: FilterContext, f: FilterSpec): IndexRow[] {
   return ctx.rows.filter((r) => FACETS.every((k) => test(ctx, f, r, k)));
@@ -118,11 +160,12 @@ export interface FacetCounts {
   books: Map<string, number>;
   units: Map<string, number>;
   chapters: Map<string, number>;
+  status: Map<StatusKey, number>;
 }
 
 /** 每個選項旁邊的數字 =「其他條件不變、只看這個選項」會有幾題。 */
 export function facetCounts(ctx: FilterContext, f: FilterSpec): FacetCounts {
-  const out: FacetCounts = { total: 0, kinds: new Map(), schools: new Map(), years: new Map(), books: new Map(), units: new Map(), chapters: new Map() };
+  const out: FacetCounts = { total: 0, kinds: new Map(), schools: new Map(), years: new Map(), books: new Map(), units: new Map(), chapters: new Map(), status: new Map() };
   const inc = <K>(m: Map<K, number>, k: K) => m.set(k, (m.get(k) ?? 0) + 1);
   const pass = new Array<boolean>(FACETS.length);
   for (const r of ctx.rows) {
@@ -145,6 +188,7 @@ export function facetCounts(ctx: FilterContext, f: FilterSpec): FacetCounts {
     if (only("books") && book != null) inc(out.books, book);
     if (only("units") && book != null && r.unit != null) inc(out.units, r.unit);
     if (only("chapters")) for (const id of ctx.chain.get(r.chap) ?? []) inc(out.chapters, id);
+    if (only("status")) for (const k of STATUS_KEYS) if (hasStatus(ctx.status, r, k.id)) inc(out.status, k.id);
   }
   return out;
 }
@@ -195,7 +239,7 @@ export function toggleChapter(ctx: FilterContext, selected: string[], id: string
 export function defaultFilter(ctx: FilterContext): FilterSpec {
   const present = new Set(ctx.rows.map((r) => r.kind));
   const kinds = ctx.kindOrder.filter((k) => present.has(k) && ctx.kindGroup.get(k) === "postmed");
-  return { subject: ctx.subject, kinds, schools: [], years: [], books: [], units: [], chapters: [], count: 20, order: "random" };
+  return { subject: ctx.subject, kinds, schools: [], years: [], books: [], units: [], chapters: [], count: 20, order: "random", status: [] };
 }
 
 /** 把存下來的條件套到目前的內容上：丟掉已不存在的選項。 */
@@ -213,6 +257,7 @@ export function sanitizeFilter(ctx: FilterContext, f: Partial<FilterSpec> | null
     chapters: (f.chapters ?? []).filter((c) => ctx.chain.has(c)),
     count: f.count === "all" || typeof f.count === "number" ? f.count : d.count,
     order: f.order === "original" ? "original" : "random",
+    status: (f.status ?? []).filter((k) => STATUS_KEYS.some((s) => s.id === k)),
   };
 }
 
@@ -224,6 +269,7 @@ export function describeFilter(ctx: FilterContext, f: FilterSpec, subjectName: s
   if (f.years.length) parts.push(some(f.years.slice().sort((a, b) => b - a)) + " 年");
   if (f.books.length) parts.push(some(f.books));
   if (f.units.length) parts.push(some(f.units, 2));
+  if (f.status?.length) parts.push(f.status.map((k) => STATUS_KEYS.find((s) => s.id === k)?.name ?? k).join("、"));
   if (f.chapters.length) parts.push(some(f.chapters.map((c) => (ctx.nodeLabel.get(c) ?? c).split("　")[0].replace(/^Book (\d+):.*$/, "Book $1")), 3));
   return parts.join("・");
 }

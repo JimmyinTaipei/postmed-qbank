@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { attempts, content, flags, qKey, sessions, useChapterNames, useFlags, useQuestion, useSession, useSessionAttempts, type Attempt, type Question, type Session } from "@/data";
 import { useSwipe } from "@/lib/useSwipe";
+import { useQuestionMenu } from "./useQuestionMenu";
+import { ExamPlayer } from "./ExamPlayer";
 import { QuestionView, useAnswerFlow } from "@/ui/content/QuestionView";
 import { Icon } from "@/ui/icons";
 import { Dialog, Menu, useToast } from "@/ui/overlays";
@@ -25,10 +27,11 @@ export function SessionPlayer() {
       </Frame>
     );
   if (session.ended_at || session.items.length === 0) return <Navigate to={`/s/${session.id}/done`} replace />;
+  if (session.mode === "exam") return <ExamPlayer session={session} />;
   return <Player session={session} answered={answered} />;
 }
 
-function Frame({ children, top, bottom }: { children: React.ReactNode; top?: React.ReactNode; bottom?: React.ReactNode }) {
+export function Frame({ children, top, bottom }: { children: React.ReactNode; top?: React.ReactNode; bottom?: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col">
       {top}
@@ -48,6 +51,7 @@ function Player({ session, answered }: { session: Session; answered: Map<string,
   const [confirmEnd, setConfirmEnd] = useState(false);
   const item = qKey(id);
   const flag = useFlags(item);
+  const menu = useQuestionMenu(item, id);
   const unanswered = total - session.items.filter((x) => answered.has(x)).length;
   const swipeRef = useRef<HTMLDivElement>(null);
 
@@ -116,13 +120,7 @@ function Player({ session, answered }: { session: Session; answered: Map<string,
         </IconButton>
         <Menu
           label="更多動作"
-          items={[
-            { label: "存疑", icon: "flag", checked: flag.doubt, onSelect: () => { void flags.set(item, "doubt", !flag.doubt); toast(flag.doubt ? "已取消存疑" : "已標為存疑，之後可以篩出來集中處理"); } },
-            { label: "編輯這一題", icon: "edit", disabledReason: "第 3 階段開放" },
-            { label: "加入複習", icon: "repeat", disabledReason: "第 2 階段開放" },
-            { label: "標為已確認", icon: "check", disabledReason: "第 3 階段開放" },
-            { label: "結束這個題組", icon: "x", onSelect: () => (unanswered > 0 ? setConfirmEnd(true) : void finish()) },
-          ]}
+          items={[...menu, { label: "結束這個題組", icon: "x", onSelect: () => (unanswered > 0 ? setConfirmEnd(true) : void finish()) }]}
         >
           <Icon name="dots" />
         </Menu>
@@ -217,7 +215,7 @@ function Loaded({ q, session, attempt, dir, top, swipeRef, isFirst, isLast, onPr
   );
 }
 
-function BottomBar({ children }: { children: React.ReactNode }) {
+export function BottomBar({ children }: { children: React.ReactNode }) {
   return (
     <div className="pb-safe fixed inset-x-0 bottom-0 z-20 border-t border-line bg-card">
       <div className="px-safe mx-auto flex max-w-3xl items-center gap-2 py-2.5 lg:px-8 [&>:first-child]:mr-auto">{children}</div>

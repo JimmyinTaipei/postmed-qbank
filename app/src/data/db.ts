@@ -4,7 +4,8 @@
 // 第 1B 階段（版本 2）加了：cfile（下載到裝置的內容包檔案）、kv（同步游標、目前的 manifest 等本機狀態）。
 
 import Dexie, { type Table } from "dexie";
-import type { Attempt, Flag, Session, Setting } from "./types";
+import type { Attempt, Flag, ReviewLog, Session, Setting, SrsState } from "./types";
+export type { SrsState } from "./types";
 
 /** 待送佇列的一筆：哪張表的哪一列（主鍵）。送出時才讀那一列目前的值，同一列改很多次只送最後一次。 */
 export interface OutboxEntry {
@@ -27,19 +28,6 @@ export interface Kv {
   value: unknown;
 }
 
-export interface SrsState {
-  item: string;
-  due: number;
-  stability: number | null;
-  difficulty: number | null;
-  reps: number;
-  lapses: number;
-  state: number;
-  last_review: number | null;
-  suspended: 0 | 1;
-  updated_at: number;
-  seq?: number;
-}
 
 class PmqDB extends Dexie {
   attempt!: Table<Attempt, string>;
@@ -47,6 +35,7 @@ class PmqDB extends Dexie {
   flag!: Table<Flag, [string, string]>;
   setting!: Table<Setting, string>;
   srs_state!: Table<SrsState, string>;
+  review_log!: Table<ReviewLog, string>;
   outbox!: Table<OutboxEntry, number>;
   cfile!: Table<ContentFile, string>;
   kv!: Table<Kv, string>;

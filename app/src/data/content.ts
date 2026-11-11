@@ -358,6 +358,38 @@ export const content = {
     return file<KbDoc>(f);
   },
 
+  /** 某一科全部的內容包鍵（搜尋用）。 */
+  async packKeys(subject: SubjectId): Promise<string[]> {
+    const m = await manifest();
+    return Object.entries(m.files.packs)
+      .filter(([pack]) => pack.split("/")[0] === subject)
+      .map(([, k]) => k);
+  },
+
+  /** 確保某一科的包都在裝置上（搜尋要讀全部本文）。回傳實際在裝置上的鍵（離線時可能少幾個）。 */
+  async ensurePacks(subject: SubjectId, onProgress?: (done: number, total: number) => void): Promise<string[]> {
+    const keys = await content.packKeys(subject);
+    const ok: string[] = [];
+    let done = 0;
+    let i = 0;
+    const worker = async () => {
+      while (i < keys.length) {
+        const k = keys[i++];
+        try {
+          // 只確保在 IndexedDB 裡（由搜尋的背景執行緒去讀），不把整科的包留在畫面這邊的記憶體
+          if (!(await has(k))) await download(k);
+          ok.push(k);
+        } catch {
+          /* 離線又沒下載：略過這一包 */
+        }
+        onProgress?.(++done, keys.length);
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    void refreshSubjectStatus();
+    return ok;
+  },
+
   /** 圖檔網址。src 是內容包裡的鍵（"a/<sha>.svg"）。圖由 Service Worker 快取（看過的圖離線可看）。 */
   assetUrl(src: string): string {
     return "/" + src;

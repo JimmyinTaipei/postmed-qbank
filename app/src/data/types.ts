@@ -176,12 +176,17 @@ export interface FilterSpec {
   chapters: string[]; // 章節樹節點 id（任一層）；選到上層代表整個子樹
   count: number | "all";
   order: "random" | "original";
+  /** 狀態條件（或）：new 沒做過｜wrong 做錯過｜star｜doubt｜verified 已確認｜unverified 未確認 */
+  status?: StatusKey[];
 }
+
+export type StatusKey = "new" | "wrong" | "star" | "doubt" | "verified" | "unverified";
 
 export interface Session {
   id: string;
   mode: SessionMode;
-  filter: (Partial<FilterSpec> & { label: string }) | { label: string };
+  /** label 是給人看的摘要；paper 是原卷的鍵（「PHY|postmed|高醫|115」），原卷方格用來找得分 */
+  filter: (Partial<FilterSpec> & { label: string; paper?: string }) | { label: string; paper?: string };
   items: string[]; // 題目 ID 順序
   cursor: number;
   started_at: number;
@@ -202,6 +207,41 @@ export interface Flag {
   value: 0 | 1;
   updated_at: number;
   seq?: number;
+}
+
+export interface ReviewLog {
+  id: string;
+  item: ItemKey; // 同題群組的代表題（q:<canonical>）
+  rating: 1 | 2 | 3 | 4; // Again｜Hard｜Good｜Easy
+  state_before: number; // 0 New｜1 Learning｜2 Review｜3 Relearning
+  elapsed_days: number;
+  scheduled_days: number;
+  duration_ms: number | null;
+  attempt_id: string | null;
+  device: string;
+  reviewed_at: number;
+  seq?: number;
+}
+
+export interface SrsState {
+  item: string;
+  due: number;
+  stability: number | null;
+  difficulty: number | null;
+  reps: number;
+  lapses: number;
+  state: number;
+  last_review: number | null;
+  suspended: 0 | 1;
+  updated_at: number;
+  seq?: number;
+}
+
+/** 間隔複習的設定（規格書 §5.4；會同步，存在 setting["srs.config"]）。 */
+export interface SrsConfig {
+  retention: number; // 目標記憶率 0.7–0.97
+  maxReviews: number; // 每日複習上限
+  maxNew: number; // 每日新卡上限
 }
 
 export interface Setting {

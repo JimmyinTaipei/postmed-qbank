@@ -77,10 +77,10 @@
 
 | 樣板 | 元件 | 示範頁 | 接功能的階段 |
 |---|---|---|---|
-| 清單頁＋搜尋列 | `SearchBar`、`ListCard`、`ListRow` | `/wrong` `/browse` `/patches` | 2、3 |
-| 複習卡片 | `ReviewCard`（翻面、四顆評分鈕） | `/review` | 2、5 |
-| 原卷方格、模擬考計時列 | `PaperGrid`、`ExamTimerBar` | `/papers` | 2 |
-| 圖表卡 | `ChartCard`、`BarList`、`ColumnChart`、`HeatTable` | `/stats` `/analysis` | 2 |
+| 清單頁＋搜尋列 | `SearchBar`、`ListCard`、`ListRow` | `/wrong` `/browse`（已接）、`/patches` | 2（完成）、3 |
+| 複習卡片 | `ReviewCard`（翻面、四顆評分鈕） | `/dev/ui`（題目的複習改用刷題畫面；卡片在第 5 階段用） | 5 |
+| 原卷方格、模擬考計時列 | `PaperGrid`、`ExamTimerBar`（`remainingS = null` 時是不計時、顯示已用時間） | `/papers`、模擬考畫面 | 2（完成） |
+| 圖表卡 | `ChartCard`、`BarList`、`ColumnChart`、`HeatTable`（`rowName` 給列的顯示名稱） | `/stats` `/analysis` | 2（完成） |
 | 資料庫閱讀頁 | `KbBlocks`（收合、編輯鈕）、`HighlightPalette` | `/kb` `/kb/:subject/:doc` | 4 |
 | 編輯面板 | `EditPanel`（原始碼＋即時預覽） | 閱讀頁的編輯模式、`/dev/ui` | 3、4 |
 | 個人筆記區、手寫區外框 | `QuestionView` 最下面兩個收合區 | 任何一題作答後 | 3、6 |

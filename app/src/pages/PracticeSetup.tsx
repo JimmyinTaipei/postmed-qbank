@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   chapterState, content, defaultFilter, describeFilter, facetCounts, pickItems, sanitizeFilter, sessions, toggleChapter,
-  useBodyIds, useContentInfo, useFilterContext, useSetting, useTaxonomy,
+  useBodyIds, useContentInfo, useFilterContext, useSetting, useStatusSets, useTaxonomy, withStatus, STATUS_KEYS,
   type ChapterNode, type FacetCounts, type FilterContext, type FilterSpec, type SubjectId,
 } from "@/data";
 import { Icon } from "@/ui/icons";
@@ -24,7 +24,9 @@ export function PracticeSetup() {
   const [saved, save, ready] = useSetting<Partial<FilterSpec> | null>("practice.last", null);
   const [subject, setSubject] = useState<SubjectId | undefined>();
   const ctxQ = useFilterContext(subject);
-  const ctx = ctxQ.data?.subject === subject ? ctxQ.data : undefined;
+  const status = useStatusSets();
+  const base = ctxQ.data?.subject === subject ? ctxQ.data : undefined;
+  const ctx = useMemo(() => (base ? withStatus(base, status) : undefined), [base, status]);
   const body = useBodyIds().data;
   const [spec, setSpec] = useState<FilterSpec | null>(null);
   const [starting, setStarting] = useState(false);
@@ -36,7 +38,7 @@ export function PracticeSetup() {
   useEffect(() => {
     if (ctx && (!spec || spec.subject !== ctx.subject)) setSpec(sanitizeFilter(ctx, saved));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx]);
+  }, [base]);
 
   const live = ctx && spec && spec.subject === ctx.subject ? spec : null;
   const counts = useMemo(() => (ctx && live ? facetCounts(ctx, live) : null), [ctx, live]);
@@ -223,6 +225,15 @@ function Filters({ ctx, spec, counts, update }: { ctx: FilterContext; spec: Filt
           )}
         </FilterGroup>
       )}
+
+      <FilterGroup title="狀態" summary={short((spec.status ?? []).map((k) => STATUS_KEYS.find((x) => x.id === k)?.name ?? k))} onClear={() => update({ status: [] })}>
+        <div className="flex flex-wrap gap-2">
+          {STATUS_KEYS.map((k) => (
+            <Chip key={k.id} selected={!!spec.status?.includes(k.id)} onToggle={() => update({ status: toggle(spec.status ?? [], k.id) })} count={counts.status.get(k.id) ?? 0}>{k.name}</Chip>
+          ))}
+        </div>
+        <p className="mt-2 text-meta text-ink-muted">勾多個時，符合任一個就算。「做錯過」包含已經離開錯題本的題目。</p>
+      </FilterGroup>
 
       <FilterGroup title="章節" summary={spec.chapters.length ? `已選 ${spec.chapters.length} 項` : ""} onClear={() => update({ chapters: [] })}>
         <ul>

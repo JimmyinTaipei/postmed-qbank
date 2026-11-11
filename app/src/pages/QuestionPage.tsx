@@ -9,6 +9,7 @@ import { Icon } from "@/ui/icons";
 import { Menu, useToast } from "@/ui/overlays";
 import { Button, Card, EmptyState, IconButton, Skeleton } from "@/ui/primitives";
 import { Page } from "@/ui/shell";
+import { useQuestionMenu } from "./useQuestionMenu";
 
 export function QuestionPage() {
   const { id = "" } = useParams();
@@ -16,6 +17,7 @@ export function QuestionPage() {
   const flag = useFlags(id ? qKey(id) : undefined);
   const toast = useToast();
   const item = qKey(id);
+  const menu = useQuestionMenu(item, id);
 
   const actions = (
     <>
@@ -24,12 +26,7 @@ export function QuestionPage() {
       </IconButton>
       <Menu
         label="更多動作"
-        items={[
-          { label: "存疑", icon: "flag", checked: flag.doubt, onSelect: () => void flags.set(item, "doubt", !flag.doubt) },
-          { label: "編輯這一題", icon: "edit", disabledReason: "第 3 階段開放" },
-          { label: "加入複習", icon: "repeat", disabledReason: "第 2 階段開放" },
-          { label: "標為已確認", icon: "check", disabledReason: "第 3 階段開放" },
-        ]}
+        items={menu}
       >
         <Icon name="dots" />
       </Menu>

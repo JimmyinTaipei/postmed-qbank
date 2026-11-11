@@ -15,7 +15,13 @@ import { QuestionPage } from "./pages/QuestionPage";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
 import { More } from "./pages/More";
-import { AnalysisTemplate, BrowsePage, KbIndex, KbReaderPage, PapersTemplate, PatchesTemplate, ReviewTemplate, StatsTemplate, WrongPage } from "./pages/Templates";
+import { KbIndex, KbReaderPage, PatchesTemplate } from "./pages/Templates";
+import { ReviewPage } from "./pages/Review";
+import { PapersPage } from "./pages/Papers";
+import { StatsPage } from "./pages/Stats";
+import { BrowsePage } from "./pages/Browse";
+import { AnalysisPage } from "./pages/Analysis";
+import { WrongBookPage } from "./pages/WrongBook";
 
 // 展示頁不常開，另外打包
 const UiGallery = lazy(() => import("./pages/UiGallery"));
@@ -44,15 +50,15 @@ export function App() {
               <Route path="/practice" element={<PracticeSetup />} />
               <Route path="/s/:sessionId/done" element={<SessionDone />} />
               <Route path="/q/:id" element={<QuestionPage />} />
-              <Route path="/review" element={<ReviewTemplate />} />
+              <Route path="/review" element={<ReviewPage />} />
               <Route path="/kb" element={<KbIndex />} />
               <Route path="/kb/:subject/:doc" element={<KbReaderPage />} />
               <Route path="/more" element={<More />} />
-              <Route path="/wrong" element={<WrongPage />} />
+              <Route path="/wrong" element={<WrongBookPage />} />
               <Route path="/browse" element={<BrowsePage />} />
-              <Route path="/papers" element={<PapersTemplate />} />
-              <Route path="/stats" element={<StatsTemplate />} />
-              <Route path="/analysis" element={<AnalysisTemplate />} />
+              <Route path="/papers" element={<PapersPage />} />
+              <Route path="/stats" element={<StatsPage />} />
+              <Route path="/analysis" element={<AnalysisPage />} />
               <Route path="/patches" element={<PatchesTemplate />} />
               <Route path="/settings" element={<Settings />} />
               <Route

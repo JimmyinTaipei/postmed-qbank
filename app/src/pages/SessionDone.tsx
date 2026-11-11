@@ -29,7 +29,8 @@ export function SessionDone() {
   const wrongIds = list.filter((x) => x.a && !x.a.correct).map((x) => x.id);
   const skipped = list.filter((x) => !x.a).length;
   const done = list.length - skipped;
-  const time = list.reduce((s, x) => s + (x.a?.elapsed_ms ?? 0), 0);
+  const isExam = session.mode === "exam";
+  const time = isExam && session.ended_at ? session.ended_at - session.started_at : list.reduce((s, x) => s + (x.a?.elapsed_ms ?? 0), 0);
 
   async function redo() {
     setBusy(true);
@@ -40,10 +41,14 @@ export function SessionDone() {
   return (
     <Page title="結果" subtitle={session.filter.label}>
       <Card className="grid grid-cols-2 gap-x-4 gap-y-5 p-5 sm:grid-cols-4">
-        <Stat value={percent(right, done)} label="答對率" hint={`${right} / ${done} 題`} />
+        {isExam ? (
+          <Stat value={`${right} / ${list.length}`} label="得分（答對題數）" hint={percent(right, list.length)} />
+        ) : (
+          <Stat value={percent(right, done)} label="答對率" hint={`${right} / ${done} 題`} />
+        )}
         <Stat value={wrongIds.length} label="答錯" />
-        <Stat value={skipped} label="略過" />
-        <Stat value={formatDuration(time)} label="作答時間" />
+        <Stat value={skipped} label={isExam ? "未作答" : "略過"} />
+        <Stat value={formatDuration(time)} label={isExam ? "用時" : "作答時間"} />
       </Card>
 
       <div className="flex flex-wrap gap-2">
@@ -66,7 +71,7 @@ export function SessionDone() {
                 leading={<span className="w-6 text-right text-meta tabular-nums">{i + 1}</span>}
                 title={<>{rows?.get(id)?.label ?? "…"}<span className="mx-1 text-ink-muted">｜</span><span className="text-ink-muted">{id}</span></>}
                 trailing={
-                  !a ? <Badge>略過</Badge> : a.correct ? <Badge tone="correct" icon="check">答對</Badge> : <Badge tone="incorrect" icon="x">答錯</Badge>
+                  !a ? <Badge>{isExam ? "未作答" : "略過"}</Badge> : a.correct ? <Badge tone="correct" icon="check">答對</Badge> : <Badge tone="incorrect" icon="x">答錯</Badge>
                 }
               />
             </li>

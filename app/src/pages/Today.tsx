@@ -1,8 +1,8 @@
-// 今日頁（規格書 §9.1）：續做、今天做了多少、錯題數、各科進度。到期複習數在第 2 階段接上。
+// 今日頁（規格書 §9.1）：到期複習數、續做、今天做了多少、錯題數、各科進度。
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { sessions, useActiveSessions, useContentInfo, useFlagCount, useSubjectProgress, useTaxonomy, useTodaySummary, type Session } from "@/data";
+import { sessions, useActiveSessions, useContentInfo, useFlagCount, useReviewQueue, useSubjectProgress, useTaxonomy, useTodaySummary, type Session } from "@/data";
 import { formatAgo, percent } from "@/lib/format";
 import { Icon } from "@/ui/icons";
 import { Dialog } from "@/ui/overlays";
@@ -17,6 +17,7 @@ export function Today() {
   const today = useTodaySummary();
   const wrong = useFlagCount("wrong");
   const progress = useSubjectProgress();
+  const review = useReviewQueue();
   const [discard, setDiscard] = useState<Session | null>(null);
   const date = new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric", weekday: "long" });
 
@@ -39,9 +40,23 @@ export function Today() {
         <Stat value={wrong ?? "—"} label="錯題本" hint={wrong ? <LinkButton to="/wrong" variant="ghost" className="-ml-4">看錯題</LinkButton> : undefined} />
       </Card>
 
-      <LinkButton to="/practice" variant="primary" block icon="pencil">
-        開始刷題
-      </LinkButton>
+      {review && review.items.length > 0 ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          <LinkButton to="/review" variant="primary" block icon="repeat">
+            今日複習（{review.items.length} 題）
+          </LinkButton>
+          <LinkButton to="/practice" block icon="pencil">
+            開始刷題
+          </LinkButton>
+        </div>
+      ) : (
+        <>
+          <LinkButton to="/practice" variant="primary" block icon="pencil">
+            開始刷題
+          </LinkButton>
+          {review && <p className="-mt-3 text-meta text-ink-muted">今天沒有要複習的題目{review.dueTotal > 0 ? "（已達每日上限）" : ""}。</p>}
+        </>
+      )}
 
       <section aria-labelledby="h-resume">
         <SectionTitle id="h-resume">續做</SectionTitle>
@@ -92,10 +107,6 @@ export function Today() {
         </Card>
       </section>
 
-      <section aria-labelledby="h-review">
-        <SectionTitle id="h-review">今日複習</SectionTitle>
-        <Card><EmptyState icon="repeat" title="間隔複習在第 2 階段開放">答錯的題目已經先記在錯題本，開放後會自動排進複習。</EmptyState></Card>
-      </section>
 
       {discard && (
         <Dialog

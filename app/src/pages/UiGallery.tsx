@@ -337,6 +337,7 @@ export default function UiGallery() {
           <ReviewCard front="PDH complex 的五個輔酶是哪些？" back="**TPP、Lipoamide、CoA、FAD、NAD⁺**" flipped={flipped} onFlip={() => setFlipped(true)} onRate={() => setFlipped(false)} ratings={[{ value: 1, label: "重來", next: "10 分鐘" }, { value: 2, label: "困難", next: "1 天" }, { value: 3, label: "良好", next: "3 天" }, { value: 4, label: "簡單", next: "7 天" }]} />
           <ExamTimerBar remainingS={52 * 60 + 5} totalS={80 * 60} answered={12} total={45} onSubmit={() => {}} />
           <ExamTimerBar remainingS={4 * 60 + 12} totalS={80 * 60} answered={41} total={45} onSubmit={() => {}} />
+          <ExamTimerBar remainingS={null} totalS={null} elapsedS={23 * 60 + 8} answered={20} total={45} onSubmit={() => {}} />
           <ChartCard title="弱點章節" subtitle="答對率最低的三章"><BarList max={100} format={(v) => `${v}%`} rows={[{ label: "Ch15 電磁感應", value: 48 }, { label: "Ch08 轉動", value: 55 }, { label: "一個名稱很長很長很長的章節", value: 91 }]} /></ChartCard>
           <ChartCard title="每日題數"><ColumnChart unit="題" data={[38, 52, 0, 61, 45, 80, 36].map((value, i) => ({ label: "一二三四五六日"[i], value }))} /></ChartCard>
         </Pair>

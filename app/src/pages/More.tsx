@@ -10,15 +10,15 @@ const GROUPS: { title: string; items: { to: string; label: string; meta: string;
     title: "題目",
     items: [
       { to: "/wrong", label: "錯題本", meta: "答錯的題目", icon: "x" },
-      { to: "/browse", label: "題庫瀏覽", meta: "用題號或來源找題目", icon: "search", stage: "第 2 階段" },
-      { to: "/papers", label: "原卷", meta: "整份考卷、模擬考", icon: "file", stage: "第 2 階段" },
+      { to: "/browse", label: "題庫瀏覽", meta: "用題號、來源或內文找題目", icon: "search" },
+      { to: "/papers", label: "原卷", meta: "整份考卷、模擬考", icon: "file" },
     ],
   },
   {
     title: "分析",
     items: [
-      { to: "/stats", label: "統計", meta: "每日題數、弱點章節", icon: "chart", stage: "第 2 階段" },
-      { to: "/analysis", label: "考題分析", meta: "各單元歷年出題數", icon: "grid", stage: "第 2 階段" },
+      { to: "/stats", label: "統計", meta: "每日題數、弱點章節", icon: "chart" },
+      { to: "/analysis", label: "考題分析", meta: "各單元歷年出題比例", icon: "grid" },
     ],
   },
   {

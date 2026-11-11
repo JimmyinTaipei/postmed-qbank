@@ -104,22 +104,26 @@ export function PaperGrid({ schools, years, cell, onOpen }: { schools: string[];
   );
 }
 
-/** 模擬考進行中固定在最上面的一列：剩餘時間、已作答數、交卷。剩不到 5 分鐘變成警示色。 */
-export function ExamTimerBar({ remainingS, totalS, answered, total, onSubmit }: { remainingS: number; totalS: number; answered: number; total: number; onSubmit: () => void }) {
-  const mm = String(Math.floor(remainingS / 60)).padStart(2, "0");
-  const ss = String(remainingS % 60).padStart(2, "0");
-  const low = remainingS <= 300;
+/** 模擬考進行中固定在最上面的一列：剩餘時間（不計時則是已用時間）、已作答數、交卷。剩不到 5 分鐘變成警示色。 */
+export function ExamTimerBar({ remainingS, totalS, elapsedS = 0, answered, total, onSubmit }: { remainingS: number | null; totalS: number | null; elapsedS?: number; answered: number; total: number; onSubmit: () => void }) {
+  const timed = remainingS != null && totalS != null;
+  const shown = timed ? Math.max(0, remainingS) : elapsedS;
+  const hh = Math.floor(shown / 3600);
+  const mm = String(Math.floor((shown % 3600) / 60)).padStart(hh ? 2 : 2, "0");
+  const ss = String(shown % 60).padStart(2, "0");
+  const text = hh ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
+  const low = timed && remainingS <= 300;
   return (
     <div className="rounded-card border border-line bg-card">
       <div className="flex items-center gap-3 px-4 py-2">
-        <span role="timer" aria-label={`剩餘 ${mm} 分 ${ss} 秒`} className={cx("flex items-center gap-1.5 rounded-btn px-2 py-1 text-title font-semibold tabular-nums", low ? "bg-warning-bg text-warning-ink" : "text-ink-strong")}>
+        <span role="timer" aria-label={timed ? `剩餘 ${Math.floor(shown / 60)} 分 ${shown % 60} 秒` : `已用 ${Math.floor(shown / 60)} 分`} className={cx("flex items-center gap-1.5 rounded-btn px-2 py-1 text-title font-semibold tabular-nums", low ? "bg-warning-bg text-warning-ink" : "text-ink-strong")}>
           <Icon name={low ? "alert" : "clock"} size={18} />
-          {mm}:{ss}
+          {text}
         </span>
-        <span className="min-w-0 flex-1 text-meta text-ink-muted">已作答 {answered} / {total}</span>
+        <span className="min-w-0 flex-1 text-meta text-ink-muted">{timed ? "" : "不計時・"}已作答 {answered} / {total}</span>
         <Button variant="primary" onClick={onSubmit}>交卷</Button>
       </div>
-      <ProgressBar value={totalS - remainingS} max={totalS} label="考試時間" className="rounded-none" />
+      {timed && <ProgressBar value={totalS - Math.max(0, remainingS)} max={totalS} label="考試時間" className="rounded-none" />}
     </div>
   );
 }
@@ -176,7 +180,7 @@ export function ColumnChart({ data, unit }: { data: { label: string; value: numb
 }
 
 /** 章節 × 年份（或學校）的出題比例表。格子底色分四級，數字照寫。 */
-export function HeatTable({ rows, cols, value, rowLabel }: { rows: string[]; cols: (string | number)[]; value: (row: string, col: string | number) => number; rowLabel: string }) {
+export function HeatTable({ rows, cols, value, rowLabel, rowName = (r) => r }: { rows: string[]; cols: (string | number)[]; value: (row: string, col: string | number) => number; rowLabel: string; rowName?: (row: string) => string }) {
   const top = useMemo(() => Math.max(1, ...rows.flatMap((r) => cols.map((c) => value(r, c)))), [rows, cols, value]);
   const shade = (v: number) => (v === 0 ? "text-ink-muted" : v / top > 0.66 ? "bg-blue-deep text-on-deep font-semibold" : v / top > 0.33 ? "bg-blue-mid text-blue-ink" : "bg-blue-light text-blue-ink");
   return (
@@ -191,7 +195,7 @@ export function HeatTable({ rows, cols, value, rowLabel }: { rows: string[]; col
         <tbody>
           {rows.map((r) => (
             <tr key={r}>
-              <th scope="row" className="sticky left-0 max-w-40 truncate bg-card px-2 py-1.5 text-left font-normal whitespace-nowrap text-ink-strong">{r}</th>
+              <th scope="row" title={rowName(r)} className="sticky left-0 max-w-40 truncate bg-card px-2 py-1.5 text-left font-normal whitespace-nowrap text-ink-strong">{rowName(r)}</th>
               {cols.map((c) => {
                 const v = value(r, c);
                 return <td key={c} className={cx("rounded-chip px-1 py-1.5 text-center", shade(v))}>{v || "·"}</td>;

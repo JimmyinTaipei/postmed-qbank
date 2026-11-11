@@ -16,13 +16,18 @@
 | `hooks.ts` | React hooks：內容用 `useAsync` 系列，個人資料用 Dexie 的即時查詢 |
 | `filter.ts` | 出題篩選的純函式 |
 | `question.ts` | 題目判讀的純函式 |
+| `srs-core.ts` | 間隔複習的純函式（ts-fsrs 包裝、評分換算、重播、錯題離開規則）；測試 `srs-core.test.ts`（`node --experimental-strip-types --test`） |
+| `srs.ts` | 排程的資料操作：`applyAttempts`（封存時呼叫）、`reviewQueue`、`dueForecast`、`srs.add／remove／rebuild` |
+| `search.ts`、`search.worker.ts` | 搜尋：背景執行緒直接讀 IndexedDB 的內容包，逐題比對 |
 
 同步哪些表、用什麼規則合併，寫在 `schema/ts/sync-tables.ts`（Worker 與 App 共用）：`attempt`、`review_log` 只增不改；`session`、`srs_state`、`flag`、`setting` 以時間較新的為準。要同步新的表，在那裡加一筆，Worker 與 App 都會跟著改。
 
 ## 幾個要知道的約定
 
 - **作答的「封存」**：`attempts.record()` 寫入的列帶 `open: 1`，代表使用者還停在那一題、信心程度（猜的／普通／很確定）還能改。換題、結束、App 進背景時畫面會呼叫 `attempts.seal()` 把 `open` 設成 0。伺服器的 `attempt` 表只增不改，所以 **只同步 `open = 0` 的列**（`seal` 時才放進 outbox）；`open` 這個欄位不送上去。上次沒正常離開而留下的未封存列，下次開 App 時 `startSync` 會封存並送出。
-- **答錯**：`record()` 會同時把 `flag(wrong)` 設成 1。「粗心錯，不追蹤」是 `attempts.markCareless()`：`flag(wrong) = 0`、`srs_state.suspended = 1`。第 2 階段的 FSRS 排程接在 `record()` 裡。
+- **答錯**：`record()` 會同時把 `flag(wrong)` 設成 1。「粗心錯，不追蹤」是 `attempts.markCareless()`：`flag(wrong) = 0`、`srs_state.suspended = 1`。
+- **排程（第 2 階段）**：在 `seal()` 之後由 `srs.applyAttempts()` 做（信心程度那時才定案）。排程的鍵是同題群組的代表題 `q:<canonical>`，用 `srsKey(id)` 取得；標記（錯題、星號）仍掛在各題自己身上。
+- **模擬考**：交卷前的作答存在 `setting["exam.<場次>"]`（會同步），交卷時 `exam.submit()` 才記 `attempt`。
 - **場次標題**：`session.filter.label` 是給人看的摘要（「物理・後西醫・高醫」），由 `describeFilter()` 產生；其餘欄位是原始條件。
 - **設定分兩種**：`settings`（Dexie 的 `setting` 表，會同步，例如上次的出題條件 `practice.last`）與 `prefs`（localStorage，不同步）。
 - **樣本**：正式內容沒有樣本模式，`bodyIds()` 回 `null`。`/dev/ui` 的「特殊情況題目」用發佈時一起產生的 `cases` 檔（`pmq publish` 呼叫 `sample.pick_cases`），不再讀 `app/fixtures/`。

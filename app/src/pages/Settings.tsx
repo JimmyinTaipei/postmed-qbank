@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   auth, prefs, setOffline, syncNow, useAsync, useContentInfo, useContentStatus, useDeviceName, useFigInvert, useOfflinePref,
-  useSyncDetail, useTaxonomy, useThemePref, wipeLocal, type Subject,
+  useSyncDetail, useTaxonomy, useThemePref, wipeLocal, settings, srs, useSrsConfig, type Subject, type SrsConfig,
 } from "@/data";
 import { formatAgo } from "@/lib/format";
 import { Dialog, useToast } from "@/ui/overlays";
@@ -68,6 +68,43 @@ function Devices() {
   );
 }
 
+function ReviewSettings() {
+  const cfg = useSrsConfig();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const set = (p: Partial<SrsConfig>) => cfg && void settings.set("srs.config", { ...cfg, ...p });
+  const row = (label: string, hint: string, control: React.ReactNode) => (
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div className="min-w-0">
+        <div className="text-ui text-ink-strong">{label}</div>
+        <div className="text-meta text-ink-muted">{hint}</div>
+      </div>
+      {control}
+    </div>
+  );
+  return (
+    <section aria-labelledby="h-review">
+      <SectionTitle id="h-review">複習</SectionTitle>
+      <Card className="divide-y divide-line">
+        {!cfg ? (
+          <div className="p-4"><Skeleton lines={3} /></div>
+        ) : (
+          <>
+            {row("目標記憶率", "越高複習越頻繁；Anki 預設 90%", <Segmented label="目標記憶率" value={cfg.retention} onChange={(v) => set({ retention: v })} options={[0.85, 0.9, 0.95].map((v) => ({ value: v, label: `${Math.round(v * 100)}%` }))} />)}
+            {row("每日複習上限", "超過的到期題目留到隔天", <Segmented label="每日複習上限" value={cfg.maxReviews} onChange={(v) => set({ maxReviews: v })} options={[100, 200, 400, 9999].map((v) => ({ value: v, label: v === 9999 ? "不限" : String(v) }))} />)}
+            {row("每日新題上限", "手動「加入複習」的題目每天最多開始幾題", <Segmented label="每日新題上限" value={cfg.maxNew} onChange={(v) => set({ maxNew: v })} options={[10, 20, 50, 9999].map((v) => ({ value: v, label: v === 9999 ? "不限" : String(v) }))} />)}
+            {row(
+              "重算排程",
+              "從每一筆評分紀錄重建排程。改了目標記憶率，或兩台裝置的到期日看起來不一致時用",
+              <Button icon="refresh" loading={busy} onClick={() => { setBusy(true); void srs.rebuild().then((r) => toast(`重算 ${r.items} 題，${r.changed} 題的排程有變`)).finally(() => setBusy(false)); }}>重算</Button>,
+            )}
+          </>
+        )}
+      </Card>
+    </section>
+  );
+}
+
 export function Settings() {
   const theme = useThemePref();
   const invert = useFigInvert();
@@ -108,6 +145,8 @@ export function Settings() {
           </div>
         </Card>
       </section>
+
+      <ReviewSettings />
 
       <section aria-labelledby="h-device">
         <SectionTitle id="h-device">這台裝置</SectionTitle>
