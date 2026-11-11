@@ -8,7 +8,7 @@ import { buildContext, chapterLabel, type FilterContext, type StatusSets } from 
 import { exam, settings, type ExamPicks } from "./personal";
 import { dueForecast, reviewQueue, srsConfig, srsKey, type ReviewQueue } from "./srs";
 import { applyPatches, isWritten, noteId } from "./patches";
-import type { Attempt, ContentPatch, FlagKind, Highlight, ItemKey, Note, Question, Session, SrsConfig, SrsState, SubjectId } from "./types";
+import type { Attempt, ContentPatch, FlagKind, Highlight, InkRow, ItemKey, Note, Question, Session, SrsConfig, SrsState, SubjectId } from "./types";
 import { keyId } from "./types";
 
 export interface Loadable<T> {
@@ -281,4 +281,18 @@ export function useAllContexts(): Loadable<Map<SubjectId, FilterContext>> {
 export function chapterLevel(ctx: FilterContext, chap: string): string {
   const up = ctx.chain.get(chap) ?? [chap];
   return up.length >= 2 ? up[up.length - 2] : up[0];
+}
+
+// ---------- 手寫與圖上標記（第 6 階段） ----------
+
+/** 一個對象的所有頁（含已刪除的列：畫面要靠它知道「另一台裝置清掉了」）。 */
+export function useInkRows(target: string | undefined): InkRow[] | undefined {
+  return useLiveQuery(async () => (target ? (await db.ink.where("target").equals(target).toArray()).sort((a, b) => a.page - b.page) : []), [target]);
+}
+
+/** 這一科手寫的保存規則（taxonomy.subjects[].ink）；查不到時當成 keep。 */
+export function useInkPolicy(subject: SubjectId | undefined): "per_attempt" | "keep" | undefined {
+  const tax = useTaxonomy();
+  if (!tax.data) return undefined;
+  return tax.data.subjects.find((s) => s.id === subject)?.ink ?? "keep";
 }

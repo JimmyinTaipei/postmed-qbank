@@ -76,6 +76,16 @@ export const SYNC_TABLES: SyncTable[] = [
     order: ["updated_at", "color"],
   },
   {
+    // 第 6 階段：手寫區與圖上標記。一個對象的一頁一列（id = ink:<target>#<page>），較新者勝；
+    // strokes 是 deflate＋base64 的字串，單列上限 MAX_INK_CHARS。
+    name: "ink",
+    pk: ["id"],
+    cols: ["id", "target", "page", "strokes", "w", "h", "updated_at", "deleted"],
+    json: [],
+    kind: "lww",
+    order: ["updated_at", "strokes"],
+  },
+  {
     // 第 3 階段：修訂佇列。裝置建立與改值；pmq（管理 API）改 status 與 note。
     name: "content_patch",
     pk: ["id"],
@@ -118,6 +128,9 @@ export const SYNC_TABLES: SyncTable[] = [
     order: ["updated_at", "value"],
   },
 ];
+
+/** ink.strokes 字串長度上限：壓縮後 1 MB（規格書 §4.6）的 base64 約 1.37 M 字元。 */
+export const MAX_INK_CHARS = 1_400_000;
 
 export const SYNC_TABLE = Object.fromEntries(SYNC_TABLES.map((t) => [t.name, t])) as Record<string, SyncTable>;
 
@@ -165,5 +178,6 @@ export function invalid(t: SyncTable, row: unknown): string | null {
   for (const k of t.order) if (k === "updated_at" && typeof r[k] !== "number") return "updated_at 不是數字";
   if (t.name === "attempt" && typeof r.created_at !== "number") return "created_at 不是數字";
   if (t.name === "review_log" && typeof r.reviewed_at !== "number") return "reviewed_at 不是數字";
+  if (t.name === "ink" && (typeof r.strokes !== "string" || r.strokes.length > MAX_INK_CHARS)) return "手寫資料太大或格式不對";
   return null;
 }

@@ -18,6 +18,8 @@ import { prefs } from "./prefs";
 import type { SyncState } from "./types";
 
 const BATCH = 500;
+/** 一批送出的資料量上限（手寫一列可能上百 KB）；至少送一列 */
+const BATCH_CHARS = 4_000_000;
 const PERIOD_MS = 30_000;
 const DEBOUNCE_MS = 2_000;
 
@@ -106,6 +108,7 @@ async function pushOnce(): Promise<number> {
   const seen = new Set<string>();
   const sendRows: { table: string; row: Row }[] = [];
   const sentN: number[] = [];
+  let chars = 0;
   for (const e of entries) {
     const t = SYNC_TABLE[e.table];
     if (!t) {
@@ -124,8 +127,12 @@ async function pushOnce(): Promise<number> {
     }
     if (e.table === "attempt" && row.open === 1) continue; // 還沒封存：留在佇列
     if (sendRows.length >= BATCH) break;
+    const picked = pickCols(t, row);
+    const size = typeof picked.strokes === "string" ? picked.strokes.length : 0;
+    if (sendRows.length && chars + size > BATCH_CHARS) break;
+    chars += size;
     seen.add(id);
-    sendRows.push({ table: e.table, row: pickCols(t, row) });
+    sendRows.push({ table: e.table, row: picked });
     sentN.push(e.n!);
   }
   if (sendRows.length) {

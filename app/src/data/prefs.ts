@@ -80,11 +80,54 @@ export const prefs = {
   setLastDeck(id: string) {
     write("pmq.lastDeck", id);
   },
+  /** 手寫工具（第 6 階段）：上次用的工具、筆色、粗細、螢光色。這台裝置記住，不同步。 */
+  inkTool(): InkToolPref {
+    try {
+      const v = JSON.parse(read("pmq.inkTool") ?? "null") as Partial<InkToolPref> | null;
+      return { ...INK_TOOL_DEFAULT, ...(v && typeof v === "object" ? v : {}) };
+    } catch {
+      return INK_TOOL_DEFAULT;
+    }
+  },
+  setInkTool(v: Partial<InkToolPref>) {
+    write("pmq.inkTool", JSON.stringify({ ...prefs.inkTool(), ...v }));
+  },
+  /** Apple Pencil 直接在內文的圖上畫（規格書 §9.7；預設開） */
+  pencilOnFigures(): boolean {
+    return read("pmq.pencilOnFigures") !== "0";
+  },
+  setPencilOnFigures(on: boolean) {
+    write("pmq.pencilOnFigures", on ? "1" : "0");
+  },
   subscribe(fn: () => void) {
     listeners.add(fn);
     return () => listeners.delete(fn);
   },
 };
+
+export interface InkToolPref {
+  tool: "pen" | "hl" | "eraser";
+  pen: string; // "ink-blue"…
+  size: 0 | 1 | 2; // 細、中、粗
+  hl: string; // "hl-yellow"…
+}
+export const INK_TOOL_DEFAULT: InkToolPref = { tool: "pen", pen: "ink-blue", size: 1, hl: "hl-yellow" };
+
+let inkToolRaw: string | null = null;
+let inkToolSnap: InkToolPref = INK_TOOL_DEFAULT;
+export function useInkToolPref(): InkToolPref {
+  return useSyncExternalStore(prefs.subscribe, () => {
+    const raw = read("pmq.inkTool");
+    if (raw !== inkToolRaw) {
+      inkToolRaw = raw;
+      inkToolSnap = prefs.inkTool();
+    }
+    return inkToolSnap;
+  });
+}
+export function usePencilOnFigures(): boolean {
+  return useSyncExternalStore(prefs.subscribe, prefs.pencilOnFigures);
+}
 
 export function useThemePref(): ThemePref {
   return useSyncExternalStore(prefs.subscribe, prefs.theme);

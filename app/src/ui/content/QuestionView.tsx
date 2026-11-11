@@ -11,6 +11,7 @@ import { HighlightableMarkdown } from "./Highlights";
 import { Markdown } from "./Markdown";
 import { MarkdownEditor } from "../templates";
 import { SourceBadges } from "./SourceBadges";
+import { Handwriting, useInkAttemptReset } from "../ink/Handwriting";
 
 export type Phase = "choose" | "multi" | "self" | "revealed" | "done";
 
@@ -112,6 +113,8 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys }: Props) {
   const parts = choice ? splitQuestion(q) : null;
   const done = flow.phase === "done";
   const showAnswer = done || flow.phase === "revealed";
+  // 物理：重新作答時手寫區與圖上標記是空白的（第 6 階段）
+  useInkAttemptReset(q, !done);
 
   useEffect(() => {
     if (!hotkeys) return;
@@ -162,6 +165,9 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys }: Props) {
           {flow.phase === "self" && <p className="text-meta text-ink-muted">這題要自己對答案：想好後按「顯示答案」，再標記對或錯。</p>}
         </>
       )}
+
+      {/* 第 6 階段：題目下方的手寫區（預設收合） */}
+      <Handwriting target={`q:${q.id}`} att={done ? attempt?.id : undefined} />
 
       {showAnswer && (
         <div className="anim-rise space-y-4">
@@ -308,15 +314,8 @@ function Solution({ q }: { q: Question }) {
 
       <RelatedNotes id={q.id} />
 
-      {/* 第 3 階段：個人筆記；第 6 階段：手寫 */}
-      <div className="space-y-2">
-        <NoteBox q={q} />
-        <Fold title="手寫區" icon="pencil">
-          <div data-noswipe className="flex h-40 items-center justify-center rounded-btn border border-dashed border-line-strong text-ui text-ink-muted">
-            Apple Pencil 手寫在第 6 階段開放
-          </div>
-        </Fold>
-      </div>
+      {/* 第 3 階段：個人筆記（手寫區在題目下方） */}
+      <NoteBox q={q} />
     </div>
   );
 }

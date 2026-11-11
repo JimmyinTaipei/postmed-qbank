@@ -10,6 +10,8 @@ import type { App, Env } from "./env";
 
 export const MAX_PUSH = 500;
 const PULL_LIMIT = 2000;
+/** 一列可能很大的表，一次拉少一點（ink 一列最多約 1.4 MB）。 */
+const TABLE_LIMIT: Record<string, number> = { ink: 100 };
 
 const q = (c: string) => `"${c}"`;
 
@@ -103,20 +105,26 @@ export async function push(c: Context<App>): Promise<Response> {
 export async function pull(c: Context<App>): Promise<Response> {
   const since = Math.max(0, Number(c.req.query("since") ?? 0) || 0);
   const limit = Math.min(PULL_LIMIT, Math.max(1, Number(c.req.query("limit") ?? PULL_LIMIT) || PULL_LIMIT));
+  const lim = (t: SyncTable) => Math.min(limit, TABLE_LIMIT[t.name] ?? limit);
   const stmts = SYNC_TABLES.map((t) =>
-    c.env.DB.prepare(`SELECT ${[...t.cols, "seq"].map(q).join(", ")} FROM ${t.name} WHERE seq > ? ORDER BY seq LIMIT ?`).bind(since, limit),
+    c.env.DB.prepare(`SELECT ${[...t.cols, "seq"].map(q).join(", ")} FROM ${t.name} WHERE seq > ? ORDER BY seq LIMIT ?`).bind(since, lim(t)),
   );
   stmts.push(c.env.DB.prepare("SELECT key, value FROM meta WHERE key IN ('sync_seq', 'manifest_h')"));
   const res = await c.env.DB.batch(stmts);
   const all: { table: string; row: Record<string, unknown>; seq: number }[] = [];
   let full = false;
+  // 有表被截斷時，游標不能超過那張表拿到的最後一列（否則它後面還沒拿的列會被跳過）
+  let cut = Infinity;
   SYNC_TABLES.forEach((t, i) => {
     const rows = res[i].results as Record<string, unknown>[];
-    if (rows.length === limit) full = true;
+    if (rows.length === lim(t)) {
+      full = true;
+      cut = Math.min(cut, rows[rows.length - 1].seq as number);
+    }
     for (const r of rows) all.push({ table: t.name, row: rowFromDb(t, r), seq: r.seq as number });
   });
   all.sort((a, b) => a.seq - b.seq);
-  const take = all.slice(0, limit);
+  const take = all.filter((r) => r.seq <= cut).slice(0, limit);
   const meta = Object.fromEntries((res[SYNC_TABLES.length].results as { key: string; value: string }[]).map((r) => [r.key, r.value]));
   const head = Number(meta.sync_seq ?? 0);
   const more = full || all.length > limit;

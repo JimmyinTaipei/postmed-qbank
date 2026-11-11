@@ -421,3 +421,39 @@ export type SyncState =
   | { kind: "syncing" }
   | { kind: "offline"; count: number }
   | { kind: "error"; message: string };
+
+// ---------- 手寫與圖上標記（第 6 階段，規格書 §4.6 ink、§9.6、§9.7） ----------
+
+/** 一筆。座標是這一列的座標空間（ink.w × ink.h），不是螢幕像素。 */
+export interface InkStroke {
+  /** pen 筆｜hl 螢光筆。之後可能有別的（例如圖上膠帶）：讀到不認得的要原樣保留、不畫 */
+  tool: string;
+  color: string; // 色彩代碼名稱，例如 "ink-blue"、"hl-yellow"
+  size: number; // 筆寬（座標空間的單位）
+  pts: [x: number, y: number, p: number][];
+  [k: string]: unknown;
+}
+
+/** 解壓後的 ink.strokes。 */
+export interface InkDoc {
+  v: 1;
+  /** 圖上標記：畫的時候那張圖的檔案（a/<sha>.svg）；圖之後被改過就和現在的不同 */
+  src?: string;
+  /** 物理（per_attempt）：在「已作答」的畫面上畫的，記下那一次作答的 id；下次重新作答時清空 */
+  att?: string;
+  strokes: InkStroke[];
+  [k: string]: unknown;
+}
+
+/** D1／Dexie 的一列。strokes 是 deflate＋base64 的字串（同步走 JSON）。 */
+export interface InkRow {
+  id: string; // "ink:" + target + "#" + page
+  target: string; // 手寫區 "q:PHY-007836"；圖上標記 "q:PHY-007836/fig:<fid>@q"｜"kb:<doc>/fig:<fid>"｜"card:<id>/m:<sha>"
+  page: number;
+  strokes: string;
+  w: number;
+  h: number;
+  updated_at: number;
+  deleted: 0 | 1;
+  seq?: number;
+}

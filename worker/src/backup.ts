@@ -48,7 +48,8 @@ function safeName(s: string): string {
 const README = `後醫題庫 個人資料匯出
 
 tables/<表>.ndjson  每行一列（JSON），欄位與 D1 相同（規格書 §4.6）。JSON 欄位（chosen、filter、items…）是字串。
-                    二進位欄位（ink.strokes）寫成 {"$b64": "…"}。
+                    手寫（ink.strokes）是 deflate（zlib）壓縮後的 JSON 再轉 base64 的字串；
+                    舊格式的二進位欄位寫成 {"$b64": "…"}。
 notes/<對象>.md     每則個人筆記一個 Markdown 檔（第 3 階段起才有內容）。
 meta.json           匯出時間、各表筆數、同步序號。
 

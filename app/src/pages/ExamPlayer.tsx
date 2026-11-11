@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { content, exam, sessions, isChoice, isMulti, qKey, splitQuestion, useExamPicks, useFlags, useQuestion, flags, type Question, type Session } from "@/data";
 import { useSwipe } from "@/lib/useSwipe";
 import { Markdown } from "@/ui/content/Markdown";
+import { Handwriting, useInkAttemptReset } from "@/ui/ink/Handwriting";
 import { Icon } from "@/ui/icons";
 import { Dialog, useToast } from "@/ui/overlays";
 import { Button, EmptyState, IconButton, Notice, OptionRow, Skeleton } from "@/ui/primitives";
@@ -198,6 +199,7 @@ function Body({ q, chosen, onPick }: { q: Question; chosen: string[]; onPick: (c
   const choice = isChoice(q);
   const multi = isMulti(q);
   const parts = choice ? splitQuestion(q) : null;
+  useInkAttemptReset(q, true);
   const pick = useCallback(
     (letter: string) => {
       if (multi) onPick(chosen.includes(letter) ? chosen.filter((x) => x !== letter) : [...chosen, letter].sort());
@@ -247,6 +249,7 @@ function Body({ q, chosen, onPick }: { q: Question; chosen: string[]; onPick: (c
           <Notice icon="info">這題不是選擇題，模擬考裡不計分；交卷後可以在結果頁點進去自己對答案。</Notice>
         </>
       )}
+      <Handwriting target={`q:${q.id}`} />
     </article>
   );
 }

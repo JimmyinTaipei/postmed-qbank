@@ -55,6 +55,16 @@
   --hl-green: #bdffb6;
   --hl-orange: #ffb9b8;
 
+  /* 手寫與圖上標記的筆色（第 6 階段，規格書 §9.6、§13.1）：只畫在白色紙面或圖上，深淺色相同；預設藍 */
+  --ink-blue: #3355bb;
+  --ink-red: #d20000;
+  --ink-rust: #d35000;
+  --ink-orange: #f59a23;
+  --ink-green: #7ec636;
+  --ink-purple: #bf55ff;
+  --ink-black: #000000;
+  --ink-white: #ffffff;
+
   --scrim: rgb(14 20 32 / 0.45);
   --shadow-pop: 0 8px 28px rgb(14 20 32 / 0.16);
 
