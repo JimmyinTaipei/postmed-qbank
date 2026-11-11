@@ -165,7 +165,7 @@ export interface Note {
   seq?: number;
 }
 
-export type HighlightColor = "yellow" | "green" | "pink" | "blue";
+export type HighlightColor = "yellow" | "blue" | "purple" | "pink" | "green" | "orange";
 
 export interface Highlight {
   id: string;

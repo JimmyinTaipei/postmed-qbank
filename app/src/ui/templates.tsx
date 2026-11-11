@@ -270,7 +270,8 @@ export function EditPanel({ title, initial, figs, role = "sol", onClose, onSave,
 
 // ---------- 資料庫閱讀頁 ----------
 
-const HL = [["yellow", "黃", "bg-hl-yellow"], ["green", "綠", "bg-hl-green"], ["pink", "粉", "bg-hl-pink"], ["blue", "藍", "bg-hl-blue"]] as const;
+// 使用者自己的螢光筆六色（順序照使用者給的）
+const HL = [["yellow", "黃", "bg-hl-yellow"], ["blue", "藍", "bg-hl-blue"], ["purple", "紫", "bg-hl-purple"], ["pink", "粉", "bg-hl-pink"], ["green", "綠", "bg-hl-green"], ["orange", "橘", "bg-hl-orange"]] as const;
 
 /** 螢光筆色票（選字後浮出）。 */
 export function HighlightPalette({ onPick, onNote }: { onPick: (color: (typeof HL)[number][0]) => void; onNote: () => void }) {

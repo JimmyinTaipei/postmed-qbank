@@ -47,10 +47,13 @@
   --paper-ink: #26262b;
 
   /* 螢光筆（資料庫閱讀頁） */
-  --hl-yellow: #fff1a8;
-  --hl-green: #d5f0c2;
-  --hl-pink: #fbd5e0;
-  --hl-blue: #cfe3fb;
+  /* 螢光筆：使用者自己的六色（2026-11-11）。深淺色模式都用同一組，螢光裡的字一律用 --paper-ink */
+  --hl-yellow: #ffff00;
+  --hl-blue: #87eaff;
+  --hl-purple: #e4b7ff;
+  --hl-pink: #ff88d5;
+  --hl-green: #bdffb6;
+  --hl-orange: #ffb9b8;
 
   --scrim: rgb(14 20 32 / 0.45);
   --shadow-pop: 0 8px 28px rgb(14 20 32 / 0.16);
@@ -111,10 +114,6 @@
     --warning: #f2b552;
     --warning-bg: #33270f;
     --warning-ink: #f5d08a;
-    --hl-yellow: #5c4a00;
-    --hl-green: #1f4a1a;
-    --hl-pink: #5a2238;
-    --hl-blue: #1e3f66;
     --scrim: rgb(0 0 0 / 0.6);
     --shadow-pop: 0 8px 28px rgb(0 0 0 / 0.5);
   }
@@ -146,10 +145,6 @@
   --warning: #f2b552;
   --warning-bg: #33270f;
   --warning-ink: #f5d08a;
-  --hl-yellow: #5c4a00;
-  --hl-green: #1f4a1a;
-  --hl-pink: #5a2238;
-  --hl-blue: #1e3f66;
   --scrim: rgb(0 0 0 / 0.6);
   --shadow-pop: 0 8px 28px rgb(0 0 0 / 0.5);
 }

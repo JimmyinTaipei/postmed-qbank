@@ -43,7 +43,7 @@ function Group({ title, note, children }: { title: string; note?: string; childr
 
 // ---------- 色彩與對比 ----------
 
-const SWATCHES = ["page", "card", "sidebar", "hover", "border", "border-strong", "text-strong", "text", "text-muted", "blue-light", "blue-mid", "blue-accent", "blue-deep", "blue-ink", "on-deep", "correct", "correct-bg", "correct-ink", "incorrect", "incorrect-bg", "incorrect-ink", "warning", "warning-bg", "warning-ink", "hl-yellow", "hl-green", "hl-pink", "hl-blue"];
+const SWATCHES = ["page", "card", "sidebar", "hover", "border", "border-strong", "text-strong", "text", "text-muted", "blue-light", "blue-mid", "blue-accent", "blue-deep", "blue-ink", "on-deep", "correct", "correct-bg", "correct-ink", "incorrect", "incorrect-bg", "incorrect-ink", "warning", "warning-bg", "warning-ink", "hl-yellow", "hl-blue", "hl-purple", "hl-pink", "hl-green", "hl-orange", "paper-ink"];
 
 // [前景, 背景, 最低對比, 用途]
 const PAIRS: [string, string, number, string][] = [
@@ -55,7 +55,7 @@ const PAIRS: [string, string, number, string][] = [
   ["correct-ink", "correct-bg", 4.5, "答對文字"], ["correct", "correct-bg", 3, "答對邊線"], ["correct", "card", 3, "正解邊線"],
   ["incorrect-ink", "incorrect-bg", 4.5, "答錯文字"], ["incorrect", "incorrect-bg", 3, "答錯邊線"], ["incorrect", "card", 3, "錯誤外框"],
   ["warning-ink", "warning-bg", 4.5, "疑點、待寫回"], ["paper-ink", "paper", 4.5, "圖片紙卡"],
-  ["text-strong", "hl-yellow", 4.5, "黃色螢光"], ["text-strong", "hl-green", 4.5, "綠色螢光"], ["text-strong", "hl-pink", 4.5, "粉色螢光"], ["text-strong", "hl-blue", 4.5, "藍色螢光"],
+  ["paper-ink", "hl-yellow", 4.5, "黃色螢光"], ["paper-ink", "hl-blue", 4.5, "藍色螢光"], ["paper-ink", "hl-purple", 4.5, "紫色螢光"], ["paper-ink", "hl-pink", 4.5, "粉色螢光"], ["paper-ink", "hl-green", 4.5, "綠色螢光"], ["paper-ink", "hl-orange", 4.5, "橘色螢光"],
 ];
 
 function luminance(rgb: number[]) {

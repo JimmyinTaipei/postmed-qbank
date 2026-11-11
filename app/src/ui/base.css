@@ -39,6 +39,8 @@
   --color-hl-green: var(--hl-green);
   --color-hl-pink: var(--hl-pink);
   --color-hl-blue: var(--hl-blue);
+  --color-hl-purple: var(--hl-purple);
+  --color-hl-orange: var(--hl-orange);
   --color-scrim: var(--scrim);
 
   --font-*: initial;
@@ -233,7 +235,7 @@
 }
 .md mark {
   background: var(--hl-yellow);
-  color: inherit;
+  color: var(--paper-ink);
   border-radius: 2px;
   padding: 0 0.1em;
 }
@@ -247,6 +249,9 @@
 .md mark.hl-green { background: var(--hl-green); }
 .md mark.hl-pink { background: var(--hl-pink); }
 .md mark.hl-blue { background: var(--hl-blue); }
+.md mark.hl-purple { background: var(--hl-purple); }
+.md mark.hl-orange { background: var(--hl-orange); }
+.md mark .katex { color: var(--paper-ink); }
 .md mark.hl-note {
   text-decoration: underline dotted var(--text-muted);
   text-underline-offset: 0.2em;

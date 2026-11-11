@@ -13,9 +13,9 @@ import { HighlightPalette, MarkdownEditor } from "../templates";
 import { Markdown } from "./Markdown";
 
 const CTX = 32;
-const COLORS: [HighlightColor, string][] = [["yellow", "黃"], ["green", "綠"], ["pink", "粉"], ["blue", "藍"]];
+const COLORS: [HighlightColor, string][] = [["yellow", "黃"], ["blue", "藍"], ["purple", "紫"], ["pink", "粉"], ["green", "綠"], ["orange", "橘"]];
 // Tailwind 只認得完整寫出來的 class 名稱
-const BG: Record<HighlightColor, string> = { yellow: "bg-hl-yellow", green: "bg-hl-green", pink: "bg-hl-pink", blue: "bg-hl-blue" };
+const BG: Record<HighlightColor, string> = { yellow: "bg-hl-yellow", blue: "bg-hl-blue", purple: "bg-hl-purple", pink: "bg-hl-pink", green: "bg-hl-green", orange: "bg-hl-orange" };
 
 interface Piece {
   node: Text;
@@ -196,7 +196,7 @@ export function HighlightableMarkdown({ target, text, figs, role }: Props) {
         <Markdown text={text} figs={figs} role={role} />
       </div>
       {pick && (
-        <div className="fixed z-40" style={{ left: Math.max(8, Math.min(pick.x - 140, window.innerWidth - 288)), top: Math.min(pick.y + 10, window.innerHeight - 72) }} onPointerDown={(e) => e.preventDefault()}>
+        <div className="fixed z-40" style={{ left: Math.max(8, Math.min(pick.x - 196, window.innerWidth - 400)), top: Math.min(pick.y + 10, window.innerHeight - 72) }} onPointerDown={(e) => e.preventDefault()}>
           <HighlightPalette onPick={(c) => void add(c, false)} onNote={() => void add("yellow", true)} />
         </div>
       )}
@@ -209,7 +209,7 @@ export function HighlightableMarkdown({ target, text, figs, role }: Props) {
           <ul className="space-y-2 px-3 pb-3">
             {orphans.map((h) => (
               <li key={h.id} className="flex items-start gap-2 text-ui">
-                <span className={cx("min-w-0 flex-1 rounded-chip px-1", BG[h.color])}>{h.quote}</span>
+                <span className={cx("min-w-0 flex-1 rounded-chip px-1 text-paper-ink", BG[h.color])}>{h.quote}</span>
                 {h.comment_md && <span className="min-w-0 flex-1 text-ink-muted">{h.comment_md}</span>}
                 <Button variant="ghost" icon="trash" onClick={() => void highlights.remove(h.id)}>刪除</Button>
               </li>
@@ -238,7 +238,7 @@ function HighlightSheet({ h, figs, onClose }: { h: Highlight; figs?: Fig[]; onCl
       }
     >
       <div className="space-y-4 p-4">
-        <blockquote className={cx("rounded-btn px-3 py-2 text-body text-ink-strong", BG[h.color])}>{h.quote}</blockquote>
+        <blockquote className={cx("rounded-btn px-3 py-2 text-body text-paper-ink", BG[h.color])}>{h.quote}</blockquote>
         <div role="group" aria-label="顏色" className="flex gap-1">
           {COLORS.map(([c, name]) => (
             <button key={c} type="button" aria-label={`改成${name}色`} aria-pressed={h.color === c} onClick={() => void highlights.update(h.id, { color: c })} className={cx("flex size-(--tap) items-center justify-center rounded-chip hover:bg-hover", h.color === c && "bg-blue-light")}>
