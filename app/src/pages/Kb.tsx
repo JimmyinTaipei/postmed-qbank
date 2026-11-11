@@ -34,6 +34,8 @@ import { Dialog, Menu, Sheet, useToast, type MenuItem } from "@/ui/overlays";
 import { Badge, Button, Card, EmptyState, IconButton, LinkButton, ListCard, ListRow, Notice, SectionTitle, Segmented, Select, Skeleton, TextField } from "@/ui/primitives";
 import { Page } from "@/ui/shell";
 import { EditPanel, KbBlocks, MarkdownEditor } from "@/ui/templates";
+import { InkScope } from "@/ui/ink/FigInk";
+import { LostMarks } from "@/ui/ink/LostMarks";
 
 const SAVED = "已存成修訂；在 Mac 上執行 pmq patches pull 寫回筆記檔";
 const CONFLICT = "這個區塊有衝突，請先到修訂佇列處理";
@@ -326,6 +328,8 @@ export function KbReaderPage() {
   const uiMarks = ov?.marks;
   // 筆記載入、套上修訂、換展開層數或列印 → 區塊重新畫過，螢光要重新包上去
   const version = useMemo(() => ({ depth, printing, doc }), [depth, printing, doc]);
+  // 圖上標記（第 6B 階段）：掛在這份筆記；列印時不顯示
+  const inkScope = useMemo(() => (key && !printing ? { base: `kb:${key}` } : null), [key, printing]);
 
   const save = async (fn: () => Promise<"ok" | "conflict" | void>) => {
     const r = await fn();
@@ -478,11 +482,14 @@ export function KbReaderPage() {
               </ul>
             </details>
           )}
-          <Card as="article" className="kb-article p-4 sm:p-6" aria-label={doc.title}>
-            <section ref={article}>
-              <KbBlocks key={printing ? "print" : depth} doc={doc} openDepth={printing ? 9 : depth} editing={editing} editMenu={menu} marks={uiMarks} notes={blockNotes} noteMode={noteMode} onNote={setNoteFor} />
-            </section>
-          </Card>
+          <InkScope value={inkScope}>
+            <Card as="article" className="kb-article p-4 sm:p-6" aria-label={doc.title}>
+              <section ref={article}>
+                <KbBlocks key={printing ? "print" : depth} doc={doc} openDepth={printing ? 9 : depth} editing={editing} editMenu={menu} marks={uiMarks} notes={blockNotes} noteMode={noteMode} onNote={setNoteFor} />
+              </section>
+            </Card>
+          </InkScope>
+          {key && <LostMarks base={`kb:${key}`} figs={doc.figs} />}
           <p className="text-meta text-ink-muted print:hidden">
             來源：{doc.file}
             {doc.refs.some((r) => !r.qid) && <> ・ <Badge>{doc.refs.filter((r) => !r.qid).length} 個出處對不到題目</Badge></>}

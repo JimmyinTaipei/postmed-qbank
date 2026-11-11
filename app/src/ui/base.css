@@ -367,6 +367,23 @@
   max-width: 100%;
   height: auto;
 }
+/* 圖上標記（第 6B 階段）：疊在圖上，和圖同大小（.fig 的內距是 8px） */
+.md .fig {
+  position: relative;
+}
+.md .fig > .fig-ink {
+  position: absolute;
+  inset: 8px;
+  line-height: normal;
+}
+/* 卡片的圖（第 6B 階段起包在 .fig 裡，可以放大與標記） */
+.md .card-fig .card-img {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
+  display: block;
+}
 .md .fig-missing {
   display: inline-block;
   font-size: var(--fs-meta);

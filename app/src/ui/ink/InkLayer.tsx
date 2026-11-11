@@ -33,13 +33,13 @@ function pathOf(s: InkStroke): string {
 }
 
 /** 只畫、不收輸入（檢視器之外的地方、別人的頁面）。 */
-export const InkStrokes = memo(function InkStrokes({ strokes, w, h, className, style }: { strokes: InkStroke[]; w: number; h: number; className?: string; style?: CSSProperties }) {
+export const InkStrokes = memo(function InkStrokes({ strokes, w, h, className, style, inverted }: { strokes: InkStroke[]; w: number; h: number; className?: string; style?: CSSProperties; /** 底下的圖反相成黑底：螢光改成半透明疊上去（相乘在黑底上會看不見），顏色不跟著反相 */ inverted?: boolean }) {
   const hl = strokes.filter((s) => s.tool === "hl");
   const pen = strokes.filter((s) => s.tool === "pen");
   return (
     <div className={cx("pointer-events-none absolute inset-0", className)} style={style} aria-hidden="true">
       {/* 螢光筆在下、用相乘混色：底下的線條與字看得見；筆在上 */}
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible" style={{ mixBlendMode: "multiply" }}>
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible" style={inverted ? { opacity: 0.55 } : { mixBlendMode: "multiply" }}>
         {hl.map((s, i) => (
           <path key={i} d={pathOf(s)} fill="none" stroke={`var(--${s.color}, ${s.color})`} strokeWidth={s.size} strokeLinecap="round" strokeLinejoin="round" />
         ))}
@@ -64,23 +64,29 @@ interface LayerProps {
   stylusDraws: boolean;
   /** 開始一筆（手寫區用來記「目前在哪一頁」） */
   onBegin?: () => void;
+  /** 只是點一下（沒有拖動）：不留下一點，改呼叫這個（圖上：筆點一下是開檢視器） */
+  onTap?: () => void;
+  inverted?: boolean;
   className?: string;
   style?: CSSProperties;
   label?: string;
 }
 
-export function InkLayer({ w, h, editor, brush, accept, stylusDraws, onBegin, className, style, label }: LayerProps) {
+const TAP_PX = 6;
+const TAP_MS = 350;
+
+export function InkLayer({ w, h, editor, brush, accept, stylusDraws, onBegin, onTap, inverted, className, style, label }: LayerProps) {
   const root = useRef<HTMLDivElement>(null);
   const livePen = useRef<SVGPathElement>(null);
   const liveHl = useRef<SVGPathElement>(null);
   // 事件處理只綁一次，用 ref 讀最新的值
-  const cur = useRef({ editor, brush, accept, stylusDraws, onBegin, w, h });
-  cur.current = { editor, brush, accept, stylusDraws, onBegin, w, h };
+  const cur = useRef({ editor, brush, accept, stylusDraws, onBegin, onTap, w, h });
+  cur.current = { editor, brush, accept, stylusDraws, onBegin, onTap, w, h };
 
   useEffect(() => {
     const el = root.current;
     if (!el) return;
-    type Active = { id: number; tool: "pen" | "hl" | "eraser"; color: string; size: number; pts: [number, number, number][]; rect: DOMRect; k: number; last: [number, number] | null; raf: number };
+    type Active = { id: number; type: string; tool: "pen" | "hl" | "eraser"; color: string; size: number; pts: [number, number, number][]; rect: DOMRect; k: number; last: [number, number] | null; raf: number; x0: number; y0: number; t0: number; far: boolean; begun: boolean; start: [number, number, number] | null };
     let a: Active | null = null;
 
     const toDoc = (e: PointerEvent, x: Active): [number, number] => [(e.clientX - x.rect.left) * x.k, (e.clientY - x.rect.top) * (cur.current.h / x.rect.height)];
@@ -98,6 +104,17 @@ export function InkLayer({ w, h, editor, brush, accept, stylusDraws, onBegin, cl
 
     const add = (e: PointerEvent) => {
       if (!a) return;
+      if (!a.far && Math.hypot(e.clientX - a.x0, e.clientY - a.y0) > TAP_PX) a.far = true;
+      // 有 onTap 時，要真的拖動了才開始畫（點一下是開檢視器）
+      if (!a.begun) {
+        if (cur.current.onTap && !a.far) return;
+        begin(a);
+        // 從按下去的那一點開始畫（等拖動才開始時，前面那一小段不要掉）
+        if (a.tool !== "eraser" && a.start) {
+          a.pts.push(a.start);
+          a.last = [a.start[0], a.start[1]];
+        }
+      }
       const [x, y] = toDoc(e, a);
       if (a.tool === "eraser") return erase(x, y, ERASER_PX * a.k);
       const minStep = MIN_STEP_PX * a.k;
@@ -111,7 +128,39 @@ export function InkLayer({ w, h, editor, brush, accept, stylusDraws, onBegin, cl
       a.pts.push([x, y, pressure(e)]);
     };
 
+    const begin = (x: Active) => {
+      x.begun = true;
+      cur.current.onBegin?.();
+      if (x.tool === "eraser") cur.current.editor.eraseBegin();
+      else {
+        const live = x.tool === "hl" ? liveHl.current : livePen.current;
+        live?.setAttribute(x.tool === "hl" ? "stroke" : "fill", `var(--${x.color}, ${x.color})`);
+        live?.setAttribute("stroke-width", String(x.size));
+      }
+    };
+    const clearLive = () => {
+      livePen.current?.setAttribute("d", "");
+      liveHl.current?.setAttribute("d", "");
+    };
+    // 畫完之後瀏覽器可能補送一個 click（滑鼠、部分觸控筆）：吃掉，免得圖被打開
+    const swallowClick = () => {
+      const stop = (ev: Event) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+      };
+      el.addEventListener("click", stop, { capture: true, once: true });
+      setTimeout(() => el.removeEventListener("click", stop, { capture: true }), 400);
+    };
+
     const down = (e: PointerEvent) => {
+      // 畫的時候放下第二根手指：取消這一筆，交給外面縮放
+      if (a && a.type === "touch" && e.pointerType === "touch") {
+        if (a.raf) cancelAnimationFrame(a.raf);
+        if (a.tool === "eraser" && a.begun) cur.current.editor.eraseEnd();
+        a = null;
+        clearLive();
+        return;
+      }
       if (a || !cur.current.accept(e)) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
       e.preventDefault();
@@ -124,31 +173,30 @@ export function InkLayer({ w, h, editor, brush, accept, stylusDraws, onBegin, cl
       const rect = el.getBoundingClientRect();
       const k = cur.current.w / Math.max(1, rect.width);
       const b = cur.current.brush;
-      a = { id: e.pointerId, tool: b.tool, color: b.color, size: b.px * k, pts: [], rect, k, last: null, raf: 0 };
-      cur.current.onBegin?.();
-      if (b.tool === "eraser") cur.current.editor.eraseBegin();
+      a = { id: e.pointerId, type: e.pointerType, tool: b.tool, color: b.color, size: b.px * k, pts: [], rect, k, last: null, raf: 0, x0: e.clientX, y0: e.clientY, t0: e.timeStamp, far: false, begun: false, start: null };
+      const [sx, sy] = toDoc(e, a);
+      a.start = [sx, sy, pressure(e)];
       add(e);
-      if (a.tool !== "eraser") {
-        const live = a.tool === "hl" ? liveHl.current : livePen.current;
-        live?.setAttribute(a.tool === "hl" ? "stroke" : "fill", `var(--${a.color}, ${a.color})`);
-        live?.setAttribute("stroke-width", String(a.size));
-        draw();
-      }
+      if (a.begun && a.tool !== "eraser") draw();
     };
     const move = (e: PointerEvent) => {
       if (!a || e.pointerId !== a.id) return;
       e.preventDefault();
       const list = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
       for (const ev of list.length ? list : [e]) add(ev);
-      if (a.tool !== "eraser" && !a.raf) a.raf = requestAnimationFrame(draw);
+      if (a && a.begun && a.tool !== "eraser" && !a.raf) a.raf = requestAnimationFrame(draw);
     };
     const finish = (e: PointerEvent) => {
       if (!a || e.pointerId !== a.id) return;
       const done = a;
       a = null;
       if (done.raf) cancelAnimationFrame(done.raf);
-      livePen.current?.setAttribute("d", "");
-      liveHl.current?.setAttribute("d", "");
+      clearLive();
+      if (!done.begun) {
+        if (e.type === "pointerup" && !done.far && e.timeStamp - done.t0 < TAP_MS) cur.current.onTap?.();
+        return;
+      }
+      swallowClick();
       if (done.tool === "eraser") return cur.current.editor.eraseEnd();
       if (!done.pts.length) return;
       cur.current.editor.add({ tool: done.tool, color: done.color, size: done.size, pts: done.pts });
@@ -193,8 +241,8 @@ export function InkLayer({ w, h, editor, brush, accept, stylusDraws, onBegin, cl
       className={cx("ink-surface absolute inset-0", brush.tool === "eraser" ? "cursor-cell" : "cursor-crosshair", className)}
       style={style}
     >
-      <InkStrokes strokes={editor.strokes} w={w} h={h} />
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 size-full overflow-visible" style={{ mixBlendMode: "multiply" }} aria-hidden="true">
+      <InkStrokes strokes={editor.strokes} w={w} h={h} inverted={inverted} />
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 size-full overflow-visible" style={inverted ? { opacity: 0.55 } : { mixBlendMode: "multiply" }} aria-hidden="true">
         <path ref={liveHl} fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden="true">

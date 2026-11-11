@@ -124,7 +124,7 @@ export function renderMarkdown(text: string, o: RenderOptions): string {
     return renderMath(m.tex, true);
   });
   html = html.replace(/@@F([0-9A-Za-z_-]+)@@/g, (_, fid: string) => renderFig(fid, o));
-  html = html.replace(/@@G([0-9a-f]{64}\.[a-z0-9]{2,5})@@/g, (_, f: string) => `<img class="card-img" src="/m/${f}" alt="" decoding="async" loading="lazy" draggable="false">`);
+  html = html.replace(/@@G([0-9a-f]{64}\.[a-z0-9]{2,5})@@/g, (_, f: string) => `<span class="fig card-fig" role="button" tabindex="0" data-m="${f}" aria-label="放大圖片"><img class="card-img" src="/m/${f}" alt="" decoding="async" loading="lazy" draggable="false"></span>`);
   html = html.replace(/@@S([0-9a-f]{64}\.[a-z0-9]{2,5})@@/g, (_, f: string) => `<button type="button" class="snd" data-snd="/m/${f}" aria-label="播放聲音">${SPEAKER}</button>`);
   return html;
 }

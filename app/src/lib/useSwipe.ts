@@ -35,7 +35,8 @@ export function useSwipe(ref: RefObject<HTMLElement | null>, { onPrev, onNext, e
       mode = "idle";
     };
     const start = (e: TouchEvent) => {
-      if (e.touches.length !== 1 || blocked(e.target)) return void (mode = "idle");
+      // defaultPrevented：Apple Pencil 正在圖上或手寫區畫（畫布擋掉了它的捲動），不是在滑
+      if (e.defaultPrevented || e.touches.length !== 1 || blocked(e.target)) return void (mode = "idle");
       const t = e.touches[0];
       if (t.clientX < 24) return void (mode = "idle");
       x0 = t.clientX;

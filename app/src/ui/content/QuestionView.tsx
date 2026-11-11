@@ -1,7 +1,7 @@
 // 一題的完整顯示與作答流程（規格書 §5.1、§9.2）。刷題畫面與單題頁共用。
 // 用法：外層用 useAnswerFlow 拿到流程狀態，交給 <QuestionView> 顯示，並用同一個 flow 決定底部主要按鈕。
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { answerText, attempts, isChoice, isMulti, judge, notes, qKey, splitQuestion, useCareless, useKbRelated, useNote, type Attempt, type FieldMark, type Question } from "@/data";
 import { Icon, type IconName } from "../icons";
@@ -12,6 +12,7 @@ import { Markdown } from "./Markdown";
 import { MarkdownEditor } from "../templates";
 import { SourceBadges } from "./SourceBadges";
 import { Handwriting, useInkAttemptReset } from "../ink/Handwriting";
+import { InkScope } from "../ink/FigInk";
 
 export type Phase = "choose" | "multi" | "self" | "revealed" | "done";
 
@@ -133,7 +134,11 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys }: Props) {
     return () => window.removeEventListener("keydown", key);
   });
 
+  // 圖上標記掛在這一題（第 6B 階段）；物理在已作答畫面上畫的記下那次作答
+  const inkScope = useMemo(() => ({ base: `q:${q.id}`, att: done ? attempt?.id : undefined }), [q.id, done, attempt?.id]);
+
   return (
+    <InkScope value={inkScope}>
     <article className="space-y-4" aria-labelledby={`q-${q.id}`}>
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         {/* 題目一律寫成「來源｜ID」 */}
@@ -176,6 +181,7 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys }: Props) {
         </div>
       )}
     </article>
+    </InkScope>
   );
 }
 

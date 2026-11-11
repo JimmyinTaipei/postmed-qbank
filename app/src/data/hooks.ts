@@ -290,6 +290,11 @@ export function useInkRows(target: string | undefined): InkRow[] | undefined {
   return useLiveQuery(async () => (target ? (await db.ink.where("target").equals(target).toArray()).sort((a, b) => a.page - b.page) : []), [target]);
 }
 
+/** 某個前綴底下所有還在的標記（筆記最下面的「失聯的圖上標記」用）。 */
+export function useInkUnder(prefix: string | undefined): InkRow[] | undefined {
+  return useLiveQuery(async () => (prefix ? (await db.ink.where("target").startsWith(prefix).toArray()).filter((r) => !r.deleted) : []), [prefix]);
+}
+
 /** 這一科手寫的保存規則（taxonomy.subjects[].ink）；查不到時當成 keep。 */
 export function useInkPolicy(subject: SubjectId | undefined): "per_attempt" | "keep" | undefined {
   const tax = useTaxonomy();

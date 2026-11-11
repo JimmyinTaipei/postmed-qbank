@@ -65,6 +65,26 @@ export const ink = {
     return row;
   },
 
+  /** 刪掉一列（失聯的圖上標記「刪除」）。 */
+  async remove(row: InkRow): Promise<void> {
+    await put({ ...row, strokes: "", deleted: 1, updated_at: Math.max(now(), row.updated_at + 1) });
+  },
+
+  /**
+   * 把一列標記移到另一張圖（失聯的圖上標記「移到這張圖」）。座標等比例換算到那張圖；那張圖已經有標記就接在後面。
+   */
+  async move(row: InkRow, toTarget: string, w: number, h: number): Promise<void> {
+    const from = await readInk(row);
+    const dest = await db.ink.get(inkId(toTarget, 0));
+    const base = dest && !dest.deleted ? await readInk(dest) : null;
+    const space = dest && !dest.deleted ? { w: dest.w, h: dest.h } : { w, h };
+    const kx = space.w / Math.max(1, row.w);
+    const ky = space.h / Math.max(1, row.h);
+    const moved = from.strokes.map((s) => ({ ...s, size: s.size * Math.sqrt(kx * ky), pts: s.pts.map(([x, y, p]) => [x * kx, y * ky, p] as [number, number, number]) }));
+    await ink.save(toTarget, 0, { ...(base ?? { v: 1 }), v: 1, strokes: [...(base?.strokes ?? []), ...moved] }, space.w, space.h);
+    await ink.remove(row);
+  },
+
   /** 清除一個對象的所有頁（手寫區的「清空」只清一頁，用 save 空白）。 */
   async clearTarget(target: string): Promise<void> {
     const rows = await db.ink.where("target").equals(target).toArray();

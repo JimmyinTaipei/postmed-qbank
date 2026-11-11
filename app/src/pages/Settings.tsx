@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  auth, prefs, setOffline, syncNow, useAsync, useContentInfo, useContentStatus, useDeviceName, useFigInvert, useOfflinePref, useShowUnverified,
+  auth, prefs, setOffline, syncNow, useAsync, useContentInfo, useContentStatus, useDeviceName, useFigInvert, useOfflinePref, usePencilOnFigures, useShowUnverified,
   useSyncDetail, useTaxonomy, useThemePref, wipeLocal, settings, srs, useSrsConfig, type Subject, type SrsConfig,
 } from "@/data";
 import { formatAgo } from "@/lib/format";
@@ -108,6 +108,7 @@ function ReviewSettings() {
 export function Settings() {
   const theme = useThemePref();
   const invert = useFigInvert();
+  const pencilFigs = usePencilOnFigures();
   const unverified = useShowUnverified();
   const info = useContentInfo().data;
   const tax = useTaxonomy().data;
@@ -127,6 +128,7 @@ export function Settings() {
             <Segmented label="主題" value={theme} onChange={(v) => prefs.setTheme(v)} options={[{ value: "system", label: "跟隨系統" }, { value: "light", label: "淺色" }, { value: "dark", label: "深色" }]} />
           </div>
           <Switch checked={invert} onChange={(v) => prefs.setFigInvert(v)} label="深色模式下反相黑白線稿" hint="只影響純黑白的圖；彩色圖一律放在白色紙卡上。也可以在圖片檢視器裡切換。" />
+          <Switch checked={pencilFigs} onChange={(v) => prefs.setPencilOnFigures(v)} label="Apple Pencil 直接在圖上畫" hint="打開時，筆在內文的圖上拖曳就是畫標記，點一下是放大；手指照常捲動。關掉後筆和手指一樣，要在圖片檢視器按「標記」才能畫。只影響這台裝置。" />
           <Switch checked={unverified} onChange={(v) => prefs.setShowUnverified(v)} label="顯示「未確認」" hint="預設只在你確認過的題目顯示「✓ 已確認」。打開後，還沒確認的題目也會顯示「未確認」。" />
         </Card>
       </section>

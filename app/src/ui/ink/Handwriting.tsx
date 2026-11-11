@@ -5,20 +5,19 @@
 // - 物理（per_attempt）：重新作答這一題時是空白的，由 useInkAttemptReset 清掉上一次的筆跡（含這一題圖上的標記）。
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ink, InkTooLarge, qKey, readInk, useInkPolicy, useInkRows, useInkToolPref, useLastAttempt, type InkRow, type Question } from "@/data";
+import { ink, qKey, useInkPolicy, useInkRows, useInkToolPref, useLastAttempt, type InkRow, type Question } from "@/data";
 import { Icon } from "../icons";
-import { useToast } from "../overlays";
 import { Button, cx } from "../primitives";
 import { InkLayer } from "./InkLayer";
 import { brushOf, InkToolbar } from "./InkToolbar";
-import { useInkEditor, type InkEditor } from "./useInkEditor";
+import { usePersistentInk } from "./persist";
+import type { InkEditor } from "./useInkEditor";
 
 /** 紙的座標空間：寬固定 1000，高預設 700，每次「加長」多 350。顯示時等比縮放到欄寬。 */
 export const PAGE_W = 1000;
 const PAGE_H = 700;
 const GROW = 350;
 const MAX_H = 4200;
-const SAVE_DELAY = 2000;
 
 const acceptPenOrMouse = (e: PointerEvent) => e.pointerType === "pen" || e.pointerType === "mouse";
 
@@ -122,73 +121,21 @@ interface PageProps {
 }
 
 function InkPage({ target, page, row, att, brush, active, multi, onActivate, onEditor }: PageProps) {
-  const toast = useToast();
-  const editor = useInkEditor();
   const [h, setH] = useState(row && !row.deleted ? row.h || PAGE_H : PAGE_H);
-  const known = useRef<number | null>(null); // 畫面上這一份對應的 updated_at
-  const edRef = useRef(editor);
-  edRef.current = editor;
   const hRef = useRef(h);
   hRef.current = h;
   const attRef = useRef(att);
   attRef.current = att;
+  const { editor, save } = usePersistentInk({
+    target,
+    page,
+    row,
+    size: () => ({ w: PAGE_W, h: hRef.current }),
+    meta: () => ({ att: attRef.current }),
+    onLoad: (r) => r && !r.deleted && r.h && setH(r.h),
+  });
 
   useEffect(() => onEditor(page, editor), [page, editor, onEditor]);
-
-  // 資料庫的內容（開啟時、另一台裝置畫了、物理重新作答被清掉）→ 畫面。自己還有沒存的變更時不蓋掉。
-  const at = row?.updated_at ?? null;
-  useEffect(() => {
-    if (at === known.current || edRef.current.dirty) return;
-    let alive = true;
-    void readInk(row).then((doc) => {
-      if (!alive || edRef.current.dirty) return;
-      known.current = at;
-      edRef.current.load(doc.strokes);
-      if (row && !row.deleted && row.h) setH(row.h);
-    });
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [at]);
-
-  const save = useCallback(
-    async (force = false) => {
-      const e = edRef.current;
-      if (!e.dirty && !force) return;
-      const rev = e.rev;
-      try {
-        const r = await ink.save(target, page, { v: 1, ...(attRef.current ? { att: attRef.current } : {}), strokes: e.strokes }, PAGE_W, hRef.current);
-        known.current = r.updated_at;
-        e.markSaved(rev);
-      } catch (err) {
-        toast(err instanceof InkTooLarge ? err.message : "手寫沒有存成功，請再寫一筆試試");
-      }
-    },
-    [target, page, toast],
-  );
-  const saveRef = useRef(save);
-  saveRef.current = save;
-
-  // 停筆 2 秒自動存
-  useEffect(() => {
-    if (!editor.dirty) return;
-    const t = setTimeout(() => void saveRef.current(), SAVE_DELAY);
-    return () => clearTimeout(t);
-  }, [editor.rev, editor.dirty]);
-
-  // 離開畫面、App 進背景：立刻存
-  useEffect(() => {
-    const flush = () => void saveRef.current();
-    const vis = () => document.visibilityState === "hidden" && flush();
-    document.addEventListener("visibilitychange", vis);
-    window.addEventListener("pagehide", flush);
-    return () => {
-      document.removeEventListener("visibilitychange", vis);
-      window.removeEventListener("pagehide", flush);
-      flush();
-    };
-  }, []);
 
   return (
     <div className="space-y-1">

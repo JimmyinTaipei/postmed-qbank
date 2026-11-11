@@ -33,6 +33,7 @@ import { Dialog, Menu, Sheet, useToast, type MenuItem } from "@/ui/overlays";
 import { Badge, Button, Card, EmptyState, IconButton, LinkButton, ListCard, ListRow, Notice, ProgressBar, SectionTitle, Segmented, Select, Skeleton, Stat, TextField, cx } from "@/ui/primitives";
 import { Page } from "@/ui/shell";
 import { MarkdownEditor, ReviewCard, SearchBar, type Rating } from "@/ui/templates";
+import { InkScope } from "@/ui/ink/FigInk";
 import { Frame } from "./SessionPlayer";
 
 /** 清單用的一行純文字：克漏字顯示答案、去掉公式符號與 HTML、圖與聲音換成記號。 */
@@ -397,6 +398,7 @@ export function CardPage() {
   ];
   return (
     <Page title={card.kind === "cloze" ? `克漏字 c${(o?.ord ?? 0) + 1}` : "卡片"} subtitle={deckNode?.path} back={`/cards/d/${card.deck_id}`} actions={<Menu label="卡片的更多動作" items={menu}><Icon name="dots" /></Menu>}>
+      <InkScope value={{ base: `card:${card.id}` }}>
       <Card as="article" className="p-5 sm:p-6">
         <div className="mb-2 text-meta font-semibold text-ink-muted">正面</div>
         <Markdown text={faces.front} figs={figs} />
@@ -406,6 +408,7 @@ export function CardPage() {
           <Markdown text={faces.back} figs={figs} role="sol" className={card.kind === "cloze" ? "mt-4" : undefined} />
         </div>
       </Card>
+      </InkScope>
       <Card className="space-y-2 p-4 text-ui">
         <div className="flex items-center gap-2"><Icon name="repeat" size={16} className="text-ink-muted" />{cards.describe(srs ?? undefined)}</div>
         {card.tags?.length ? <div className="flex flex-wrap gap-1.5">{card.tags.map((t) => <Badge key={t} className="max-w-full whitespace-normal [overflow-wrap:anywhere]">{t}</Badge>)}</div> : null}
@@ -574,6 +577,7 @@ export function CardReviewPage() {
   const [done, setDone] = useState({ n: 0, again: 0 });
   const shownAt = useRef(Date.now());
   const id = queue?.[idx];
+  const reviewScope = useMemo(() => (id ? { base: `card:${id}` } : null), [id]);
   const live = useCard(id);
   // 換卡時 live 還是上一張的結果：只用這一張的
   const row = live === null ? null : live && live.card.id === id ? live : undefined;
@@ -678,7 +682,9 @@ export function CardReviewPage() {
       ) : (
         <div className={cx("mt-2", row?.srs?.state === 0 && "")}>
           {row?.srs?.state === 0 && <div className="mb-2"><Badge tone="blue">新卡</Badge></div>}
+          <InkScope value={reviewScope}>
           <ReviewCard bigFront={row?.card.kind !== "cloze" && !faces.front.includes("\n") && cardPlain(faces.front).length <= 40} front={flipped ? faces.reveal : faces.front} back={faces.back} figs={figs} flipped={flipped} onFlip={flip} ratings={ratings} onRate={(v) => void rate(v)} />
+          </InkScope>
           <p className="mt-3 hidden text-center text-meta text-ink-muted lg:block">空白鍵翻面；1 重來、2 困難、3 良好、4 簡單</p>
         </div>
       )}

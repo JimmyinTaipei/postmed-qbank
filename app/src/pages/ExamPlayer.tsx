@@ -8,6 +8,7 @@ import { content, exam, sessions, isChoice, isMulti, qKey, splitQuestion, useExa
 import { useSwipe } from "@/lib/useSwipe";
 import { Markdown } from "@/ui/content/Markdown";
 import { Handwriting, useInkAttemptReset } from "@/ui/ink/Handwriting";
+import { InkScope } from "@/ui/ink/FigInk";
 import { Icon } from "@/ui/icons";
 import { Dialog, useToast } from "@/ui/overlays";
 import { Button, EmptyState, IconButton, Notice, OptionRow, Skeleton } from "@/ui/primitives";
@@ -223,6 +224,7 @@ function Body({ q, chosen, onPick }: { q: Question; chosen: string[]; onPick: (c
   });
 
   return (
+    <InkScope value={{ base: `q:${q.id}` }}>
     <article className="space-y-4" aria-labelledby={`q-${q.id}`}>
       <h2 id={`q-${q.id}`} className="text-ui font-semibold text-ink-strong">
         {q.label}
@@ -251,5 +253,6 @@ function Body({ q, chosen, onPick }: { q: Question; chosen: string[]; onPick: (c
       )}
       <Handwriting target={`q:${q.id}`} />
     </article>
+    </InkScope>
   );
 }
