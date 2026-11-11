@@ -35,3 +35,4 @@ export {
 } from "./filter";
 export { isChoice, isMulti, judge, splitQuestion, answerText } from "./question";
 export { useSearch, searchText, prepareSearch, type SearchHit, type SearchState } from "./search";
+export { pushRecent, kbRecent, useKbRecent, KB_RECENT, type KbRecent } from "./recent";

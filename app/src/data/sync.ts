@@ -145,6 +145,10 @@ async function pushOnce(): Promise<number> {
       // 伺服器拒收的列（格式不對）重送也不會過：記下原因，不卡住後面的資料
       console.warn("[sync] 伺服器拒收", res.rejected.map((r) => ({ ...r, row: sendRows[r.i] })));
       set({ error: `有 ${res.rejected.length} 筆資料伺服器拒收（${res.rejected[0].error}）` });
+      // 例外：伺服器「不認得的表」= 伺服器還是舊版（App 先更新、Worker 還沒重開或部署）。
+      // 這些不是資料壞掉，記下來，下次開 App 時整張表重送（2026-11-11：iPad 的手寫因此沒傳到電腦）
+      const old = [...new Set(res.rejected.filter((r) => r.error === "不認得的表").map((r) => sendRows[r.i]?.table).filter(Boolean))];
+      for (const t of old) await db.kv.put({ key: `sync.resend.${t}`, value: 1 });
     }
   }
   await db.outbox.bulkDelete(sentN);
@@ -238,9 +242,27 @@ export function syncNow(): Promise<void> {
 let started = false;
 
 /** App 啟動時呼叫一次（main.tsx）。 */
+/** 整張表重新排進待送（伺服器之前不認得這張表時）。手寫（ink）第一次更新到這版也做一次。 */
+async function resendTables(): Promise<void> {
+  for (const name of Object.keys(SYNC_TABLE)) {
+    const flag = `sync.resend.${name}`;
+    const once = name === "ink" && !(await db.kv.get("sync.resend.ink.v1"));
+    if (!once && !(await db.kv.get(flag))) continue;
+    const tb = tableOf(name);
+    const t = SYNC_TABLE[name];
+    const keys = (await tb.toArray()).map((r) => dexieKey(t, r as unknown as Row));
+    await db.transaction("rw", tb, db.outbox, db.kv, async () => {
+      for (const k of keys) await enqueue(name, k as never);
+      await db.kv.delete(flag);
+      if (name === "ink") await db.kv.put({ key: "sync.resend.ink.v1", value: 1 });
+    });
+  }
+}
+
 export function startSync(): void {
   if (started || typeof window === "undefined") return;
   started = true;
+  void resendTables().then(kick, (e) => console.warn("[sync] 重送失敗", e));
   // 上次沒正常離開而留下的未封存作答：封存後送出
   void db.attempt
     .where("open")

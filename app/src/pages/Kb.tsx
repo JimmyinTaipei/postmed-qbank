@@ -36,6 +36,9 @@ import { Page } from "@/ui/shell";
 import { EditPanel, KbBlocks, MarkdownEditor } from "@/ui/templates";
 import { InkScope } from "@/ui/ink/FigInk";
 import { LostMarks } from "@/ui/ink/LostMarks";
+import { createPortal } from "react-dom";
+import { useKbPosition } from "./useKbPosition";
+import { ContinueReading } from "./ContinueReading";
 
 const SAVED = "已存成修訂；在 Mac 上執行 pmq patches pull 寫回筆記檔";
 const CONFLICT = "這個區塊有衝突，請先到修訂佇列處理";
@@ -79,6 +82,7 @@ export function KbIndex() {
         <Card><EmptyState icon="book" title="還沒有筆記">筆記在 Mac 上用 Typora 寫，pmq publish 之後會出現在這裡。</EmptyState></Card>
       ) : (
         <>
+          <ContinueReading limit={5} />
           <Segmented label="科目" value={sid!} onChange={(v) => setParams({ s: v }, { replace: true })} options={subjects.map((s) => ({ value: s.id, label: s.name }))} />
           {subj && !subj.imported && <Notice>{subj.name}目前只有章節目錄，筆記內容之後再匯入。</Notice>}
           {myDrafts.length > 0 && (
@@ -399,6 +403,14 @@ export function KbReaderPage() {
     return () => window.clearTimeout(t);
   }, [doc, loc.hash]);
 
+  // 記住上次讀到哪裡（第 4B 階段）
+  const pos = useKbPosition({ docKey: key, doc, root: article, depth, setDepth, linked: /^#b-/.test(loc.hash), paused: printing });
+  useEffect(() => {
+    if (!pos.restored) return;
+    const t = window.setTimeout(pos.dismiss, 8000);
+    return () => window.clearTimeout(t);
+  }, [pos.restored, pos.dismiss]);
+
   // 列印：全部展開後再叫出列印對話框
   useEffect(() => {
     if (!printing) return;
@@ -536,6 +548,30 @@ export function KbReaderPage() {
           </ul>
         </Sheet>
       )}
+      {pos.restored &&
+        createPortal(
+          <div className="fixed inset-x-0 z-30 px-3 print:hidden lg:left-60" style={{ bottom: "calc(env(safe-area-inset-bottom) + 76px)" }}>
+            <div role="status" className="anim-rise mx-auto flex max-w-xl items-center gap-2 rounded-card border border-line bg-card py-1 pr-1 pl-4 shadow-pop">
+              <Icon name="book" size={18} className="shrink-0 text-ink-muted" />
+              <p className="min-w-0 flex-1 truncate text-ui text-ink-strong">
+                回到上次讀到的地方{pos.restored.heading ? `：${pos.restored.heading}` : ""}
+              </p>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  window.scrollTo({ top: 0 });
+                  pos.dismiss();
+                }}
+              >
+                從頭讀
+              </Button>
+              <IconButton label="關閉提示" onClick={pos.dismiss}>
+                <Icon name="x" size={18} />
+              </IconButton>
+            </div>
+          </div>,
+          document.body,
+        )}
       {noteFor && key && <BlockNoteSheet docKey={key} b={noteFor} doc={doc!} initial={blockNotes?.get(noteFor.bid)?.body_md ?? ""} onClose={() => setNoteFor(null)} onSaved={(msg) => toast(msg)} />}
       {target && doc && key && (
         <EditPanel

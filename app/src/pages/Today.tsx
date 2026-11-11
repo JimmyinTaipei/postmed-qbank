@@ -8,6 +8,7 @@ import { Icon } from "@/ui/icons";
 import { Dialog } from "@/ui/overlays";
 import { Button, Card, EmptyState, IconButton, LinkButton, ListCard, ListRow, Notice, ProgressBar, SectionTitle, Skeleton, Stat } from "@/ui/primitives";
 import { Page, SyncStatus } from "@/ui/shell";
+import { ContinueReading } from "./ContinueReading";
 
 export function Today() {
   const nav = useNavigate();
@@ -90,6 +91,8 @@ export function Today() {
           </ListCard>
         )}
       </section>
+
+      <ContinueReading limit={1} title="繼續閱讀筆記" />
 
       <section aria-labelledby="h-subjects">
         <SectionTitle id="h-subjects">各科進度</SectionTitle>
