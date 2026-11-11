@@ -61,6 +61,11 @@ function readCookie(req: Request): string | null {
   return null;
 }
 
+/** 登入頁一打開就問：目前是否被鎖、還要等幾秒。不需要登入；只回秒數，不透露其他資訊。 */
+export async function loginStatus(c: Context<App>): Promise<Response> {
+  return c.json({ retry_after_s: await lockedFor(c.env, Date.now()) }, 200, { "Cache-Control": "no-store" });
+}
+
 export async function login(c: Context<App>): Promise<Response> {
   const env = c.env;
   const now = Date.now();

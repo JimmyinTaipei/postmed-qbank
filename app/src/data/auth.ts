@@ -40,6 +40,17 @@ export const auth = {
     return { ok: false, reason: "server", message: j.message ?? `伺服器回 ${res.status}` };
   },
 
+  /** 登入是否被鎖：回傳還要等幾秒（0 = 沒鎖；連不上也當 0，送出時伺服器會再擋）。 */
+  async lockedFor(): Promise<number> {
+    try {
+      const res = await fetch("/api/login", { credentials: "same-origin", cache: "no-store" });
+      const j = (await res.json()) as { retry_after_s?: number };
+      return Math.max(0, Number(j.retry_after_s) || 0);
+    } catch {
+      return 0;
+    }
+  },
+
   /** 登出這台裝置：先盡量把待送資料送出。裝置上的題庫與作答副本留著，重新登入後繼續。 */
   async logout(): Promise<{ unsent: number }> {
     await syncNow().catch(() => undefined);

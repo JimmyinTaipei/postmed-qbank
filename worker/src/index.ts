@@ -5,7 +5,7 @@
 
 import { Hono } from "hono";
 import { backupNow, exportZip, getManifest, have, putBlob, putManifest, restoreRoute, usage } from "./admin";
-import { checkAdmin, checkSession, listDevices, login, logout, revokeDevice } from "./auth";
+import { checkAdmin, checkSession, listDevices, login, loginStatus, logout, revokeDevice } from "./auth";
 import { buildExportZip, nightlyBackup } from "./backup";
 import type { App, Env } from "./env";
 import { pull, push } from "./sync";
@@ -48,6 +48,7 @@ api.onError((err, c) => {
 });
 
 api.post("/api/login", login);
+api.get("/api/login", loginStatus);
 
 api.use("/api/admin/*", async (c, next) => {
   const r = checkAdmin(c.env, c.req.raw);

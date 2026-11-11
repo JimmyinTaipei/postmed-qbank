@@ -491,7 +491,7 @@ export function TextField({ label, hint, error, hideLabel, leading, className, i
           aria-invalid={!!error || undefined}
           aria-describedby={describe}
           className={cx(
-            "min-h-(--tap) w-full rounded-btn border bg-card px-3 text-base placeholder:text-ink-muted",
+            "min-h-(--tap) w-full rounded-btn border bg-card px-3 text-base placeholder:text-ink-muted disabled:cursor-not-allowed disabled:bg-hover disabled:text-ink-muted",
             !!leading && "pl-10",
             error ? "border-incorrect" : "border-line-strong",
           )}
