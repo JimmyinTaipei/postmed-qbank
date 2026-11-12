@@ -46,10 +46,10 @@ export async function putBlob(c: Context<App>): Promise<Response> {
   return c.json({ ok: true, key, bytes: data.length });
 }
 
-/** GET /api/admin/blob/m/<sha>.<ext>：卡片的媒體檔（pmq anki export 打包用）。 */
+/** GET /api/admin/blob/<key>：卡片的媒體檔（pmq anki export 打包用）、內容包的檔（pmq publish --subject 讀線上的 taxonomy 等）。 */
 export async function getBlob(c: Context<App>): Promise<Response> {
   const key = decodeURIComponent(new URL(c.req.url).pathname.slice("/api/admin/blob/".length));
-  if (!/^m\/[0-9a-f]{64}\.[a-z0-9]{2,5}$/.test(key)) return c.json({ error: "bad_key", key }, 400);
+  if (!BLOB_KEY.test(key)) return c.json({ error: "bad_key", key }, 400);
   const obj = await c.env.R2.get(key);
   if (!obj) return c.json({ error: "not_found", key }, 404);
   return new Response(obj.body, { headers: { "Content-Type": contentType(key) } });
