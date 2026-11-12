@@ -5,6 +5,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useApplyTheme } from "./lib/theme";
 import { FigureViewerProvider } from "./ui/content/FigureViewer";
 import { ToastProvider } from "./ui/overlays";
+import { UpdateBanner } from "./ui/UpdateBanner";
 import { EmptyState, LinkButton, Skeleton } from "./ui/primitives";
 import { AppShell, Page } from "./ui/shell";
 import { Today } from "./pages/Today";
@@ -84,6 +85,7 @@ export function App() {
             </Route>
           </Routes>
           </EditorProvider>
+          <UpdateBanner />
         </FigureViewerProvider>
       </ToastProvider>
     </BrowserRouter>
