@@ -1,0 +1,70 @@
+<div class="card-container">
+  <div class="label">QUESTION</div>
+  <div class="front-text">{{Word}}</div>
+  {{#Part of Speech}}
+    <div class="pos-text">{{Part of Speech}}</div>
+  {{/Part of Speech}}
+
+  <hr class="answer-line">
+
+  <div class="label">ANSWER</div>
+  <div class="back-text">{{Meaning and Definition}}</div>
+
+  {{#Sentence}}
+  <div class="extra-container">
+    <div class="label">EXAMPLE SENTENCE</div>
+    <div class="extra-text">{{Sentence}}</div>
+  </div>
+  {{/Sentence}}
+
+  {{#Derivative}}
+  <div class="extra-container">
+    <div class="label">DERIVATIVES</div>
+    <div class="extra-text">{{Derivative}}</div>
+  </div>
+  {{/Derivative}}
+
+  {{#Memo & Confusable}}
+  <div class="extra-container confusable-section">
+    <div class="label">MEMO & CONFUSABLE</div>
+    <div class="extra-text">{{Memo & Confusable}}</div>
+  </div>
+  {{/Memo & Confusable}}
+
+  {{#Synonyms}}
+  <div class="extra-container">
+      <div class="label">SYNONYMS</div>
+      <div class="extra-text">{{Synonyms}}</div>
+  </div>
+  {{/Synonyms}}
+
+  {{#Antonyms}}
+  <div class="extra-container">
+      <div class="label">ANTONYMS</div>
+      <div class="extra-text">{{Antonyms}}</div>
+  </div>
+  {{/Antonyms}}
+
+  {{#Prefix & Roots}}
+  <div class="extra-container">
+      <div class="label">ROOTS & ETYMOLOGY</div>
+      <div class="extra-text">{{Prefix & Roots}}</div>
+  </div>
+  {{/Prefix & Roots}}
+
+  {{#Image}}
+  <div class="image-container">
+    {{Image}}
+  </div>
+  {{/Image}}
+
+  {{#Source}}
+  <div class="source-tag">Source: {{Source}}</div>
+  {{/Source}}
+
+  {{#Tags}}
+  <div class="tags-container-back">
+    <span class="tag-pill">{{Tags}}</span>
+  </div>
+  {{/Tags}}
+</div>

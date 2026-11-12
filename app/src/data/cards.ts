@@ -7,13 +7,13 @@
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { ulid } from "@/lib/ulid";
-import { cardFaces, formatIvl, interleave, noteKey, parseTsv, pickCards, splitNote, toTsv, type TsvRow } from "./card-core";
+import { cardFaces, cleanFields, formatIvl, interleave, noteKey, parseTsv, pickCards, splitNote, toTsv, vocabMd, type TsvRow } from "./card-core";
 import { db } from "./db";
 import { prefs } from "./prefs";
 import { review, scheduler, startOfDay, DAY_MS, toCard } from "./srs-core";
 import { srsConfig } from "./srs";
 import { enqueue, kick } from "./sync";
-import type { Card, CardKind, CardOrigin, Deck, ReviewLog, SrsConfig, SrsState } from "./types";
+import type { Card, CardFields, CardKind, CardOrigin, Deck, ReviewLog, SrsConfig, SrsState } from "./types";
 
 export * from "./card-core";
 
@@ -201,6 +201,8 @@ export interface NoteInput {
   kind: CardKind;
   front: string;
   back: string;
+  /** 單字卡（kind = "vocab"）的 11 個欄位；有給時 front／back 由它產生 */
+  fields?: CardFields;
   tags?: string[];
   origin?: Omit<CardOrigin, "note" | "ord">;
 }
@@ -208,16 +210,19 @@ export interface NoteInput {
 export const cards = {
   /** 新增一則筆記（依種類拆成一或多張卡）。回傳第一張卡的 ID；克漏字沒有 {{c1::…}} 時回 null。 */
   async create(n: NoteInput): Promise<string | null> {
-    const parts = splitNote(n.kind, n.front, n.back);
+    const fields = n.kind === "vocab" ? cleanFields(n.fields) : null;
+    if (fields && !fields.Word) return null;
+    const md = fields ? vocabMd(fields) : { front_md: n.front, back_md: n.back };
+    const parts = splitNote(n.kind, md.front_md, md.back_md);
     if (!parts.length) return null;
     const t = now();
     const note = ulid(t);
     let first: string | null = null;
     await db.transaction("rw", TABLES(), async () => {
       for (const p of parts) {
-        const id = parts.length === 1 && n.kind === "basic" ? note : `${note}-${p.ord}`;
+        const id = parts.length === 1 && (n.kind === "basic" || n.kind === "vocab") ? note : `${note}-${p.ord}`;
         first ??= id;
-        await putCard({ id, deck_id: n.deck_id, kind: n.kind, front_md: p.front_md, back_md: p.back_md, tags: n.tags?.length ? n.tags : null, origin: { from: "site", ...n.origin, note, ord: p.ord }, updated_at: t, deleted: 0 });
+        await putCard({ id, deck_id: n.deck_id, kind: n.kind, front_md: p.front_md, back_md: p.back_md, fields, tags: n.tags?.length ? n.tags : null, origin: { from: "site", ...n.origin, note, ord: p.ord }, updated_at: t, deleted: 0 });
         await newState(id, t);
       }
     });
@@ -229,9 +234,16 @@ export const cards = {
    * 改一張卡（連同同一則筆記的其他卡）。front／back 是使用者在編輯器裡看到的那一則筆記的內容
    * （正反卡是第一張的正面與背面）。
    */
-  async edit(id: string, front: string, back: string, tags: string[] | null, deckId?: string): Promise<void> {
+  async edit(id: string, front: string, back: string, tags: string[] | null, deckId?: string, fields?: CardFields): Promise<void> {
     const card = await db.card.get(id);
     if (!card) return;
+    if (card.kind === "vocab") {
+      const f = cleanFields(fields ?? card.fields);
+      const md = vocabMd(f);
+      await db.transaction("rw", TABLES(), () => putCard({ ...card, fields: f, front_md: md.front_md, back_md: md.back_md, tags, deck_id: deckId ?? card.deck_id, updated_at: now() }));
+      kick();
+      return;
+    }
     const key = noteKey(card);
     const siblings = (await db.card.toArray()).filter((c) => noteKey(c) === key);
     const t = now();
@@ -267,9 +279,10 @@ export const cards = {
   },
 
   /** 編輯器要顯示的「那一則筆記」：正反卡回第一張的正反面。 */
-  async noteOf(id: string): Promise<{ front: string; back: string } | null> {
+  async noteOf(id: string): Promise<{ front: string; back: string; fields?: CardFields } | null> {
     const card = await db.card.get(id);
     if (!card) return null;
+    if (card.kind === "vocab") return { front: card.front_md, back: card.back_md, fields: cleanFields(card.fields) };
     if (card.kind === "reverse" && (card.origin?.ord ?? 0) === 1) return { front: card.back_md, back: card.front_md };
     return { front: card.front_md, back: card.back_md };
   },

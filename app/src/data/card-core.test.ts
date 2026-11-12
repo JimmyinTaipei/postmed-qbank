@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cardFaces, clozeNumbers, clozeSide, interleave, mdToAnkiHtml, parseTsv, pickCards, splitNote, toTsv } from "./card-core.ts";
+import { cardFaces, cleanFields, clozeNumbers, clozeSide, interleave, maskChinese, mdToAnkiHtml, parseTsv, pickCards, splitNote, stripSounds, toTsv, vocabMd, vocabSounds } from "./card-core.ts";
 import type { SrsState } from "./types.ts";
 
 test("克漏字：遮第 n 個，其他直接顯示", () => {
@@ -64,4 +64,33 @@ test("TSV：讀 Anki 的純文字匯出（引號、tab、標籤欄）", () => {
 test("mdToAnkiHtml：圖、聲音、公式", () => {
   const sha = "a".repeat(64);
   assert.equal(mdToAnkiHtml(`![](m/${sha}.png)\n[sound:m/${sha}.mp3] $$E$$ a\\_b`), `<img src="${sha}.png"><br>[sound:${sha}.mp3] \\[E\\] a_b`);
+});
+
+// ---------- 單字卡（第 8B-1 階段） ----------
+
+const SND = "m/" + "a".repeat(64) + ".mp3";
+
+test("單字卡：front_md 只有單字，back_md 照樣板順序、空格不出現、格式與 pmq anki import 相同", () => {
+  const f = cleanFields({ Word: "abate ", "Part of Speech": "v.", "Meaning and Definition": "減輕；減少", Sentence: "abate a tax\n減稅", "Memo & Confusable": "【辨別】bash 打", Derivative: "rebate", Antonyms: "  ", Image: `[sound:${SND}]` });
+  assert.equal(f.Antonyms, undefined);
+  const md = vocabMd(f);
+  assert.equal(md.front_md, "abate");
+  assert.equal(md.back_md, `v.\n\n減輕；減少\n\n<div class="card-label">例句</div>\n\nabate a tax\n減稅\n\n<div class="card-label">衍生字</div>\n\nrebate\n\n<div class="card-label">辨析</div>\n\n【辨別】bash 打\n\n[sound:${SND}]`);
+  const faces = cardFaces({ kind: "vocab", front_md: "舊的", back_md: "舊的", origin: null, fields: f });
+  assert.equal(faces.front, "abate");
+  assert.ok(faces.back.includes("[sound:"), "翻面時自動播放要找得到聲音");
+  assert.deepEqual(splitNote("vocab", "abate", md.back_md).length, 1);
+});
+
+test("單字卡：例句裡的中文包上遮罩，公式與聲音不動", () => {
+  assert.equal(maskChinese("The medicine abated her pain\n這種藥減輕了她的痛苦."), 'The medicine abated her pain\n<span class="spoiler">這種藥減輕了她的痛苦</span>.');
+  assert.equal(maskChinese("$x$ 中文 <u>底線</u>"), '$x$ <span class="spoiler">中文</span> <u><span class="spoiler">底線</span></u>');
+  assert.equal(maskChinese("only English"), "only English");
+  assert.equal(maskChinese(`[sound:${SND}]`), `[sound:${SND}]`);
+});
+
+test("單字卡：聲音從欄位裡找、內文拿掉聲音", () => {
+  const f = { Word: "x", Image: `[sound:${SND}]` };
+  assert.deepEqual(vocabSounds(f), ["/" + SND]);
+  assert.equal(stripSounds(f.Image), "");
 });

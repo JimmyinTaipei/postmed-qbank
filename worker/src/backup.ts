@@ -10,7 +10,7 @@ import { b64, taipeiDate } from "./util";
 /** 所有個人資料表（不含登入用的 auth_*、meta）。順序就是 restore 的順序。 */
 export const PERSONAL_TABLES = [
   "attempt", "session", "srs_state", "review_log", "flag", "note", "highlight", "ink",
-  "content_patch", "deck", "card", "media", "setting",
+  "content_patch", "deck", "card", "media", "setting", "vocab_mark",
 ] as const;
 
 const PAGE = 5000;

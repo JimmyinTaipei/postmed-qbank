@@ -5,7 +5,7 @@ import time
 import unittest
 from pathlib import Path
 
-from pmq.anki_export import build_apkg, guid_for, md_to_html
+from pmq.anki_export import build_apkg, guid_for, md_to_html, vocab_model
 from pmq.anki_html import html_to_md
 from pmq.anki_import import Importer
 
@@ -90,6 +90,73 @@ class RoundTripTest(unittest.TestCase):
         self.assertEqual(sorted(c["origin"]["ord"] for c in cloze), [0, 1])
         self.assertEqual(sum(1 for s in imp.srs.values() if s["suspended"]), 1)
         self.assertEqual(len(imp.logs), 1)
+
+
+MP3 = b"ID3" + b"1" * 64
+MSHA = hashlib.sha256(MP3).hexdigest()
+VOCAB_CFG = {"vocab_models": ["0_後醫單字基本型"], "labels": {"Source": "出處", "Image": ""},
+             "models": {"0_後醫單字基本型": {"front": ["Word"], "back": ["Part of Speech", "Meaning and Definition", "Sentence", "Derivative", "Memo & Confusable",
+                                                                       "Synonyms", "Antonyms", "Prefix & Roots", "Image", "Source"],
+                                            "labels": {"Part of Speech": "", "Meaning and Definition": "", "Sentence": "例句", "Memo & Confusable": "辨析"}}}}
+
+
+class VocabTest(unittest.TestCase):
+    """第 8B-1 階段：單字卡 → 0_後醫單字基本型 → 讀回來，11 個欄位與進度一致。"""
+
+    def test_vocab_roundtrip(self):
+        now_ms = int(time.time() * 1000)
+        fields = {"Word": "abate", "Part of Speech": "v.", "Meaning and Definition": "減輕；減少",
+                  "Sentence": "abate a tax\n減稅", "Memo & Confusable": "【辨別】bash 打", "Image": f"[sound:m/{MSHA}.mp3]", "Source": "GRE"}
+        data = {"decks": [{"id": "d", "name": "05_English", "parent": None}],
+                "cards": [{"id": "v1", "deck_id": "d", "kind": "vocab", "front_md": "abate", "back_md": "v.\n\n減輕；減少", "fields": fields,
+                           "tags": ["05_English::RedBook"], "origin": {"from": "anki", "guid": "g1", "ord": 0, "mid": 1774097454204}}],
+                "srs_state": [{"item": "card:v1", "state": 2, "due": now_ms + 9 * DAY, "last_review": now_ms - 2 * DAY, "stability": 11.0,
+                               "difficulty": 4.0, "reps": 3, "lapses": 0, "suspended": 0}],
+                "review_log": []}
+        pkg, stats = build_apkg(data, None, lambda key: MP3, now_ms)
+        self.assertEqual((stats["notes"], stats["cards"], stats["media"], stats.get("vocab")), (1, 1, 1, 1))
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "v.apkg"
+            p.write_bytes(pkg)
+            import sqlite3, zipfile
+            z = zipfile.ZipFile(p)
+            Path(d, "c.anki2").write_bytes(z.read("collection.anki2"))
+            db = sqlite3.connect(Path(d, "c.anki2"))
+            import json as _j
+            models = _j.loads(db.execute("select models from col").fetchone()[0])
+            vm = vocab_model()
+            m = models[str(vm["id"])]
+            self.assertEqual(m["name"], "0_後醫單字基本型")
+            self.assertEqual([f["name"] for f in m["flds"]], vm["fields"])
+            self.assertIn("toggleHint", m["tmpls"][0]["qfmt"])
+            db.close()
+            imp = Importer(VOCAB_CFG, ["05_English"])
+            imp.read(p)
+        (c,) = imp.cards.values()
+        self.assertEqual(c["kind"], "vocab")
+        self.assertEqual(c["tags"], ["05_English::RedBook"])
+        for k, v in fields.items():
+            self.assertEqual(c["fields"][k], v, k)
+        self.assertEqual(len(c["fields"]), 11)
+        self.assertEqual(c["front_md"], "abate")
+        self.assertIn('<div class="card-label">例句</div>', c["back_md"])
+        self.assertIn('<div class="card-label">辨析</div>', c["back_md"])
+        self.assertLess(c["back_md"].index("例句"), c["back_md"].index("辨析"))
+        s = imp.srs["card:" + c["id"]]
+        self.assertLess(abs(s["due"] - (now_ms + 9 * DAY)), DAY)
+        self.assertAlmostEqual(s["stability"], 11.0, places=2)
+
+    def test_other_models_stay_basic(self):
+        now_ms = int(time.time() * 1000)
+        pkg, _ = build_apkg(site_data(now_ms), ["英文"], lambda key: PNG, now_ms)
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "x.apkg"
+            p.write_bytes(pkg)
+            imp = Importer(VOCAB_CFG, ["英文"])
+            imp.read(p)
+        (c,) = imp.cards.values()
+        self.assertEqual(c["kind"], "basic")
+        self.assertIsNone(c["fields"])
 
 
 if __name__ == "__main__":

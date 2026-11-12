@@ -29,16 +29,32 @@ export interface Rating {
 }
 
 /** 複習卡片：點卡片或按空白鍵翻面；翻面後才出現四顆評分鈕。 */
-export function ReviewCard({ front, back, figs, flipped, onFlip, ratings, onRate, bigFront }: { front: string; back: string; figs?: Fig[]; flipped: boolean; onFlip: () => void; ratings: Rating[]; onRate: (v: Rating["value"]) => void; /** 正面只是一個詞（單字卡）：放大顯示 */ bigFront?: boolean }) {
+export function ReviewCard({ front, back, figs, flipped, onFlip, ratings, onRate, bigFront, body }: {
+  front: string;
+  back: string;
+  figs?: Fig[];
+  flipped: boolean;
+  onFlip: () => void;
+  ratings: Rating[];
+  onRate: (v: Rating["value"]) => void;
+  /** 正面只是一個詞：放大顯示 */
+  bigFront?: boolean;
+  /** 有自己樣板的卡（單字卡）：整個卡面換成這個，front／back 只用來播聲音 */
+  body?: ReactNode;
+}) {
   return (
     <div className="space-y-3">
       <Card as="article" className="flex min-h-64 flex-col">
         <div className="flex-1 p-5 sm:p-6">
-          <Markdown text={front} figs={figs} role="q" className={bigFront ? "text-display font-semibold text-ink-strong" : undefined} />
-          {flipped && back.trim() && (
-            <div className="anim-rise mt-5 border-t border-line pt-5">
-              <Markdown text={back} figs={figs} role="sol" />
-            </div>
+          {body ?? (
+            <>
+              <Markdown text={front} figs={figs} role="q" className={bigFront ? "text-display font-semibold text-ink-strong" : undefined} />
+              {flipped && back.trim() && (
+                <div className="anim-rise mt-5 border-t border-line pt-5">
+                  <Markdown text={back} figs={figs} role="sol" />
+                </div>
+              )}
+            </>
           )}
         </div>
       </Card>

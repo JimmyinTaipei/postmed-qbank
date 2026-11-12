@@ -7,6 +7,8 @@ import { content, useAsync, type Attempt, type Question, type SyncState } from "
 import { QuestionView, useAnswerFlow } from "@/ui/content/QuestionView";
 import { Markdown } from "@/ui/content/Markdown";
 import { SourceBadges } from "@/ui/content/SourceBadges";
+import { VocabCard } from "@/ui/content/VocabCard";
+import type { CardFields } from "@/data";
 import { Icon, ICON_NAMES } from "@/ui/icons";
 import { Dialog, Menu, Sheet, useToast, type MenuItem } from "@/ui/overlays";
 import {
@@ -16,6 +18,21 @@ import {
 import { Page, SyncStatus } from "@/ui/shell";
 import { BarList, ChartCard, ColumnChart, EditPanel, ExamTimerBar, HighlightPalette, KbBlocks, ReviewCard, SearchBar, type KbBlockMark } from "@/ui/templates";
 import type { KbDoc } from "@/data";
+
+// 單字卡樣本（第 8B-1 階段）：內容取自使用者的英文牌組（abate），聲音拿掉
+const VOCAB_DEMO: CardFields = {
+  Word: "abate",
+  "Part of Speech": "v.",
+  "Meaning and Definition": "減輕；減少",
+  Sentence: "abate a tax\n減稅\nThe medicine abated her pain\n這種藥減輕了她的痛苦.",
+  "Memo & Confusable": "【辨別】bash 打；debate 辯論",
+  Derivative: "rebate vt. 給回扣\ndebate v. 辯論",
+  Synonyms: "wane = alleviate = diminish",
+  Antonyms: "augment v. 增加\nintensify v. 加強",
+  "Prefix & Roots": "【語源】\nab（離開；去）＋ bat（打；擊）＋ e → 將力量或氣勢打下去 → 減輕、減少",
+  Source: "GRE 紅寶書",
+};
+const VOCAB_MIN: CardFields = { Word: "cashier", "Part of Speech": "n.", "Meaning and Definition": "收銀員；撤職" };
 
 // ---------- 淺色／深色並排 ----------
 
@@ -205,6 +222,7 @@ export default function UiGallery() {
   const [sheet, setSheet] = useState(false);
   const [edit, setEdit] = useState(false);
   const [flipped, setFlipped] = useState(false);
+  const [vocabFlipped, setVocabFlipped] = useState(false);
   const [search, setSearch] = useState("");
   const cases = useAsync(() => content.sampleCases(), []).data;
   const stress = useRef(stressQuestion()).current;
@@ -375,6 +393,8 @@ export default function UiGallery() {
         </div>
         <Pair>
           <ReviewCard front="PDH complex 的五個輔酶是哪些？" back="**TPP、Lipoamide、CoA、FAD、NAD⁺**" flipped={flipped} onFlip={() => setFlipped(true)} onRate={() => setFlipped(false)} ratings={[{ value: 1, label: "重來", next: "10 分鐘" }, { value: 2, label: "困難", next: "1 天" }, { value: 3, label: "良好", next: "3 天" }, { value: 4, label: "簡單", next: "7 天" }]} />
+          <ReviewCard front="" back="" body={<VocabCard fields={VOCAB_DEMO} tags={["05_English::RedBook", "05_English::#Prefix::ad-"]} side={vocabFlipped ? "back" : "front"} />} flipped={vocabFlipped} onFlip={() => setVocabFlipped(true)} onRate={() => setVocabFlipped(false)} ratings={[{ value: 1, label: "重來", next: "10 分鐘" }, { value: 2, label: "困難", next: "1 天" }, { value: 3, label: "良好", next: "3 天" }, { value: 4, label: "簡單", next: "7 天" }]} />
+          <Card className="p-5"><div className="mb-2 text-meta text-ink-muted">單字卡背面：只有字義（空的欄位整塊不顯示）</div><VocabCard fields={VOCAB_MIN} side="back" /></Card>
           <ExamTimerBar remainingS={52 * 60 + 5} totalS={80 * 60} answered={12} total={45} onSubmit={() => {}} />
           <ExamTimerBar remainingS={4 * 60 + 12} totalS={80 * 60} answered={41} total={45} onSubmit={() => {}} />
           <ExamTimerBar remainingS={null} totalS={null} elapsedS={23 * 60 + 8} answered={20} total={45} onSubmit={() => {}} />

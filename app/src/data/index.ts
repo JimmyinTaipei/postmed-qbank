@@ -6,7 +6,7 @@ export { content, setOffline, useContentStatus, type ContentStatus } from "./con
 export { attempts, exam, flags, sessions, settings, wipeLocal, wrongBook, type ExamPicks } from "./personal";
 export { srs, type ReviewQueue } from "./srs";
 export { ink, inkId, readInk, encodeInk, decodeInk, InkTooLarge } from "./ink";
-export { cards, decks, tsv, cardQueue, ratingPreview, deckSubtree, flattenDecks, useCard, useCardQueue, useDeck, useDeckCards, useDeckTree, cardFaces, clozeNumbers, formatIvl, type CardQueue, type CardRow, type DeckNode, type NoteInput } from "./cards";
+export { cards, decks, tsv, cardQueue, ratingPreview, deckSubtree, flattenDecks, useCard, useCardQueue, useDeck, useDeckCards, useDeckTree, cardFaces, clozeNumbers, formatIvl, maskChinese, stripSounds, vocabMd, vocabSounds, VOCAB_BACK, VOCAB_FORM_LABEL, VOCAB_LABEL, type CardQueue, type CardRow, type DeckNode, type NoteInput } from "./cards";
 export { patches, notes, highlights, applyPatches, answerValue, fieldValue, fieldHash, markOf, patchNote, isWritten, FIELD_NAME, type AnswerValue } from "./patches";
 export { kbPatches, applyKbPatches, useKbPatches, useKbDrafts, useKbDraft, draftName, isNewBid, kbTarget, KB_EDITABLE, KB_DELETABLE, KB_BAD_NAME, type KbMark, type KbOverlay } from "./kbPatches";
 export { DEFAULT_SRS, ratingOf, startOfDay, localDay } from "./srs-core";

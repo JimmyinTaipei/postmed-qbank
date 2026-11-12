@@ -2,6 +2,8 @@
 
 - 封裝用 Anki 的舊格式（collection.anki2，schema 11；Anki 2.1 以後都能匯入，匯入時勾「包含排程」）。
 - 筆記類型三種：後醫網站・問答（正面、背面）、後醫網站・正反（兩張卡）、後醫網站・克漏字（內文、補充）。
+  單字卡（kind = "vocab"，第 8B-1 階段）還原成使用者原本的「0_後醫單字基本型」：同一個筆記類型 ID、11 個欄位、
+  原本的樣板與 CSS（anki_models/vocab/，2026-11-12 從使用者的 05_English.apkg 取出）。
 - 牌組：網站上的牌組階層照搬（名稱用 :: 連起來）。
 - 進度：srs_state → cards（到期日、間隔、複習次數、忘記次數、暫停）；FSRS 的穩定度與難度寫進 cards.data。
   review_log → revlog。
@@ -85,17 +87,29 @@ def md_to_html(md: str) -> str:
     return out + inline(md[last:])
 
 
+_VOCAB_DIR = Path(__file__).with_name("anki_models") / "vocab"
+
+
+def vocab_model() -> dict:
+    """使用者的「0_後醫單字基本型」：{id, name, template, fields, front, back, css}。"""
+    m = json.loads((_VOCAB_DIR / "model.json").read_text("utf-8"))
+    m["front"] = (_VOCAB_DIR / "front.html").read_text("utf-8")
+    m["back"] = (_VOCAB_DIR / "back.html").read_text("utf-8")
+    m["css"] = (_VOCAB_DIR / "style.css").read_text("utf-8")
+    return m
+
+
 def _strip(html: str) -> str:
     return re.sub(r"<[^>]+>", "", html).strip()
 
 
-def _model(mid: int, name: str, fields: list[str], tmpls: list[tuple[str, str, str]], cloze: bool, now: int) -> dict:
+def _model(mid: int, name: str, fields: list[str], tmpls: list[tuple[str, str, str]], cloze: bool, now: int, css: str | None = None) -> dict:
     return {
         "id": mid, "name": name, "type": 1 if cloze else 0, "mod": now, "usn": -1, "sortf": 0, "did": 1,
         "tmpls": [{"name": n, "ord": i, "qfmt": q, "afmt": a, "bqfmt": "", "bafmt": "", "did": None, "bfont": "", "bsize": 0}
                   for i, (n, q, a) in enumerate(tmpls)],
         "flds": [{"name": f, "ord": i, "sticky": False, "rtl": False, "font": "Arial", "size": 20, "media": []} for i, f in enumerate(fields)],
-        "css": CSS, "latexPre": "\\documentclass[12pt]{article}\n\\special{papersize=3in,5in}\n\\usepackage{amssymb,amsmath}\n\\pagestyle{empty}\n\\setlength{\\parindent}{0in}\n\\begin{document}\n",
+        "css": css or CSS, "latexPre": "\\documentclass[12pt]{article}\n\\special{papersize=3in,5in}\n\\usepackage{amssymb,amsmath}\n\\pagestyle{empty}\n\\setlength{\\parindent}{0in}\n\\begin{document}\n",
         "latexPost": "\\end{document}", "latexsvg": False,
         "req": [[i, "any", [0]] for i in range(len(tmpls))] if not cloze else [[0, "any", [0]]],
         "tags": [], "vers": [],
@@ -143,6 +157,10 @@ def build_apkg(data: dict, deck_filter: list[str] | None, blob, now_ms: int | No
         str(M_REV): _model(M_REV, "後醫網站・正反", ["Front", "Back"], [("卡片 1", "{{Front}}", a_tmpl), ("卡片 2", "{{Back}}", "{{FrontSide}}\n<hr id=answer>\n{{Front}}")], False, now),
         str(M_CLOZE): _model(M_CLOZE, "後醫網站・克漏字", ["Text", "Back Extra"], [("克漏字", "{{cloze:Text}}", "{{cloze:Text}}<br>\n{{Back Extra}}")], True, now),
     }
+    vm = vocab_model()
+    M_VOCAB = int(vm["id"])
+    if any(c["kind"] == "vocab" and c.get("fields") for c in cards):
+        models[str(M_VOCAB)] = _model(M_VOCAB, vm["name"], vm["fields"], [(vm["template"], vm["front"], vm["back"])], False, now, vm["css"])
     anki_did = {did: 1_700_000_001_000 + i for i, did in enumerate(sorted(keep, key=lambda d: names[d]))}
     deck_json = {"1": _deck(1, "Default", now)}
     for did, aid in anki_did.items():
@@ -178,16 +196,24 @@ def build_apkg(data: dict, deck_filter: list[str] | None, blob, now_ms: int | No
             mid = M_REV
         elif kind == "cloze":
             front, back, mid = first["front_md"], first["back_md"], M_CLOZE
+        elif kind == "vocab" and first.get("fields"):
+            front, back, mid = first["front_md"], first["back_md"], M_VOCAB
         else:
             front, back, mid = first["front_md"], first["back_md"], M_BASIC
-        for m in re.findall(r"m/([0-9a-f]{64}\.[a-z0-9]+)", front + back):
+        if mid == M_VOCAB:
+            vals = [md_to_html(first["fields"].get(f) or "") for f in vm["fields"]]
+            src = "".join(first["fields"].get(f) or "" for f in vm["fields"])
+            stats["vocab"] = stats.get("vocab", 0) + 1
+        else:
+            vals = [md_to_html(front), md_to_html(back)]
+            src = front + back
+        for m in re.findall(r"m/([0-9a-f]{64}\.[a-z0-9]+)", src):
             media_names.setdefault(m, len(media_names))
-        f1, f2 = md_to_html(front), md_to_html(back)
         nid_seq += 1
-        sf = _strip(f1)
+        sf = _strip(vals[0])
         db.execute("insert into notes values (?, ?, ?, ?, -1, ?, ?, ?, ?, 0, '')",
                    (nid_seq, guid_for(key), mid, now, " " + " ".join(first.get("tags") or []) + " " if first.get("tags") else "",
-                    f1 + "\x1f" + f2, sf, int(hashlib.sha1(sf.encode()).hexdigest()[:8], 16)))
+                    "\x1f".join(vals), sf, int(hashlib.sha1(sf.encode()).hexdigest()[:8], 16)))
         stats["notes"] += 1
         for c in cs:
             o = c.get("origin") or {}

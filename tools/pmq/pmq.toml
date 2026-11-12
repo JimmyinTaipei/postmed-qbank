@@ -54,6 +54,10 @@ import = [
   "03_Physics::Other Resources::公式整理",
 ]
 
+# 第 8B-1 階段：這些筆記類型匯成單字卡（kind = "vocab"，保留 11 個欄位；規格書 §9.11）。
+# 網站上的單字卡樣板、匯出回 Anki 的筆記類型都以「0_後醫單字基本型」為準（tools/pmq/pmq/anki_models/vocab/）。
+vocab_models = ["0_後醫單字基本型"]
+
 # Anki 最上層牌組 → 網站科目
 [anki.subjects]
 "01_Biology" = "BIO"
@@ -73,7 +77,8 @@ import = [
 # 個別筆記類型：正面放哪些欄位、背面依序放哪些欄位、欄位的小標題。沒列的類型照 Anki 樣板自動判斷。
 [anki.models."0_後醫單字基本型"]
 front = ["Word"]
-back = ["Part of Speech", "Meaning and Definition", "Sentence", "Memo & Confusable", "Derivative",
+# 背面的順序照使用者 Anki 樣板（2026-11-12 第 8B-1 階段改成與樣板相同；網站 app/src/data/card-core.ts 的 VOCAB_BACK 也是這個順序）
+back = ["Part of Speech", "Meaning and Definition", "Sentence", "Derivative", "Memo & Confusable",
         "Synonyms", "Antonyms", "Prefix & Roots", "Image", "Source"]
 
 [anki.models."0_後醫單字基本型".labels]

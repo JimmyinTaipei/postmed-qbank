@@ -426,6 +426,49 @@
 .md .snd:hover {
   background: var(--hover);
 }
+/* 單字卡（8B-1）：單字大字、詞性灰、字義大字深藍（.md 自己的字級與顏色會蓋過 Tailwind，所以寫在這裡） */
+.md.vocab-word {
+  font-size: calc(var(--fs-display) * 1.15);
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.md.vocab-pos {
+  font-size: var(--fs-title);
+  color: var(--text-muted);
+}
+.md.vocab-meaning {
+  font-size: calc(var(--fs-title) * 1.15);
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--blue-deep);
+}
+.md.vocab-source {
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+}
+/* 單字卡（8B-1）：例句裡被遮住的中文，點了才顯示（照使用者 Anki 樣板的 spoiler） */
+.md .spoiler {
+  border-radius: 4px;
+  padding: 0 0.2em;
+  background: var(--border-strong);
+  color: transparent;
+  cursor: pointer;
+  user-select: none;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-color var(--dur-fast), color var(--dur-fast);
+}
+.md .spoiler.revealed,
+.spoilers-open .md .spoiler {
+  background: transparent;
+  color: inherit;
+  cursor: auto;
+  user-select: text;
+}
+@media print {
+  .md .spoiler { color: inherit; background: none; }
+}
 .md .cloze {
   display: inline-block;
   padding: 0 0.45em;

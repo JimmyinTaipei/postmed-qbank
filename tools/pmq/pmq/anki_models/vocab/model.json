@@ -1,0 +1,18 @@
+{
+ "id": 1774097454204,
+ "name": "0_後醫單字基本型",
+ "template": "卡片 1",
+ "fields": [
+  "Word",
+  "Part of Speech",
+  "Meaning and Definition",
+  "Sentence",
+  "Memo & Confusable",
+  "Derivative",
+  "Synonyms",
+  "Antonyms",
+  "Prefix & Roots",
+  "Image",
+  "Source"
+ ]
+}

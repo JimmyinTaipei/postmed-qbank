@@ -20,6 +20,9 @@ import {
   useDeckCards,
   useDeckTree,
   useQuestion,
+  VOCAB_FIELDS,
+  VOCAB_FORM_LABEL,
+  type CardFields,
   type CardKind,
   type CardOrigin,
   type DeckNode,
@@ -34,6 +37,7 @@ import { Badge, Button, Card, EmptyState, IconButton, LinkButton, ListCard, List
 import { Page } from "@/ui/shell";
 import { MarkdownEditor, ReviewCard, SearchBar, type Rating } from "@/ui/templates";
 import { InkScope } from "@/ui/ink/FigInk";
+import { VocabCard } from "@/ui/content/VocabCard";
 import { Frame } from "./SessionPlayer";
 
 /** 清單用的一行純文字：克漏字顯示答案、去掉公式符號與 HTML、圖與聲音換成記號。 */
@@ -56,10 +60,17 @@ function useCardFigs(origin: CardOrigin | null | undefined): Fig[] | undefined {
   return q && typeof q === "object" ? q.figs : undefined;
 }
 
+/** 單字卡在清單上的一行：詞性＋字義。 */
+function vocabMeta(f: CardFields | null | undefined): string | null {
+  if (!f) return null;
+  return [f["Part of Speech"], f["Meaning and Definition"]].map((x) => cardPlain(x ?? "")).filter(Boolean).join(" ").slice(0, 80) || null;
+}
+
 const KINDS: { value: CardKind; label: string }[] = [
   { value: "basic", label: "問答" },
   { value: "reverse", label: "正反兩張" },
   { value: "cloze", label: "克漏字" },
+  { value: "vocab", label: "單字" },
 ];
 
 function deckMeta(n: Pick<DeckNode, "total" | "due" | "fresh" | "suspended">): string {
@@ -334,7 +345,7 @@ export function DeckPage() {
                   <ListRow
                     to={`/cards/c/${card.id}`}
                     title={cardPlain(card.front_md) || "（空白）"}
-                    meta={[card.kind === "cloze" ? `克漏字 c${(card.origin?.ord ?? 0) + 1}` : null, cardPlain(card.back_md).slice(0, 80) || null].filter(Boolean).join("・")}
+                    meta={[card.kind === "cloze" ? `克漏字 c${(card.origin?.ord ?? 0) + 1}` : null, card.kind === "vocab" ? vocabMeta(card.fields) : cardPlain(card.back_md).slice(0, 80) || null].filter(Boolean).join("・")}
                     trailing={srs?.suspended ? <Badge>暫停</Badge> : srs?.state === 0 ? <Badge tone="blue">新</Badge> : undefined}
                   />
                 </li>
@@ -397,8 +408,20 @@ export function CardPage() {
     { label: "刪除這張卡", icon: "trash", danger: true, onSelect: () => setConfirmDel(true) },
   ];
   return (
-    <Page title={card.kind === "cloze" ? `克漏字 c${(o?.ord ?? 0) + 1}` : "卡片"} subtitle={deckNode?.path} back={`/cards/d/${card.deck_id}`} actions={<Menu label="卡片的更多動作" items={menu}><Icon name="dots" /></Menu>}>
+    <Page title={card.kind === "cloze" ? `克漏字 c${(o?.ord ?? 0) + 1}` : card.kind === "vocab" ? "單字卡" : "卡片"} subtitle={deckNode?.path} back={`/cards/d/${card.deck_id}`} actions={<Menu label="卡片的更多動作" items={menu}><Icon name="dots" /></Menu>}>
       <InkScope value={{ base: `card:${card.id}` }}>
+      {card.kind === "vocab" && card.fields ? (
+        <>
+          <Card as="article" className="p-5 sm:p-6" aria-label="正面">
+            <div className="mb-2 text-meta font-semibold text-ink-muted">正面</div>
+            <VocabCard fields={card.fields} tags={card.tags} side="front" figs={figs} resetKey={card.id} />
+          </Card>
+          <Card as="article" className="p-5 sm:p-6" aria-label="背面">
+            <div className="mb-2 text-meta font-semibold text-ink-muted">背面</div>
+            <VocabCard fields={card.fields} tags={card.tags} side="back" figs={figs} />
+          </Card>
+        </>
+      ) : (
       <Card as="article" className="p-5 sm:p-6">
         <div className="mb-2 text-meta font-semibold text-ink-muted">正面</div>
         <Markdown text={faces.front} figs={figs} />
@@ -408,10 +431,11 @@ export function CardPage() {
           <Markdown text={faces.back} figs={figs} role="sol" className={card.kind === "cloze" ? "mt-4" : undefined} />
         </div>
       </Card>
+      )}
       </InkScope>
       <Card className="space-y-2 p-4 text-ui">
         <div className="flex items-center gap-2"><Icon name="repeat" size={16} className="text-ink-muted" />{cards.describe(srs ?? undefined)}</div>
-        {card.tags?.length ? <div className="flex flex-wrap gap-1.5">{card.tags.map((t) => <Badge key={t} className="max-w-full whitespace-normal [overflow-wrap:anywhere]">{t}</Badge>)}</div> : null}
+        {card.tags?.length && card.kind !== "vocab" ? <div className="flex flex-wrap gap-1.5">{card.tags.map((t) => <Badge key={t} className="max-w-full whitespace-normal [overflow-wrap:anywhere]">{t}</Badge>)}</div> : null}
         {o?.from === "anki" && <div className="text-meta text-ink-muted">從 Anki 搬來：{o.deck}（{o.model}）</div>}
         {o?.from === "q" && o.id && <div className="text-meta text-ink-muted">由題目做成：<a href={`/q/${o.id}`} onClick={(e) => { e.preventDefault(); nav(`/q/${o.id}`); }}>{o.id}</a></div>}
         {o?.from === "kb" && o.doc && <div className="text-meta text-ink-muted">由筆記做成：<a href={`/kb/${o.doc}${o.bid ? `#b-${o.bid}` : ""}`} onClick={(e) => { e.preventDefault(); nav(`/kb/${o.doc}${o.bid ? `#b-${o.bid}` : ""}`); }}>{o.doc.split("/").pop()}</a></div>}
@@ -444,6 +468,52 @@ export interface CardDraft {
   back?: string;
   origin?: Omit<CardOrigin, "note" | "ord">;
   tags?: string[];
+  /** 單字卡：預先填好的欄位（8B-2 做題時新增單字卡用） */
+  fields?: CardFields;
+}
+
+/** 多行的欄位（3B 之前先用純文字；3B 做完換成 RichEditor）。 */
+function FieldArea({ label, value, onChange, hint, rows = 2 }: { label: string; value: string; onChange: (v: string) => void; hint?: string; rows?: number }) {
+  const id = `vf-${label}`;
+  const lines = value.split("\n").length;
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-ui font-medium text-ink-strong">{label}</label>
+      <textarea
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={Math.min(12, Math.max(rows, lines))}
+        aria-describedby={hint ? `${id}-hint` : undefined}
+        autoCapitalize="none"
+        className="block w-full rounded-btn border border-line-strong bg-card px-3 py-2.5 text-base leading-relaxed placeholder:text-ink-muted"
+      />
+      {hint && <p id={`${id}-hint`} className="mt-1.5 text-meta text-ink-muted">{hint}</p>}
+    </div>
+  );
+}
+
+const VOCAB_ROWS: Partial<Record<(typeof VOCAB_FIELDS)[number], number>> = { Sentence: 4, "Memo & Confusable": 3, "Prefix & Roots": 4, Derivative: 2, Synonyms: 2, Antonyms: 2 };
+const VOCAB_HINT: Partial<Record<(typeof VOCAB_FIELDS)[number], string>> = {
+  Sentence: "英文一行、中文一行；正面按「提示／例句」時中文會先遮住",
+  Image: "發音是 [sound:…]，從 Anki 搬來的卡已經有；不用改",
+  Source: "例如：高醫 115｜ENG-000058",
+};
+
+/** 單字卡的 11 格。 */
+function VocabForm({ value, onChange }: { value: CardFields; onChange: (v: CardFields) => void }) {
+  const set = (k: (typeof VOCAB_FIELDS)[number]) => (v: string) => onChange({ ...value, [k]: v });
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
+        <TextField label={VOCAB_FORM_LABEL.Word} data-autofocus value={value.Word ?? ""} onChange={(e) => set("Word")(e.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+        <TextField label={VOCAB_FORM_LABEL["Part of Speech"]} hint="例如：v.、n.、adj." value={value["Part of Speech"] ?? ""} onChange={(e) => set("Part of Speech")(e.target.value)} autoCapitalize="none" autoCorrect="off" />
+      </div>
+      {VOCAB_FIELDS.filter((k) => k !== "Word" && k !== "Part of Speech").map((k) => (
+        <FieldArea key={k} label={VOCAB_FORM_LABEL[k]} value={value[k] ?? ""} onChange={set(k)} rows={VOCAB_ROWS[k] ?? 1} hint={VOCAB_HINT[k]} />
+      ))}
+    </div>
+  );
 }
 
 export function CardEditPage() {
@@ -460,6 +530,7 @@ export function CardEditPage() {
   const [front, setFront] = useState(draft?.front ?? "");
   const [back, setBack] = useState(draft?.back ?? "");
   const [tags, setTags] = useState((draft?.tags ?? []).join(" "));
+  const [fields, setFields] = useState<CardFields>(draft?.fields ?? {});
   const [newDeckName, setNewDeckName] = useState("我的卡片");
   const [busy, setBusy] = useState(false);
   const loaded = useRef(false);
@@ -473,6 +544,7 @@ export function CardEditPage() {
       if (!n) return;
       setFront(n.front);
       setBack(n.back);
+      if (n.fields) setFields(n.fields);
     });
     setKind(row.card.kind);
     setDeck(row.card.deck_id);
@@ -488,7 +560,7 @@ export function CardEditPage() {
   if (editing && row === null) return <Navigate to="/cards" replace />;
   const noDecks = tree && tree.length === 0;
   const clozeN = kind === "cloze" ? clozeNumbers(front).length : 0;
-  const problem = !front.trim() ? "正面還是空的" : kind === "cloze" && !clozeN ? "克漏字要有 {{c1::答案}}" : kind !== "cloze" && !back.trim() ? "背面還是空的" : null;
+  const problem = kind === "vocab" ? (!(fields.Word ?? "").trim() ? "單字還是空的" : null) : !front.trim() ? "正面還是空的" : kind === "cloze" && !clozeN ? "克漏字要有 {{c1::答案}}" : kind !== "cloze" && !back.trim() ? "背面還是空的" : null;
   const tagList = tags.split(/\s+/).filter(Boolean);
 
   const save = async () => {
@@ -497,13 +569,13 @@ export function CardEditPage() {
     let target = deck;
     if (noDecks) target = await decks.create(newDeckName || "我的卡片", null);
     if (editing && row) {
-      await cards.edit(row.card.id, front, back, tagList.length ? tagList : null, target);
+      await cards.edit(row.card.id, front, back, tagList.length ? tagList : null, target, kind === "vocab" ? fields : undefined);
       setBusy(false);
       toast("已儲存");
       nav(`/cards/c/${row.card.id}`, { replace: true });
       return;
     }
-    const id = await cards.create({ deck_id: target, kind, front, back, tags: tagList, origin: draft?.origin });
+    const id = await cards.create({ deck_id: target, kind, front, back, fields: kind === "vocab" ? fields : undefined, tags: tagList, origin: draft?.origin });
     prefs.setLastDeck(target);
     setBusy(false);
     if (!id) return;
@@ -513,6 +585,7 @@ export function CardEditPage() {
     else {
       setFront("");
       setBack("");
+      setFields({});
     }
   };
 
@@ -540,6 +613,10 @@ export function CardEditPage() {
           {kind === "cloze" && (
             <Notice icon="info">用 <code>{"{{c1::答案}}"}</code> 挖空、<code>{"{{c1::答案::提示}}"}</code> 加提示。同一個編號一起遮；不同編號各做一張卡{clozeN ? `（目前 ${clozeN} 張）` : ""}。公式裡也可以挖空，例如 <code>{"$E = {{c1::mc^2}}$"}</code>。</Notice>
           )}
+          {kind === "vocab" ? (
+            <VocabForm value={fields} onChange={setFields} />
+          ) : (
+          <>
           <div>
             <h2 className="mb-2 text-title font-semibold text-ink-strong">{kind === "cloze" ? "內文" : "正面"}</h2>
             <MarkdownEditor value={front} onChange={setFront} figs={figs} role="q" label={kind === "cloze" ? "內文（Markdown）" : "正面（Markdown）"} minRows="short" />
@@ -548,6 +625,8 @@ export function CardEditPage() {
             <h2 className="mb-2 text-title font-semibold text-ink-strong">{kind === "cloze" ? "補充（翻面後顯示，可留空）" : "背面"}</h2>
             <MarkdownEditor value={back} onChange={setBack} figs={figs} role="sol" label={kind === "cloze" ? "補充（Markdown）" : "背面（Markdown）"} minRows="short" />
           </div>
+          </>
+          )}
           <TextField label="標籤" hint="用空白分隔，例如：GRE 易混淆" value={tags} onChange={(e) => setTags(e.target.value)} autoCapitalize="none" autoCorrect="off" />
           <div className="flex flex-wrap items-center justify-end gap-2">
             {problem && <span className="mr-auto text-meta text-ink-muted">{problem}</span>}
@@ -683,7 +762,9 @@ export function CardReviewPage() {
         <div className={cx("mt-2", row?.srs?.state === 0 && "")}>
           {row?.srs?.state === 0 && <div className="mb-2"><Badge tone="blue">新卡</Badge></div>}
           <InkScope value={reviewScope}>
-          <ReviewCard bigFront={row?.card.kind !== "cloze" && !faces.front.includes("\n") && cardPlain(faces.front).length <= 40} front={flipped ? faces.reveal : faces.front} back={faces.back} figs={figs} flipped={flipped} onFlip={flip} ratings={ratings} onRate={(v) => void rate(v)} />
+          <ReviewCard
+            body={row?.card.kind === "vocab" && row.card.fields ? <VocabCard key={row.card.id} fields={row.card.fields} tags={row.card.tags} side={flipped ? "back" : "front"} figs={figs} resetKey={row.card.id} /> : undefined}
+            bigFront={row?.card.kind !== "cloze" && !faces.front.includes("\n") && cardPlain(faces.front).length <= 40} front={flipped ? faces.reveal : faces.front} back={faces.back} figs={figs} flipped={flipped} onFlip={flip} ratings={ratings} onRate={(v) => void rate(v)} />
           </InkScope>
           <p className="mt-3 hidden text-center text-meta text-ink-muted lg:block">空白鍵翻面；1 重來、2 困難、3 良好、4 簡單</p>
         </div>

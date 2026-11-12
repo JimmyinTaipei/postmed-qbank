@@ -1,0 +1,44 @@
+<div class="card-container">
+  <div class="label">QUESTION</div>
+  <div class="front-text">{{Word}}</div>
+
+  <!-- 例句提示區塊 (只要 Sentence 有填寫就會顯示按鈕) -->
+  {{#Sentence}}
+  <div class="hint-wrapper">
+    <button class="hint-toggle" onclick="toggleHint(event)">💡 HINT / SENTENCE</button>
+    <div id="hint-content" class="hint-container hidden">{{Sentence}}</div>
+  </div>
+  {{/Sentence}}
+
+  <!-- 標籤區塊 -->
+  {{#Tags}}
+  <div class="tags-wrapper">
+    <div id="tags-content" class="tags-container hidden">{{Tags}}</div>
+    <button class="tags-toggle" onclick="toggleTags(event)">🏷️ VIEW TAGS</button>
+  </div>
+  {{/Tags}}
+</div>
+
+<script>
+function toggleHint(event) {
+    event.preventDefault();
+    var container = document.getElementById('hint-content');
+    if (container) {
+        // 自動將中文字串包覆遮罩 class（只執行一次）
+        if (!container.dataset.cleaned) {
+            // 使用正規表達式抓取連續的中文字串與標點符號，包進 spoiler 標籤中
+            container.innerHTML = container.innerHTML.replace(/([\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]+)/g, '<span class="spoiler" onclick="this.classList.toggle(\'revealed\')">$1</span>');
+            container.dataset.cleaned = "true";
+        }
+        container.classList.toggle('hidden');
+    }
+}
+
+function toggleTags(event) {
+    event.preventDefault();
+    var container = document.getElementById('tags-content');
+    if (container) {
+        container.classList.toggle('hidden');
+    }
+}
+</script>

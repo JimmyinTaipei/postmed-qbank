@@ -106,10 +106,20 @@ export const SYNC_TABLES: SyncTable[] = [
   {
     name: "card",
     pk: ["id"],
-    cols: ["id", "deck_id", "kind", "front_md", "back_md", "tags", "origin", "updated_at", "deleted"],
-    json: ["tags", "origin"],
+    // fields：第 8B-1 階段（migration 0002）。有欄位的卡（vocab）的各欄位 Markdown；其他種類是 null。
+    cols: ["id", "deck_id", "kind", "front_md", "back_md", "fields", "tags", "origin", "updated_at", "deleted"],
+    json: ["fields", "tags", "origin"],
     kind: "lww",
     order: ["updated_at", "front_md"],
+  },
+  {
+    // 第 8B 階段：查過的單字（migration 0002）。8B-2 才開始寫入；先建好表與同步。
+    name: "vocab_mark",
+    pk: ["id"],
+    cols: ["id", "lemma", "card", "target", "quote", "prefix", "suffix", "start", "end", "kind", "updated_at", "deleted"],
+    json: [],
+    kind: "lww",
+    order: ["updated_at", "card"],
   },
   {
     name: "media",

@@ -7,6 +7,8 @@
 - 進度：Anki 的 FSRS 穩定度／難度（cards.data 的 s、d）與到期日直接搬進 srs_state；
   複習紀錄（revlog）搬進 review_log（device = "anki"）。暫停的卡維持暫停。
 - 媒體：卡片用到的圖與聲音上傳到 R2 的 m/<sha256>.<副檔名>。
+- 單字卡（第 8B-1 階段，規格書 §9.11）：[anki] vocab_models 列出的筆記類型（預設「0_後醫單字基本型」）
+  匯成 kind = "vocab"，11 個欄位各自轉成 Markdown 存進 card.fields；front_md／back_md 仍照樣板產生（搜尋、TSV 用）。
 - 寫入走管理 API /api/admin/rows。預設「已存在就不動」：重新匯入不會蓋掉網站上改過的內容與進度。
   --update 只覆寫卡片內容與牌組名稱（進度不動）。
 """
@@ -23,6 +25,8 @@ from pathlib import Path
 
 from .anki import SEP, open_package, pb_get
 from .anki_html import html_to_md, media_refs
+
+VOCAB_MODEL = "0_後醫單字基本型"
 
 SPECIAL = {"FrontSide", "Tags", "Deck", "Subdeck", "Card", "CardFlag", "Type", "CardID"}
 SKIP_MOD = {"type", "tts", "tts-voices"}
@@ -68,6 +72,7 @@ def template_fields(tmpl: str) -> tuple[list[str], list[str]]:
 class Model:
     def __init__(self, ntid, name, is_cloze, fields, templates, cfg):
         self.id, self.name, self.cloze, self.fields = ntid, name, is_cloze, fields
+        self.vocab = not is_cloze and name in (cfg.get("vocab_models") or [VOCAB_MODEL])
         over = (cfg.get("models") or {}).get(name, {})
         self.labels = {**(cfg.get("labels") or {}), **(over.get("labels") or {})}
         self.layout = []   # 每個樣板：(front fields, back fields)
@@ -225,13 +230,16 @@ class Importer:
                     mp[r] = p
             front, back = model.render(ord_, values, mp)
             self.cards[sid] = {
-                "id": sid, "deck_id": deck_id(dname), "kind": "cloze" if model.cloze else "basic",
+                "id": sid, "deck_id": deck_id(dname), "kind": "vocab" if model.vocab else "cloze" if model.cloze else "basic",
                 "front_md": front, "back_md": back, "tags": tags.split() or None,
-                "origin": {"from": "anki", "guid": guid, "model": model.name, "ord": ord_, "nid": nid, "cid": cid, "deck": dname},
+                "fields": {f: html_to_md(values.get(f, ""), mp) for f in model.fields} if model.vocab else None,
+                "origin": {"from": "anki", "guid": guid, "model": model.name, "ord": ord_, "nid": nid, "cid": cid, "deck": dname,
+                           **({"mid": model.id} if model.vocab else {})},
                 "updated_at": self.t0, "deleted": 0,
             }
             st = self.stats[dname]
             st["卡片"] += 1
+            st["單字卡"] += model.vocab
             st["暫停"] += queue == -1
             # 進度
             try:
@@ -288,6 +296,8 @@ class Importer:
             step = max(1, len(cs) // n)
             for c in cs[::step][:n]:
                 L += [f"### {c['id']}（{c['origin']['deck']}）", "", "**正面**", "", "```", c["front_md"], "```", "", "**背面**", "", "```", c["back_md"], "```", ""]
+                if c.get("fields"):
+                    L += ["**欄位**", ""] + [f"- {k}：`{v[:120]}`" for k, v in c["fields"].items() if v] + [""]
         return "\n".join(L)
 
 

@@ -373,8 +373,17 @@ export interface Deck {
   seq?: number;
 }
 
-/** basic＝問答；reverse＝正反兩張（同一則筆記的兩面互換）；cloze＝克漏字（遮第 ord+1 個 {{cN::…}}）。 */
-export type CardKind = "basic" | "reverse" | "cloze";
+/**
+ * basic＝問答；reverse＝正反兩張（同一則筆記的兩面互換）；cloze＝克漏字（遮第 ord+1 個 {{cN::…}}）；
+ * vocab＝單字卡（第 8B-1 階段：11 個欄位存在 fields，照單字樣板顯示）。
+ */
+export type CardKind = "basic" | "reverse" | "cloze" | "vocab";
+
+/** 單字卡的 11 個欄位（名稱與 Anki「0_後醫單字基本型」相同，匯出回 Anki 時一格對一格）。 */
+export const VOCAB_FIELDS = ["Word", "Part of Speech", "Meaning and Definition", "Sentence", "Memo & Confusable", "Derivative", "Synonyms", "Antonyms", "Prefix & Roots", "Image", "Source"] as const;
+export type VocabField = (typeof VOCAB_FIELDS)[number];
+/** 每格是一段 Markdown；缺的格當空字串。 */
+export type CardFields = Partial<Record<VocabField, string>>;
 
 export interface CardOrigin {
   from: "anki" | "site" | "q" | "kb" | "tsv";
@@ -383,6 +392,8 @@ export interface CardOrigin {
   note?: string;
   ord?: number;
   model?: string;
+  /** Anki 的筆記類型 ID（單字卡匯出回 Anki 時沿用） */
+  mid?: number;
   deck?: string;
   nid?: number;
   cid?: number;
@@ -398,8 +409,27 @@ export interface Card {
   kind: CardKind;
   front_md: string;
   back_md: string;
+  /** 有欄位的卡（vocab）：以它為準，front_md／back_md 由它產生。其他種類是 null（舊資料沒有這個屬性）。 */
+  fields?: CardFields | null;
   tags: string[] | null;
   origin: CardOrigin | null;
+  updated_at: number;
+  deleted: 0 | 1;
+  seq?: number;
+}
+
+/** 查過的單字（第 8B 階段，規格書 §4.6；8B-2 開始寫入）。 */
+export interface VocabMark {
+  id: string;
+  lemma: string;
+  card: string | null;
+  target: string;
+  quote: string;
+  prefix: string | null;
+  suffix: string | null;
+  start: number | null;
+  end: number | null;
+  kind: "lookup" | "link";
   updated_at: number;
   deleted: 0 | 1;
   seq?: number;
