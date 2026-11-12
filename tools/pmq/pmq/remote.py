@@ -4,6 +4,7 @@
 金鑰存在 Mac 鑰匙圈（scripts/set-secrets.sh 寫入），這裡在執行時讀，不寫進任何檔案。
 """
 import json
+import time
 import os
 import subprocess
 import urllib.error
@@ -67,8 +68,18 @@ class Remote:
             missing += self._req("POST", "/api/admin/have", {"keys": keys[i:i + 2000]})["missing"]
         return missing
 
-    def put_blob(self, key, data, ctype):
-        return self._req("PUT", "/api/admin/blob/" + urllib.parse.quote(key, safe="/"), data, ctype=ctype)
+    def put_blob(self, key, data, ctype, tries=5):
+        """上傳一個檔。R2 偶爾回 500（例如 10001 internal error）或連線中斷：同一個檔重傳是安全的，等一下再試，最多 tries 次。"""
+        path = "/api/admin/blob/" + urllib.parse.quote(key, safe="/")
+        for i in range(tries):
+            try:
+                return self._req("PUT", path, data, ctype=ctype)
+            except RemoteError as e:
+                msg = str(e)
+                transient = "（500）" in msg or "（502）" in msg or "（504）" in msg or "（429）" in msg or msg.startswith("連不上")
+                if not transient or i == tries - 1:
+                    raise
+                time.sleep(2 * (i + 1))
 
     def put_manifest(self, manifest):
         return self._req("POST", "/api/admin/manifest", json.dumps(manifest, ensure_ascii=False, indent=1).encode("utf-8"))
