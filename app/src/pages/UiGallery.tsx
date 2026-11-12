@@ -404,7 +404,7 @@ export default function UiGallery() {
         <Pair>
           <ReviewCard front="PDH complex 的五個輔酶是哪些？" back="**TPP、Lipoamide、CoA、FAD、NAD⁺**" flipped={flipped} onFlip={() => setFlipped(true)} onRate={() => setFlipped(false)} ratings={[{ value: 1, label: "重來", next: "10 分鐘" }, { value: 2, label: "困難", next: "1 天" }, { value: 3, label: "良好", next: "3 天" }, { value: 4, label: "簡單", next: "7 天" }]} />
           <ReviewCard front="" back="" body={<VocabCard fields={VOCAB_DEMO} tags={["05_English::RedBook", "05_English::#Prefix::ad-"]} side={vocabFlipped ? "back" : "front"} />} flipped={vocabFlipped} onFlip={() => setVocabFlipped(true)} onRate={() => setVocabFlipped(false)} ratings={[{ value: 1, label: "重來", next: "10 分鐘" }, { value: 2, label: "困難", next: "1 天" }, { value: 3, label: "良好", next: "3 天" }, { value: 4, label: "簡單", next: "7 天" }]} />
-          <Card className="p-5"><div className="mb-2 text-meta text-ink-muted">單字卡背面：只有字義（空的欄位整塊不顯示）</div><VocabCard fields={VOCAB_MIN} side="back" /></Card>
+          <Card className="p-5"><div className="mb-2 text-meta text-ink-muted">單字卡背面：只有字義（空的欄位整塊不顯示；AI 產生、還沒改過的欄位標「AI」）</div><VocabCard fields={VOCAB_MIN} side="back" ai={["Part of Speech", "Meaning and Definition"]} /></Card>
           <ExamTimerBar remainingS={52 * 60 + 5} totalS={80 * 60} answered={12} total={45} onSubmit={() => {}} />
           <ExamTimerBar remainingS={4 * 60 + 12} totalS={80 * 60} answered={41} total={45} onSubmit={() => {}} />
           <ExamTimerBar remainingS={null} totalS={null} elapsedS={23 * 60 + 8} answered={20} total={45} onSubmit={() => {}} />

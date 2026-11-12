@@ -20,6 +20,18 @@ interface Props {
   figs?: Fig[];
   /** 換卡時把「提示」「標籤」收回去 */
   resetKey?: string;
+  /** AI 產生、還沒改過的欄位（card.origin.ai）：背面在那一格標「AI」 */
+  ai?: readonly string[] | null;
+}
+
+/** AI 產生的欄位標示（第 8B-3 階段）。改過那一格就不再標。 */
+function AiMark() {
+  return (
+    <Badge tone="warning" className="ml-1.5 px-1.5 py-0 align-middle text-[11px]">
+      <span title="AI 產生，還沒改過">AI</span>
+      <span className="sr-only">產生，還沒改過</span>
+    </Badge>
+  );
 }
 
 const SECTIONS: VocabField[] = ["Sentence", "Derivative", "Memo & Confusable", "Synonyms", "Antonyms", "Prefix & Roots"];
@@ -69,7 +81,8 @@ function Hint({ md, figs }: { md: string; figs?: Fig[] }) {
   );
 }
 
-export function VocabCard({ fields, tags, side, figs, resetKey }: Props) {
+export function VocabCard({ fields, tags, side, figs, resetKey, ai }: Props) {
+  const isAi = (k: VocabField) => !!ai?.includes(k);
   const [hint, setHint] = useState(false);
   const [showTags, setShowTags] = useState(false);
   useEffect(() => {
@@ -118,17 +131,30 @@ export function VocabCard({ fields, tags, side, figs, resetKey }: Props) {
           <Markdown text={word} figs={figs} role="q" tight className="vocab-word" />
           <Speaker sounds={sounds} />
         </div>
-        {pos && <Markdown text={pos} tight className="vocab-pos mt-1" />}
+        {pos && (
+          <div className="mt-1 flex items-center justify-center">
+            <Markdown text={pos} tight className="vocab-pos" />
+            {isAi("Part of Speech") && <AiMark />}
+          </div>
+        )}
       </div>
       <hr className="my-5 border-line" />
-      {meaning && <Markdown text={meaning} figs={figs} role="sol" className="vocab-meaning text-center" />}
+      {meaning && (
+        <div className="text-center">
+          <Markdown text={meaning} figs={figs} role="sol" className="vocab-meaning inline-block" />
+          {isAi("Meaning and Definition") && <AiMark />}
+        </div>
+      )}
       {SECTIONS.map((k) => {
         const md = (fields[k] ?? "").trim();
         if (!md) return null;
         const confusable = k === "Memo & Confusable";
         return (
           <section key={k} className={cx("mt-4 rounded-btn bg-page px-4 py-3", confusable && "border-l-4 border-incorrect")}>
-            <h3 className="mb-1 text-meta font-semibold text-ink-muted">{confusable ? "辨析與易混淆" : VOCAB_LABEL[k]}</h3>
+            <h3 className="mb-1 text-meta font-semibold text-ink-muted">
+              {confusable ? "辨析與易混淆" : VOCAB_LABEL[k]}
+              {isAi(k) && <AiMark />}
+            </h3>
             <Markdown text={md} figs={figs} role="sol" />
           </section>
         );

@@ -187,7 +187,7 @@ export function VocabLookup({ req, onClose }: { req: LookupReq; onClose: () => v
               </div>
             )}
             {full ? (
-              <VocabCard fields={card.fields ?? {}} tags={card.tags} side="back" />
+              <VocabCard fields={card.fields ?? {}} tags={card.tags} side="back" ai={card.origin?.ai} />
             ) : (
               <CardSummary card={card} />
             )}

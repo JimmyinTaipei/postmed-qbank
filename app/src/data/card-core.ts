@@ -3,7 +3,7 @@
 // 執行測試：cd app && node --experimental-strip-types --test src/data/card-core.test.ts
 
 import { mathRanges } from "../../../schema/ts/options.ts";
-import { VOCAB_FIELDS, type Card, type CardFields, type CardKind, type SrsState, type VocabField } from "./types.ts";
+import { VOCAB_FIELDS, type Card, type CardFields, type CardKind, type CardOrigin, type SrsState, type VocabField } from "./types.ts";
 
 // ---------- 克漏字 ----------
 
@@ -96,6 +96,15 @@ export function vocabMd(f: CardFields): { front_md: string; back_md: string } {
     parts.push((label ? `<div class="card-label">${label}</div>\n\n` : "") + md);
   }
   return { front_md: (f.Word ?? "").trim(), back_md: parts.join("\n\n") };
+}
+
+/** AI 產生的欄位：使用者改過的那一格拿掉「AI」標示（規格書 §9.11「8B（5）」）。 */
+export function aiAfterEdit(card: Pick<Card, "origin" | "fields">, f: CardFields): CardOrigin | null {
+  const o = card.origin;
+  if (!o?.ai?.length) return o;
+  const old = cleanFields(card.fields);
+  const ai = o.ai.filter((k) => (old[k as VocabField] ?? "") === (f[k as VocabField] ?? ""));
+  return { ...o, ai };
 }
 
 const CJK = /[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]+/g;

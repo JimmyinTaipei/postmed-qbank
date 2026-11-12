@@ -391,7 +391,7 @@ export type VocabField = (typeof VOCAB_FIELDS)[number];
 export type CardFields = Partial<Record<VocabField, string>>;
 
 export interface CardOrigin {
-  from: "anki" | "site" | "q" | "kb" | "tsv";
+  from: "anki" | "site" | "q" | "kb" | "tsv" | "ai";
   /** 同一則筆記的卡片共用：Anki 的 guid，或網站產生的 note ID。編輯時一起改。 */
   guid?: string;
   note?: string;
@@ -406,6 +406,9 @@ export interface CardOrigin {
   id?: string;
   doc?: string;
   bid?: string;
+  /** AI 產生的單字卡（第 8B-3 階段 pmq vocab import）：批次名稱、還沒被使用者改過的 AI 欄位（卡片上標「AI」，改過就拿掉） */
+  batch?: string;
+  ai?: string[];
 }
 
 export interface Card {

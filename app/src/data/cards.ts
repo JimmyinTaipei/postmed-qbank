@@ -7,7 +7,7 @@
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { ulid } from "@/lib/ulid";
-import { cardFaces, cleanFields, formatIvl, interleave, isAskedNew, noteKey, parseTsv, pickCards, splitNote, toTsv, vocabMd, type TsvRow } from "./card-core";
+import { aiAfterEdit, cardFaces, cleanFields, formatIvl, interleave, isAskedNew, noteKey, parseTsv, pickCards, splitNote, toTsv, vocabMd, type TsvRow } from "./card-core";
 import { db } from "./db";
 import { prefs } from "./prefs";
 import { review, scheduler, startOfDay, DAY_MS, toCard } from "./srs-core";
@@ -241,7 +241,8 @@ export const cards = {
     if (card.kind === "vocab") {
       const f = cleanFields(fields ?? card.fields);
       const md = vocabMd(f);
-      await db.transaction("rw", TABLES(), () => putCard({ ...card, fields: f, front_md: md.front_md, back_md: md.back_md, tags, deck_id: deckId ?? card.deck_id, updated_at: now() }));
+      const origin = aiAfterEdit(card, f);
+      await db.transaction("rw", TABLES(), () => putCard({ ...card, origin, fields: f, front_md: md.front_md, back_md: md.back_md, tags, deck_id: deckId ?? card.deck_id, updated_at: now() }));
       kick();
       return;
     }

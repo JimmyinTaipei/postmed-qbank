@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cardFaces, cleanFields, clozeNumbers, clozeSide, interleave, maskChinese, mdToAnkiHtml, parseTsv, pickCards, splitNote, stripSounds, toTsv, vocabMd, vocabSounds } from "./card-core.ts";
+import { aiAfterEdit, cardFaces, cleanFields, clozeNumbers, clozeSide, interleave, maskChinese, mdToAnkiHtml, parseTsv, pickCards, splitNote, stripSounds, toTsv, vocabMd, vocabSounds } from "./card-core.ts";
 import type { SrsState } from "./types.ts";
 
 test("克漏字：遮第 n 個，其他直接顯示", () => {
@@ -93,4 +93,22 @@ test("單字卡：聲音從欄位裡找、內文拿掉聲音", () => {
   const f = { Word: "x", Image: `[sound:${SND}]` };
   assert.deepEqual(vocabSounds(f), ["/" + SND]);
   assert.equal(stripSounds(f.Image), "");
+});
+
+test("AI 產生的單字卡：改過的欄位拿掉 AI 標示，沒改的留著（8B-3）", () => {
+  const card = {
+    fields: { Word: "inundate", "Part of Speech": "v.", "Meaning and Definition": "淹沒", Sentence: "The village was **inundated**." },
+    origin: { from: "ai" as const, batch: "V001", ai: ["Part of Speech", "Meaning and Definition", "Sentence"] },
+  };
+  const edited = aiAfterEdit(card, { ...card.fields, "Meaning and Definition": "淹沒；使應接不暇" });
+  assert.deepEqual(edited?.ai, ["Part of Speech", "Sentence"]);
+  assert.equal(edited?.batch, "V001");
+  // 只改標籤、欄位沒動：標示都還在
+  assert.deepEqual(aiAfterEdit(card, { ...card.fields })?.ai, card.origin.ai);
+  // 清空一格也算改過
+  const { Sentence: _, ...noSentence } = card.fields;
+  assert.deepEqual(aiAfterEdit(card, noSentence)?.ai, ["Part of Speech", "Meaning and Definition"]);
+  // 不是 AI 的卡：origin 原樣
+  const anki = { fields: card.fields, origin: { from: "anki" as const, deck: "x" } };
+  assert.equal(aiAfterEdit(anki, {}), anki.origin);
 });

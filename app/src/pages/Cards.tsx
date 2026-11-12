@@ -418,7 +418,7 @@ export function CardPage() {
           </Card>
           <Card as="article" className="p-5 sm:p-6" aria-label="背面">
             <div className="mb-2 text-meta font-semibold text-ink-muted">背面</div>
-            <VocabCard fields={card.fields} tags={card.tags} side="back" figs={figs} />
+            <VocabCard fields={card.fields} tags={card.tags} side="back" figs={figs} ai={card.origin?.ai} />
           </Card>
         </>
       ) : (
@@ -437,6 +437,7 @@ export function CardPage() {
         <div className="flex items-center gap-2"><Icon name="repeat" size={16} className="text-ink-muted" />{cards.describe(srs ?? undefined)}</div>
         {card.tags?.length && card.kind !== "vocab" ? <div className="flex flex-wrap gap-1.5">{card.tags.map((t) => <Badge key={t} className="max-w-full whitespace-normal [overflow-wrap:anywhere]">{t}</Badge>)}</div> : null}
         {o?.from === "anki" && <div className="text-meta text-ink-muted">從 Anki 搬來：{o.deck}（{o.model}）</div>}
+        {o?.from === "ai" && <div className="text-meta text-ink-muted">AI 產生（批次 {o.batch}）{o.ai?.length ? "；標「AI」的欄位還沒改過" : "；全部欄位都改過了"}</div>}
         {o?.from === "q" && o.id && <div className="text-meta text-ink-muted">由題目做成：<a href={`/q/${o.id}`} onClick={(e) => { e.preventDefault(); nav(`/q/${o.id}`); }}>{o.id}</a></div>}
         {o?.from === "kb" && o.doc && <div className="text-meta text-ink-muted">由筆記做成：<a href={`/kb/${o.doc}${o.bid ? `#b-${o.bid}` : ""}`} onClick={(e) => { e.preventDefault(); nav(`/kb/${o.doc}${o.bid ? `#b-${o.bid}` : ""}`); }}>{o.doc.split("/").pop()}</a></div>}
       </Card>
@@ -763,7 +764,7 @@ export function CardReviewPage() {
           {row?.srs?.state === 0 && <div className="mb-2"><Badge tone="blue">新卡</Badge></div>}
           <InkScope value={reviewScope}>
           <ReviewCard
-            body={row?.card.kind === "vocab" && row.card.fields ? <VocabCard key={row.card.id} fields={row.card.fields} tags={row.card.tags} side={flipped ? "back" : "front"} figs={figs} resetKey={row.card.id} /> : undefined}
+            body={row?.card.kind === "vocab" && row.card.fields ? <VocabCard key={row.card.id} fields={row.card.fields} tags={row.card.tags} side={flipped ? "back" : "front"} figs={figs} resetKey={row.card.id} ai={row.card.origin?.ai} /> : undefined}
             bigFront={row?.card.kind !== "cloze" && !faces.front.includes("\n") && cardPlain(faces.front).length <= 40} front={flipped ? faces.reveal : faces.front} back={faces.back} figs={figs} flipped={flipped} onFlip={flip} ratings={ratings} onRate={(v) => void rate(v)} />
           </InkScope>
           <p className="mt-3 hidden text-center text-meta text-ink-muted lg:block">空白鍵翻面；1 重來、2 困難、3 良好、4 簡單</p>

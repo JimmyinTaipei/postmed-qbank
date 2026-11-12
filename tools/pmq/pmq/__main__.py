@@ -4,6 +4,7 @@
 第 1B 階段：publish、usage、backup pull、restore、auth hash。
 第 3 階段：patches list／pull／resolve。
 第 5 階段：anki inspect／import／export。
+第 8B-3 階段：vocab todo／check／import（交給 Antigravity 3.8 Flash 的單字批次工作）。
 """
 import argparse
 import json
@@ -55,6 +56,18 @@ def main(argv=None):
     an.add_argument("--dry-run", action="store_true", help="import：只轉換、出預覽（reports/anki_import_preview.md），不上傳")
     an.add_argument("--update", action="store_true", help="import：已存在的卡片也覆寫內容（進度不動）")
     an.add_argument("--url")
+    vo = sub.add_parser("vocab", help="英文單字的批次工作（交給 Flash）：todo 產生任務單、check 檢查輸出、import 建立單字卡")
+    vo.add_argument("what", choices=["todo", "check", "import"])
+    vo.add_argument("file", nargs="?", help="check／import：批次資料夾裡的 輸出.json")
+    vo.add_argument("--kind", choices=["fields", "phrases", "senses"], default="fields",
+                    help="todo：fields＝常考但沒有卡的字的欄位（預設）、phrases＝一份考卷的片語、senses＝一字多義用哪個意思")
+    vo.add_argument("--limit", type=int, help="todo：每批最多幾個字（fields 預設 100、senses 預設 50）")
+    vo.add_argument("--min-papers", type=int, default=2, help="todo fields：至少出現在幾份考卷（預設 2）")
+    vo.add_argument("--paper", help="todo phrases：考卷代碼，例如 ENG-CMU-113")
+    vo.add_argument("--phrases", help="todo fields：改排這個片語批次（P…/輸出.json）裡還沒有卡的片語")
+    vo.add_argument("--include-common", action="store_true", help="todo fields：連常見字（effect、argue…）也排")
+    vo.add_argument("--dry-run", action="store_true", help="import：只印出會建立什麼，不上傳")
+    vo.add_argument("--url")
     args = ap.parse_args(argv)
     cfg = Config()
     cfg.reports.mkdir(parents=True, exist_ok=True)
@@ -102,6 +115,24 @@ def main(argv=None):
             ap.error("pmq anki export 要給一個輸出檔路徑，例如 ~/Desktop/網站卡片.apkg")
         run_export(cfg, args.paths[0], args.deck, args.url or cfg.site_url)
         return 0
+    if args.cmd == "vocab":
+        from . import vocab_tasks as vt
+        url = args.url or cfg.site_url
+        if args.what == "todo":
+            if args.kind == "phrases":
+                if not args.paper:
+                    ap.error("pmq vocab todo --kind phrases 要給 --paper 考卷代碼")
+                vt.todo_phrases(cfg, args.paper)
+            elif args.kind == "senses":
+                vt.todo_senses(cfg, url, limit=args.limit or 50)
+            else:
+                vt.todo_fields(cfg, url, limit=args.limit or 100, min_papers=args.min_papers, phrases=args.phrases, include_common=args.include_common)
+            return 0
+        if not args.file:
+            ap.error(f"pmq vocab {args.what} 要給批次資料夾裡的 輸出.json")
+        if args.what == "check":
+            return vt.run_check(args.file)
+        return vt.run_import(args.file, url, dry_run=args.dry_run)
     if args.cmd == "sample":
         from .sample import make_sample
         make_sample(cfg)
