@@ -138,7 +138,13 @@ export async function usage(c: Context<App>): Promise<Response> {
     cursor = list.truncated ? list.cursor : undefined;
   } while (cursor);
   const total = Object.values(prefixes).reduce((s, e) => s + e.bytes, 0);
-  return c.json({ d1_bytes: d1Bytes, r2_bytes: total, r2: prefixes });
+  // 個人資料各表的筆數（pmq status 用；有 deleted 欄的不算已刪除的）
+  const names = Object.keys(SYNC_TABLE);
+  const counted = await c.env.DB.batch(
+    names.map((t) => c.env.DB.prepare(`SELECT COUNT(*) AS n FROM ${t}${SYNC_TABLE[t].cols.includes("deleted") ? " WHERE COALESCE(deleted, 0) = 0" : ""}`)),
+  );
+  const rows = Object.fromEntries(names.map((t, i) => [t, (counted[i].results[0] as { n: number }).n]));
+  return c.json({ d1_bytes: d1Bytes, r2_bytes: total, r2: prefixes, rows });
 }
 
 // ---------- 清掉沒用到的圖（pmq prune） ----------

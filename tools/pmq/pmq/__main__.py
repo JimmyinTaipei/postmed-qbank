@@ -38,6 +38,7 @@ def main(argv=None):
     pr = sub.add_parser("prune", help="列出（--yes 才刪）R2 上目前內容沒用到的圖，例如已經有 SVG 的物理原始 PNG")
     pr.add_argument("--yes", action="store_true", help="真的刪掉")
     pr.add_argument("--url")
+    sub.add_parser("status", help="本機版（8787）與部署版並排：各有哪些題庫內容、個人資料、儲存空間（只讀）")
     us = sub.add_parser("usage", help="本專案 D1 大小與 R2 用量（規格書 §11-6）")
     us.add_argument("--url")
     bk = sub.add_parser("backup", help="pmq backup pull：下載個人資料整包")
@@ -153,6 +154,9 @@ def main(argv=None):
         if not args.id or not (args.mine or args.theirs):
             ap.error("resolve 要給修訂 ID 與 --mine 或 --theirs")
         return patches.resolve(cfg, url, args.id, mine=args.mine)
+    if args.cmd == "status":
+        from .status import status
+        return status(cfg)
     if args.cmd == "prune":
         from .publish import prune
         return prune(cfg, url, yes=args.yes)
