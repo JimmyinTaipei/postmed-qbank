@@ -9,7 +9,7 @@
 
 對應規則（規格書 §9.11 的表）：
 - passage 的 `### content` → group.stem；group.gid ＝ passage id；group.order ＝ 原卷題號
-- chapter（EN01…）→ chap（ENG:EN01）；8C 的文法分類檔 → xchap（還沒有）
+- chapter（EN01…）→ chap（ENG:EN01）；8C 的子章節分類檔（文法 G01–G25）→ xchap；講義題用它所在的章
 - source_section → tags.type（中文名）；講義的考點寫在 tags.topic
 - answer.accepted 一個 → single；多個 → any（多個答案皆可）；award_all → any＋全部選項（送分）
 - type=short_answer（作文、問答）→ 自評題
@@ -69,8 +69,84 @@ class SharedAdapter:
                     self.report.warn("shared_chapter_title_differs", subject=self.subject, code=code, a=cat[code], b=title, file=self.cfg.rel(path))
                 cat.setdefault(code, title)
         self._catalog = cat
-        return [{"id": f"{self.subject}:{code}", "subject": self.subject, "parent": None, "title": title, "order": i}
-                for i, (code, title) in enumerate(sorted(cat.items()), 1)]
+        out = [{"id": f"{self.subject}:{code}", "subject": self.subject, "parent": None, "title": title, "order": i}
+               for i, (code, title) in enumerate(sorted(cat.items()), 1)]
+        xc = self.load_xchap()
+        if xc:
+            parent = self.spec.get("xchap_parent")
+            pid = f"{self.subject}:{parent}" if parent else None
+            if parent and parent not in cat:
+                self.report.error("子章節的上層章節不在章節目錄", subject=self.subject, parent=parent)
+                pid = None
+            out += [{"id": f"{self.subject}:{code}", "subject": self.subject, "parent": pid, "title": title, "order": i}
+                    for i, (code, title) in enumerate(xc["chapters"].items(), 1)]
+        return out
+
+    # ---------- 子章節分類檔（第 8C 階段）----------
+
+    XCHAP_MAX = 4
+
+    def load_xchap(self):
+        """子章節分類檔（pmq.toml 的 xchap_file，相對科目資料夾）。格式：
+        {"chapters": {"G01": "基本句型", …}（順序就是章節樹的順序）,
+         "questions": {"ENG-000123": ["G09", "G12"], …}（第一個是最主要的，最多 4 個）,
+         "unsure": ["ENG-…"]（分得勉強、待複核；只是記錄）}
+        講義題（front matter 的 book.chapter 是數字）不必寫進來：自動歸到代碼數字相同的那一章。
+        回傳 None ＝ 這一科沒有分類檔。"""
+        if hasattr(self, "_xchap"):
+            return self._xchap
+        self._xchap = None
+        rel = self.spec.get("xchap_file")
+        if not rel:
+            return None
+        path = self.root / rel
+        if not path.exists():
+            self.report.error("子章節分類檔不存在", subject=self.subject, file=self.cfg.rel(path))
+            return None
+        try:
+            data = json.loads(path.read_text("utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            self.report.error("子章節分類檔讀不到或不是 JSON", file=self.cfg.rel(path), message=str(e))
+            return None
+        self.cache.sha256(path, path.read_bytes())
+        chapters = data.get("chapters") if isinstance(data.get("chapters"), dict) else {}
+        if not chapters:
+            self.report.error("子章節分類檔沒有 chapters", file=self.cfg.rel(path))
+        qmap = {}
+        for qid, codes in (data.get("questions") or {}).items():
+            if not isinstance(codes, list) or not codes:
+                self.report.error("子章節分類檔：章節要是非空的清單", id=qid, file=self.cfg.rel(path))
+                continue
+            bad = [c for c in codes if c not in chapters]
+            if bad:
+                self.report.error("子章節分類檔：章節代碼不在章節表", id=qid, codes=bad, file=self.cfg.rel(path))
+            if len(codes) > self.XCHAP_MAX:
+                self.report.error("子章節分類檔：一題最多 4 個章節", id=qid, count=len(codes), file=self.cfg.rel(path))
+            if len(set(codes)) != len(codes):
+                self.report.warn("xchap_duplicate_code", id=qid, codes=codes)
+            qmap[qid] = [c for c in dict.fromkeys(codes) if c in chapters][: self.XCHAP_MAX]
+        bynum = {}
+        for code in chapters:
+            m = re.search(r"\d+", code)
+            if m:
+                bynum.setdefault(int(m.group()), code)
+        self._xchap = {"chapters": chapters, "questions": qmap, "bynum": bynum, "file": self.cfg.rel(path),
+                       "unsure": [x for x in data.get("unsure") or [] if isinstance(x, str)]}
+        return self._xchap
+
+    def _xchap_of(self, qid, fmeta):
+        xc = self.load_xchap()
+        if not xc:
+            return []
+        codes = xc["questions"].get(qid)
+        if codes is None and fmeta.get("source_kind") == "lecture_handout":
+            ch = (fmeta.get("book") or {}).get("chapter") if isinstance(fmeta.get("book"), dict) else None
+            code = xc["bynum"].get(int(ch)) if isinstance(ch, int) or (isinstance(ch, str) and ch.isdigit()) else None
+            codes = [code] if code else []
+            self.report.count("xchap", "講義題（所在的章）" if code else "講義題（章號對不到）")
+        elif codes is not None:
+            self.report.count("xchap", "分類檔")
+        return [f"{self.subject}:{c}" for c in codes or []]
 
     # ---------- 讀檔 ----------
 
@@ -125,6 +201,13 @@ class SharedAdapter:
                 if pid not in used:
                     self.report.warn("shared_passage_unused", file=self.cfg.rel(path), passage=pid)
         self._number_groups(out)
+        xc = self.load_xchap()
+        if xc:
+            known = {q["id"] for q in out}
+            for qid in xc["questions"]:
+                if qid not in known:
+                    self.report.error("子章節分類檔：題目 ID 不存在", id=qid, file=xc["file"])
+            self.report.count("xchap", "待複核（unsure）", len(xc["unsure"]))
         return out
 
     def _sections(self, path, text):
@@ -345,7 +428,7 @@ class SharedAdapter:
             "alt_sources": [],
             "canonical": qid,
             "chap": f"{self.subject}:{chapter}" if chapter else None,
-            "xchap": [],
+            "xchap": self._xchap_of(qid, fmeta),
             "tags": tags,
             "qtype": qtype,
             "group": group,

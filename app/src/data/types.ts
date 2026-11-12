@@ -235,6 +235,8 @@ export interface KbCatalogDoc {
   counts: Partial<Record<KbBlock["type"], number>>;
   /** 第二層標題 */
   sections: string[];
+  /** 對應的題目章節（第 8C 階段；pmq.toml [kb] chapter_docs） */
+  chap?: string;
 }
 
 /** 題目 → 引用它的筆記段落（c/kbrel）。 */

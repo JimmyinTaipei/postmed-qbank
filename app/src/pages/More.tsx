@@ -1,26 +1,11 @@
-// 更多：主導覽放不下的頁面。
+// 更多：主導覽放不下的頁面。卡片、考題（錯題本、題庫瀏覽、原卷）第 2B 階段搬到主導覽。
 
-import { useFlagCount, useOpenPatchCount } from "@/data";
+import { useOpenPatchCount } from "@/data";
 import { Icon, type IconName } from "@/ui/icons";
 import { Badge, ListCard, ListRow, SectionTitle } from "@/ui/primitives";
 import { Page } from "@/ui/shell";
 
 const GROUPS: { title: string; items: { to: string; label: string; meta: string; icon: IconName; stage?: string }[] }[] = [
-  {
-    title: "卡片",
-    items: [
-      { to: "/cards", label: "卡片", meta: "Anki 搬來的牌組、自己做的卡片", icon: "list" },
-      { to: "/vocab", label: "常考單字", meta: "考古題裡的單字出現幾次、我會不會", icon: "book" },
-    ],
-  },
-  {
-    title: "題目",
-    items: [
-      { to: "/wrong", label: "錯題本", meta: "答錯的題目", icon: "x" },
-      { to: "/browse", label: "題庫瀏覽", meta: "用題號、來源或內文找題目", icon: "search" },
-      { to: "/papers", label: "原卷", meta: "整份考卷、模擬考", icon: "file" },
-    ],
-  },
   {
     title: "分析",
     items: [
@@ -38,7 +23,6 @@ const GROUPS: { title: string; items: { to: string; label: string; meta: string;
 ];
 
 export function More() {
-  const wrong = useFlagCount("wrong");
   const openPatches = useOpenPatchCount();
   return (
     <Page title="更多">
@@ -48,7 +32,7 @@ export function More() {
           <ListCard>
             {g.items.map((it) => (
               <li key={it.to}>
-                <ListRow to={it.to} title={it.label} meta={it.meta} leading={<Icon name={it.icon} size={20} />} trailing={it.to === "/wrong" && wrong ? <Badge tone="incorrect">{wrong}</Badge> : it.to === "/patches" && openPatches ? <Badge tone="warning">{openPatches}</Badge> : it.stage ? <Badge>{it.stage}</Badge> : undefined} />
+                <ListRow to={it.to} title={it.label} meta={it.meta} leading={<Icon name={it.icon} size={20} />} trailing={it.to === "/patches" && openPatches ? <Badge tone="warning">{openPatches}</Badge> : it.stage ? <Badge>{it.stage}</Badge> : undefined} />
               </li>
             ))}
           </ListCard>

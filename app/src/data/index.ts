@@ -37,6 +37,7 @@ export {
 } from "./filter";
 export { isChoice, isMulti, judge, splitQuestion, answerText } from "./question";
 export { clusterItems, expandUnits, groupsOf, pageAt, pageLabel, pagesOf, takeUnits, type Page as ItemPage } from "./group-core";
+export * from "./browse";
 export { useSearch, searchText, prepareSearch, type SearchHit, type SearchState } from "./search";
 export { pushRecent, kbRecent, useKbRecent, KB_RECENT, type KbRecent } from "./recent";
 export { clozes, useClozeMarksUnder, useClozeCards, useTapeLevel, tapeLevel, buildFront, findInMd, mdPlain, squash, tableRowOf, maxCloze, MATH, TAPE_CLASS, TAPE_NAME, type ClozeCardInfo, type ClozePick, type ClozeResult, type ClozeSource, type TapeLevel } from "./cloze";

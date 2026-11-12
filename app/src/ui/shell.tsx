@@ -9,7 +9,10 @@ import { IconButton, Notice, cx } from "./primitives";
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: "/", label: "今日", icon: "home", end: true },
   { to: "/practice", label: "刷題", icon: "pencil" },
+  // 第 2B 階段：考題（題目瀏覽、整份考卷、搜尋、錯題本）與卡片從「更多」搬上來
+  { to: "/browse", label: "考題", icon: "file" },
   { to: "/review", label: "複習", icon: "repeat" },
+  { to: "/cards", label: "卡片", icon: "list" },
   { to: "/kb", label: "資料庫", icon: "book" },
   { to: "/more", label: "更多", icon: "grid" },
 ];
@@ -63,11 +66,11 @@ export function AppShell() {
               <NavLink
                 to={n.to}
                 end={n.end}
-                className={({ isActive }) => cx("flex h-14 flex-col items-center justify-center gap-0.5 text-meta no-underline select-none", isActive ? "font-semibold text-blue-deep" : "text-ink-muted")}
+                className={({ isActive }) => cx("flex h-14 flex-col items-center justify-center gap-0.5 px-0.5 text-meta whitespace-nowrap no-underline select-none", isActive ? "font-semibold text-blue-deep" : "text-ink-muted")}
               >
                 {({ isActive }) => (
                   <>
-                    <span className={cx("flex h-7 w-14 items-center justify-center rounded-full transition-colors duration-(--dur-fast)", isActive && "bg-blue-light text-blue-ink")}>
+                    <span className={cx("flex h-7 w-full max-w-14 items-center justify-center rounded-full transition-colors duration-(--dur-fast)", isActive && "bg-blue-light text-blue-ink")}>
                       <Icon name={n.icon} size={20} />
                     </span>
                     {n.label}

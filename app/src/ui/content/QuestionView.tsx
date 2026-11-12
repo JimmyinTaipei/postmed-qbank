@@ -1,5 +1,6 @@
 // 一題的完整顯示與作答流程（規格書 §5.1、§9.2）。刷題畫面與單題頁共用。
 // 用法：外層用 useAnswerFlow 拿到流程狀態，交給 <QuestionView> 顯示，並用同一個 flow 決定底部主要按鈕。
+// 題目瀏覽（第 2B 階段）用 <QuestionRead>：同一個元件的唯讀模式，不能作答、不寫 attempt。
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -16,7 +17,8 @@ import { SourceBadges } from "./SourceBadges";
 import { Handwriting, useInkAttemptReset } from "../ink/Handwriting";
 import { InkScope } from "../ink/FigInk";
 
-export type Phase = "choose" | "multi" | "self" | "revealed" | "done";
+/** read：題目瀏覽的唯讀模式（第 2B 階段） */
+export type Phase = "choose" | "multi" | "self" | "revealed" | "done" | "read";
 
 export interface AnswerFlow {
   phase: Phase;
@@ -67,7 +69,8 @@ export function useAnswerFlow(q: Question, attempt: Attempt | null | undefined, 
   };
 }
 
-function optionState(letter: string, flow: AnswerFlow, q: Question, attempt: Attempt | null | undefined): OptionState {
+function optionState(letter: string, flow: AnswerFlow, q: Question, attempt: Attempt | null | undefined, reveal: boolean): OptionState {
+  if (flow.phase === "read") return reveal && q.answer.keys.includes(letter) ? "missed" : "idle";
   if (flow.phase !== "done") return flow.picked.includes(letter) ? "selected" : "idle";
   const chosen = attempt?.chosen ?? [];
   const key = q.answer.keys.includes(letter);
@@ -110,14 +113,17 @@ interface Props {
   hotkeys?: boolean;
   /** 標題列右邊的按鈕（題組頁每一小題自己的星號與 ⋯） */
   headerExtra?: ReactNode;
+  /** 唯讀模式顯示到哪裡（flow.phase 是 "read" 時）：q 只有題目、a 加答案、all 再加詳解 */
+  show?: "q" | "a" | "all";
 }
 
-export function QuestionView({ q, flow, attempt, chapter, hotkeys, headerExtra }: Props) {
+export function QuestionView({ q, flow, attempt, chapter, hotkeys, headerExtra, show }: Props) {
   const choice = isChoice(q);
   const multi = isMulti(q);
   const parts = choice ? splitQuestion(q) : null;
+  const read = flow.phase === "read";
   const done = flow.phase === "done";
-  const showAnswer = done || flow.phase === "revealed";
+  const showAnswer = done || flow.phase === "revealed" || (read && show !== "q");
   // 物理：重新作答時手寫區與圖上標記是空白的（第 6 階段）
   useInkAttemptReset(q, !done);
 
@@ -163,10 +169,10 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys, headerExtra }
       ) : parts ? (
         <>
           <HighlightableMarkdown target={`q:${q.id}/ques`} text={parts.stem} figs={q.figs} role="q" />
-          {multi && !done && <p className="text-meta text-ink-muted">複選題：選好所有答案後按「送出」。</p>}
+          {multi && !done && !read && <p className="text-meta text-ink-muted">複選題：選好所有答案後按「送出」。</p>}
           <div role={multi ? "group" : "radiogroup"} aria-label="選項" className="space-y-2">
             {parts.options.map((o) => (
-              <OptionRow key={o.letter} letter={o.letter} multi={multi} locked={done} state={optionState(o.letter, flow, q, attempt)} onSelect={() => flow.select(o.letter)}>
+              <OptionRow key={o.letter} letter={o.letter} multi={multi} locked={done || read} state={optionState(o.letter, flow, q, attempt, showAnswer)} onSelect={() => flow.select(o.letter)}>
                 <Markdown text={o.md} figs={q.figs} role="q" tight />
               </OptionRow>
             ))}
@@ -186,11 +192,33 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys, headerExtra }
       {showAnswer && (
         <div className="anim-rise space-y-4">
           <Result q={q} flow={flow} attempt={attempt} />
-          <Solution q={q} />
+          {(!read || show === "all") && <Solution q={q} />}
         </div>
       )}
     </article>
     </InkScope>
+  );
+}
+
+const READ_FLOW: AnswerFlow = { phase: "read", picked: [], canSubmit: false, select: () => {}, submit: () => {}, reveal: () => {}, grade: () => {} };
+
+/**
+ * 題目瀏覽用的唯讀顯示（第 2B 階段，規格書 §9.9）：題幹、選項、螢光、手寫、答案、詳解都和作答畫面是同一份，
+ * 只是不能點選項作答、不寫 attempt。show 是「只看題目」時，題目下方可以單獨展開這一題的答案與詳解。
+ */
+export function QuestionRead({ q, show, chapter, headerExtra }: { q: Question; show: "q" | "a" | "all"; chapter?: string; headerExtra?: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [show]);
+  const eff = open ? "all" : show;
+  return (
+    <div className="space-y-3">
+      <QuestionView q={q} flow={READ_FLOW} attempt={null} chapter={chapter} headerExtra={headerExtra} show={eff} />
+      {show !== "all" && (
+        <Button variant="ghost" icon={open ? "eyeOff" : "eye"} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+          {open ? (show === "q" ? "收起答案與詳解" : "收起詳解") : show === "q" ? "看這一題的答案與詳解" : "看這一題的詳解"}
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -373,7 +401,8 @@ function QuestionWordsIf({ q }: { q: Question }) {
   return subs?.includes(q.subject) ? <QuestionWords qid={q.id} subject={q.subject} /> : null;
 }
 
-/** 相關筆記（規格書 §9.4）：哪些講義筆記的段落在句尾引用了這一題。點了跳到那個段落。 */
+/** 相關筆記（規格書 §9.4）：哪些講義筆記的段落在句尾引用了這一題。點了跳到那個段落。
+ *  第 8C 階段起也列出這一題的章節對應的整份講義（bid 是空字串：開在最上面）。 */
 function RelatedNotes({ id }: { id: string }) {
   const rel = useKbRelated(id).data;
   if (!rel?.length) return null;
@@ -382,7 +411,7 @@ function RelatedNotes({ id }: { id: string }) {
       <ul className="space-y-1">
         {rel.map((r) => (
           <li key={r.key + r.bid}>
-            <Link to={`/kb/${r.key.split("/").map(encodeURIComponent).join("/")}#b-${r.bid}`} className="flex min-h-(--tap) flex-col justify-center rounded-btn px-2 py-1 no-underline hover:bg-hover">
+            <Link to={`/kb/${r.key.split("/").map(encodeURIComponent).join("/")}${r.bid ? `#b-${r.bid}` : ""}`} className="flex min-h-(--tap) flex-col justify-center rounded-btn px-2 py-1 no-underline hover:bg-hover">
               <span className="text-ui text-blue-deep">{[r.title, ...r.path].join(" › ")}</span>
               {r.text && <span className="line-clamp-2 text-meta text-ink-muted">{r.text}</span>}
             </Link>

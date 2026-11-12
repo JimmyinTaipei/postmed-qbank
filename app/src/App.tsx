@@ -1,7 +1,7 @@
 // 路由表（規格書 §9.1）。有外殼的頁面放在 <AppShell> 底下；刷題畫面與登入頁是全螢幕、沒有導覽。
 
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useApplyTheme } from "./lib/theme";
 import { FigureViewerProvider } from "./ui/content/FigureViewer";
 import { ToastProvider } from "./ui/overlays";
@@ -21,9 +21,9 @@ import { CardEditPage, CardPage, CardReviewPage, CardsIndex, DeckPage } from "./
 import { PatchesPage } from "./pages/Patches";
 import { EditorProvider } from "./pages/EditQuestion";
 import { ReviewPage } from "./pages/Review";
-import { PapersPage } from "./pages/Papers";
 import { StatsPage } from "./pages/Stats";
 import { BrowsePage } from "./pages/Browse";
+import { BrowseReaderPage } from "./pages/BrowseReader";
 import { AnalysisPage } from "./pages/Analysis";
 import { WrongBookPage } from "./pages/WrongBook";
 import { VocabPage } from "./pages/Vocab";
@@ -70,7 +70,10 @@ export function App() {
               <Route path="/more" element={<More />} />
               <Route path="/wrong" element={<WrongBookPage />} />
               <Route path="/browse" element={<BrowsePage />} />
-              <Route path="/papers" element={<PapersPage />} />
+              <Route path="/browse/:kind/:a" element={<BrowseReaderPage />} />
+              <Route path="/browse/:kind/:a/:b" element={<BrowseReaderPage />} />
+              {/* 第 2B 階段：原卷併進「考題」的「依考卷」 */}
+              <Route path="/papers" element={<Navigate to="/browse?tab=paper" replace />} />
               <Route path="/stats" element={<StatsPage />} />
               <Route path="/analysis" element={<AnalysisPage />} />
               <Route path="/patches" element={<PatchesPage />} />

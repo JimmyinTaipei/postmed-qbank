@@ -143,6 +143,8 @@ export function CardsIndex() {
           </div>
         </>
       )}
+      {/* 第 2B 階段：卡片搬到主導覽，原本在「更多」的常考單字放這裡 */}
+      <LinkButton to="/vocab" block icon="book">常考單字：考古題裡的單字出現幾次、我會不會</LinkButton>
 
       <section aria-labelledby="h-decks">
         <SectionTitle id="h-decks">牌組</SectionTitle>

@@ -31,6 +31,9 @@ import {
   type ClozeSource,
   type ContentPatch,
   type KbBlock,
+  chapterIds,
+  scopeUrl,
+  useFilterContext,
   type KbCatalog,
   type KbDoc,
 } from "@/data";
@@ -473,6 +476,7 @@ export function KbReaderPage() {
 
   const subj = cat.data?.subjects.find((s) => s.id === subject);
   const group = subj?.groups.find((g) => g.docs.some((d) => d.key === key) || `${subj.id}/${g.id}` === key);
+  const catDoc = group?.docs.find((d) => d.key === key);
 
   const mdOf = useCallback((bid: string) => (doc ? (findBlock(doc.blocks, bid)?.md ?? null) : null), [doc]);
   const clozeSrc = useCallback(
@@ -631,6 +635,7 @@ export function KbReaderPage() {
               <LinkButton to={`/cards/review?deck=${encodeURIComponent(docCards.deck)}`} variant="secondary" icon="repeat">複習這份筆記</LinkButton>
             </div>
           )}
+          {catDoc?.chap && subject && !tape && <ChapterQuestions subject={subject} chap={catDoc.chap} />}
           {tape && (
             <div role="status" className="sticky top-[calc(env(safe-area-inset-top)+3.75rem)] z-20 flex flex-wrap items-center gap-2 rounded-btn border border-line bg-card px-3 py-1.5 shadow-pop print:hidden">
               <Icon name="tape" size={18} className="text-ink-muted" />
@@ -835,5 +840,32 @@ function BlockNoteEditor({ docKey, b, doc, initial, onClose, onSaved }: { docKey
         onSaved(r.md.trim() ? (initial ? "已更新筆記" : "已新增筆記") : "已刪除筆記", () => void notes.save(target, initial));
       }}
     />
+  );
+}
+
+/** 講義頁首「這一章的題目」（第 8C 階段）：目錄記了這份筆記對應的題目章節（英文文法 Ch09 ↔ ENG:G09）時才出現。 */
+function ChapterQuestions({ subject, chap }: { subject: string; chap: string }) {
+  const ctx = useFilterContext(subject).data;
+  const n = useMemo(() => {
+    if (!ctx || ctx.subject !== subject) return null;
+    let exam = 0;
+    let all = 0;
+    for (const r of ctx.rows) {
+      if (!chapterIds(ctx, r).includes(chap)) continue;
+      all++;
+      const g = ctx.kindGroup.get(r.kind);
+      if (g === "postmed" || g === "exam") exam++;
+    }
+    return { exam, other: all - exam, all };
+  }, [ctx, subject, chap]);
+  if (!n?.all) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-ui print:hidden">
+      <Icon name="file" size={18} className="text-ink-muted" />
+      <span className="text-ink">
+        這一章的題目：考古題 {n.exam} 題{n.other ? `・講義與教材 ${n.other} 題` : ""}
+      </span>
+      <LinkButton to={scopeUrl(`c:${subject}:${chap}`)} icon="book">瀏覽這一章的題目</LinkButton>
+    </div>
   );
 }

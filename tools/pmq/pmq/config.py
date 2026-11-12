@@ -39,7 +39,9 @@ class Config:
                 continue
             self.shared_subjects.append({"id": sid, "name": spec["name"], "path": rel(spec["path"]),
                                          "id_pattern": spec.get("id_pattern", rf"^{sid}-\d{{6}}$"),
-                                         "ink": spec.get("ink", "keep"), "escape_dollar": spec.get("escape_dollar", True)})
+                                         "ink": spec.get("ink", "keep"), "escape_dollar": spec.get("escape_dollar", True),
+                                         # 第 8C 階段：子章節分類檔（題目 ID → 子章節；英文的文法章節），相對 path
+                                         "xchap_file": spec.get("xchap_file"), "xchap_parent": spec.get("xchap_parent")})
         self.project = PROJECT
         self.reports = PROJECT / "reports"
         self.schema = PROJECT / "schema"

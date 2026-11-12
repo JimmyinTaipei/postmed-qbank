@@ -462,8 +462,53 @@ def build_kb(cfg, c, only=None):
             plain = re.sub(r"!\[[^\]]*\]\([^)]*\)|[*_`]|^#+\s*", "", b["md"] if b else "")
             snippet = re.sub(r"\s+", " ", re.sub(r"[（(][^（()）]*\d{2,3}-\d+[^（()）]*[）)]", "", plain)).strip()[:80]
             related.setdefault(r["qid"], []).append({"key": key, "bid": r["bid"], "title": d["title"], "path": [re.sub(r"[*`]|\$", "", p) for p in path[1:]] if path else [], "text": snippet})
+    link_chapter_docs(cfg, c, docs, catalog, related)
     for u in unmapped:
         c.report.warn("kb_ref_unmapped", doc=u["doc"], text=u["text"])
     c.report.count("kb_refs", "對到題目", sum(1 for d in docs.values() for r in d["refs"] if r["qid"]))
     c.report.count("kb_refs", "對不到", len(unmapped))
     return docs, catalog, related
+
+
+def link_chapter_docs(cfg, c, docs, catalog, related):
+    """筆記 ↔ 題目章節（第 8C 階段；英文文法講義 Ch09_動詞時態.md ↔ ENG:G09）。
+    pmq.toml [kb.chapter_docs]：科目 → {pattern = 檔名的正規式（第一組是章號）, chapter = "ENG:G{n:02d}"}。
+    對到的筆記在目錄（kbcat）記 chap；主章節或 xchap 是這一章的題目，「相關筆記」多一筆整份講義（bid 空字串＝開在最上面）。"""
+    rules = cfg.kb.get("chapter_docs") or {}
+    if not rules:
+        return
+    chapters = {ch["id"]: ch for ch in c.chapters}
+    doc_chap = {}
+    for subj, rule in rules.items():
+        pat = re.compile(rule["pattern"])
+        for key, d in docs.items():
+            if d["subject"] != subj:
+                continue
+            m = pat.search(Path(d["file"]).stem)
+            if not m:
+                continue
+            cid = rule["chapter"].format(n=int(m.group(1)))
+            if cid not in chapters:
+                c.report.warn("kb_chapter_doc_missing", doc=key, chapter=cid)
+                continue
+            doc_chap[key] = cid
+    for s in catalog["subjects"]:
+        for g in s["groups"]:
+            for doc in g["docs"]:
+                if doc["key"] in doc_chap:
+                    doc["chap"] = doc_chap[doc["key"]]
+    by_chap = {}
+    for key, cid in sorted(doc_chap.items()):
+        by_chap.setdefault(cid, []).append(key)
+    n = 0
+    for q in c.questions:
+        for cid in dict.fromkeys([q["chap"], *q["xchap"]]):
+            for key in by_chap.get(cid, []):
+                lst = related.setdefault(q["id"], [])
+                if any(r["key"] == key for r in lst):
+                    continue
+                lst.append({"key": key, "bid": "", "title": docs[key]["title"], "path": [],
+                            "text": f"這一題歸在「{chapters[cid]['title']}」這一章"})
+                n += 1
+    c.report.count("kb_chapter_docs", "對到章節的筆記", len(doc_chap))
+    c.report.count("kb_chapter_docs", "題目 → 章節講義", n)
