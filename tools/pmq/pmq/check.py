@@ -9,7 +9,7 @@ from pathlib import Path
 import jsonschema
 
 from . import mathcheck
-from .build import Contract, SUBJECTS
+from .build import Contract
 from .figs import SVG_SIZE_LIMIT
 
 
@@ -26,14 +26,15 @@ def validators(cfg):
     return {n: mk(load(n + ".schema.json")) for n in ("question", "index-row", "taxonomy", "kb")}
 
 
-def run_check(cfg, with_math=True, answers_file=None):
+def run_check(cfg, with_math=True, answers_file=None, only=None):
     disk_guard()
     t0 = time.time()
-    c = Contract(cfg).run()
+    c = Contract(cfg, only=only).run()
     rep = c.report
     v = validators(cfg)
 
     # ---- structural checks ----
+    SUBJECTS = c.subjects
     patterns = {s["id"]: re.compile(s["id_pattern"]) for s in SUBJECTS}
     chapter_ids = {ch["id"] for ch in c.chapters}
     ids = collections.Counter(q["id"] for q in c.questions)
@@ -85,15 +86,19 @@ def run_check(cfg, with_math=True, answers_file=None):
                 items.append((q["id"], "answer", q["answer"]["text"]))
             for t in q["teacher"]:
                 items.append((q["id"], "teacher", t["md"]))
-        for path in note_files(cfg):
-            items.append((cfg.rel(path), "note", path.read_text("utf-8")))
+        if not only:
+            for path in note_files(cfg):
+                items.append((cfg.rel(path), "note", path.read_text("utf-8")))
         math_fail, math_stats = mathcheck.run(items, cfg)
-
-    note_link_stats(cfg, rep)
 
     # ---- 資料庫（講義筆記，第 4 階段）----
     from .kb import build_kb, count_blocks
-    c.kb_docs, c.kb_catalog, c.kb_related = build_kb(cfg, c)
+    if only:
+        # 只看一科：不讀筆記（筆記與題目互連要全部的題目；發佈時沿用線上的筆記）
+        c.kb_docs, c.kb_catalog, c.kb_related = {}, {"subjects": []}, {}
+    else:
+        note_link_stats(cfg, rep)
+        c.kb_docs, c.kb_catalog, c.kb_related = build_kb(cfg, c)
     kb_fail = 0
     for key, d in c.kb_docs.items():
         errs = list(v["kb"].iter_errors(d))
@@ -106,6 +111,7 @@ def run_check(cfg, with_math=True, answers_file=None):
     elapsed = time.time() - t0
     result = {
         "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "only": only,
         "elapsed_s": round(elapsed, 1),
         "cache": {"hits": c.cache.hits, "misses": c.cache.misses},
         "counts": {s["id"]: sum(1 for q in c.questions if q["subject"] == s["id"]) for s in SUBJECTS},

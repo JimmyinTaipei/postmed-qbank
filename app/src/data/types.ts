@@ -66,6 +66,10 @@ export interface IndexRow {
   human_verified: boolean;
   pack: string;
   canonical: string;
+  /** 題組 id（第 8A 階段）：同一組放在同一頁、出題整組出 */
+  gid?: string;
+  /** 題組內的順序（原卷題號） */
+  go?: number;
 }
 
 export interface Fig {
@@ -93,7 +97,8 @@ export interface Question {
   xchap: string[];
   tags: { topic?: string[]; type?: string[]; method?: string[] };
   qtype: IndexRow["qtype"];
-  group: { gid: string; stem: string | null; order: number | null; parts?: string[] } | null;
+  /** stem：共用的文章（英文閱讀、克漏字段落）；members：同一組全部小題（共用格式才有） */
+  group: { gid: string; stem: string | null; order: number | null; parts?: string[]; members?: string[] } | null;
   ques: string;
   opt: OptSpan[] | null;
   opt_span: [stemEnd: number, tailStart: number] | null;

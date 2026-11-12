@@ -23,6 +23,7 @@ export {
   facetCounts,
   matchRows,
   pickItems,
+  chapterIds,
   sanitizeFilter,
   toggleChapter,
   withStatus,
@@ -34,5 +35,6 @@ export {
   type FilterContext,
 } from "./filter";
 export { isChoice, isMulti, judge, splitQuestion, answerText } from "./question";
+export { clusterItems, expandUnits, groupsOf, pageAt, pageLabel, pagesOf, takeUnits, type Page as ItemPage } from "./group-core";
 export { useSearch, searchText, prepareSearch, type SearchHit, type SearchState } from "./search";
 export { pushRecent, kbRecent, useKbRecent, KB_RECENT, type KbRecent } from "./recent";

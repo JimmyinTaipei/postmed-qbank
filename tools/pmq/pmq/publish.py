@@ -70,7 +70,8 @@ def build_bundle(cfg, c):
 
 def publish(cfg, url, subject=None, dry_run=False, workers=6):
     t0 = time.time()
-    c, result = run_check(cfg, with_math=False)
+    # --subject：只讀這一科的主檔（其他科的主檔可能是 iCloud 雲端佔位，讀了會觸發下載）；其他科沿用線上版本
+    c, result = run_check(cfg, with_math=False, only=subject)
     if result["errors"]:
         print(f"有 {len(result['errors'])} 個擋發佈的錯誤，停止。前幾個：")
         for e in result["errors"][:10]:
@@ -88,15 +89,30 @@ def publish(cfg, url, subject=None, dry_run=False, workers=6):
     if subject:
         cur = remote.get_manifest()
         if not cur:
-            print("線上還沒有任何內容，第一次發佈不能只發一科（拿掉 --subject）。")
-            return 1
+            # 空的網站（例如本機測試站）：只有這一科
+            print(f"線上還沒有任何內容：這次只會有 {subject} 這一科。")
+            cur = {"files": {"index": {}, "packs": {}, "kb": {}, "taxonomy": None}, "counts": {}}
         keep = lambda d, new: {**{k: v for k, v in d.items() if not k.startswith(subject + "/") and k != subject},
                                **{k: v for k, v in new.items() if k.startswith(subject + "/") or k == subject}}
         files["index"] = keep(cur["files"]["index"], files["index"])
         files["packs"] = keep(cur["files"]["packs"], files["packs"])
-        files["kb"] = keep(cur["files"].get("kb", {}), files["kb"])
+        # 筆記、筆記互連、特殊情況表：只讀一科時沒有建，沿用線上的
+        files["kb"] = dict(cur["files"].get("kb", {}))
+        for k in ("kbcat", "kbrel", "cases"):
+            if cur["files"].get(k):
+                files[k] = cur["files"][k]
+        # taxonomy：線上那份換掉這一科的科目、章節、來源
+        old_tax = json.loads(remote.get_blob(cur["files"]["taxonomy"])) if cur["files"].get("taxonomy") else {"subjects": [], "chapters": [], "sources": []}
+        tax = {
+            "subjects": [x for x in old_tax["subjects"] if x["id"] != subject] + c.taxonomy["subjects"],
+            "chapters": [x for x in old_tax["chapters"] if x["subject"] != subject] + c.taxonomy["chapters"],
+            "source_kinds": c.taxonomy["source_kinds"],
+            "sources": [x for x in old_tax["sources"] if x["subject"] != subject] + c.taxonomy["sources"],
+        }
+        files["taxonomy"], data = _named("taxonomy", tax)
+        blobs[files["taxonomy"]] = data
         counts = {**cur.get("counts", {}), subject: counts[subject]}
-        wanted = set(files["index"].values()) | set(files["packs"].values()) | set(files["kb"].values()) | {files["taxonomy"], files["cases"], files["kbcat"], files["kbrel"]}
+        wanted = set(files["index"].values()) | set(files["packs"].values()) | {files["taxonomy"], files["kbcat"], files["kbrel"], files["cases"]}
         blobs = {k: v for k, v in blobs.items() if k in wanted}
         assets = {k: p for k, p in assets.items()}
 

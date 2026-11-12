@@ -301,3 +301,12 @@ export function useInkPolicy(subject: SubjectId | undefined): "per_attempt" | "k
   if (!tax.data) return undefined;
   return tax.data.subjects.find((s) => s.id === subject)?.ink ?? "keep";
 }
+
+/** 頁面上的「科目」切換：預設是內容包裡的第一科（不寫死科目，第 8A 階段）。選過的科目不在內容包裡時也退回第一科。 */
+export function useSubjectChoice(): [SubjectId, (s: SubjectId) => void] {
+  const tax = useAsync(() => content.taxonomy(), []).data;
+  const [picked, setPicked] = useState<SubjectId | null>(null);
+  const ids = tax?.subjects.map((s) => s.id) ?? [];
+  const subject = picked && ids.includes(picked) ? picked : (ids[0] ?? "");
+  return [subject, setPicked];
+}

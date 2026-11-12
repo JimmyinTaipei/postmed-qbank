@@ -72,6 +72,7 @@
 | `SourceBadges` | content/SourceBadges.tsx | 答案與詳解的來源。不顯示「未確認」 |
 | `FigureViewerProvider` | content/FigureViewer.tsx | 全螢幕圖片檢視器；`Markdown` 裡的圖點了會自動開 |
 | `HighlightableMarkdown` | content/Highlights.tsx | 可以畫螢光、加註的 `Markdown`（題幹、思路、詳解）。給 `target`（`q:<ID>/sol`） |
+| `GroupLayout` + `GroupItem` | content/GroupView.tsx | **題組**（第 8A 階段）：同一篇文章的小題放在同一頁。電腦與 iPad 橫向（variant `split:`＝寬 ≥ 64rem 且橫向）左文章右小題、各自捲動；直向文章在上、捲到小題時收成上緣一列。每一小題包一個 `GroupItem`（給 `order`＝原卷題號，克漏字空格 `.cloze-blank` 點了捲過去）。文章的螢光掛在 `g:<gid>/stem`。刷題、模擬考、錯題與複習、單題頁共用；一頁的小題由 `pagesOf()`（`data/group-core.ts`）切 |
 | `MarkdownEditor` | templates.tsx | Markdown 原始碼＋即時預覽；貼上 AI 回覆自動轉 Markdown（`content/paste.ts`）。所有可編輯的 Markdown 都用它 |
 
 ## 4. 頁面樣板（`app/src/ui/templates.tsx`、`app/src/pages/Templates.tsx`）

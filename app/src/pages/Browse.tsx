@@ -2,7 +2,7 @@
 // 搜尋在背景執行緒做（data/search.worker.ts），打字不會卡；結果先列題號／來源符合的，再列本文符合的。
 
 import { useMemo, useState } from "react";
-import { useChapterNames, useFilterContext, useRows, useSearch, useTaxonomy, type SubjectId } from "@/data";
+import { useChapterNames, useFilterContext, useRows, useSearch, useTaxonomy, useSubjectChoice } from "@/data";
 import { Badge, Button, Card, EmptyState, ListCard, ListRow, Notice, ProgressBar, Segmented, Skeleton } from "@/ui/primitives";
 import { Page } from "@/ui/shell";
 import { SearchBar } from "@/ui/templates";
@@ -12,7 +12,7 @@ const WHERE = { ques: "題幹", idea: "思路", sol: "詳解" } as const;
 
 export function BrowsePage() {
   const tax = useTaxonomy().data;
-  const [subject, setSubject] = useState<SubjectId>("PHY");
+  const [subject, setSubject] = useSubjectChoice();
   const ctx = useFilterContext(subject).data;
   const chapters = useChapterNames();
   const [q, setQ] = useState("");

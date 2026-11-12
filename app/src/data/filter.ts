@@ -1,6 +1,7 @@
 // 出題篩選：純函式，只吃索引列與章節樹（規格書 §5.2）。畫面與測試共用。
 
 import type { Chapter, FilterSpec, IndexRow, StatusKey, SubjectId, Taxonomy } from "./types";
+import { expandUnits, takeUnits } from "./group-core";
 
 /** 狀態條件用的個人資料（題目 ID 的集合）。沒給時狀態條件不生效。 */
 export interface StatusSets {
@@ -140,12 +141,21 @@ function test(ctx: FilterContext, f: FilterSpec, r: IndexRow, facet: Facet): boo
       return !f.units.length || r.unit == null || ctx.bookOf.get(r.sid) == null || f.units.includes(r.unit);
     case "chapters": {
       if (!f.chapters.length) return true;
-      const up = ctx.chain.get(r.chap);
-      return !!up && up.some((id) => f.chapters.includes(id));
+      // 主章節與 xchap 都算（一題屬於多個章節，第 8A 階段）
+      return chapterIds(ctx, r).some((id) => f.chapters.includes(id));
     }
     case "status":
       return !f.status?.length || f.status.some((k) => hasStatus(ctx.status, r, k));
   }
+}
+
+/** 這一題所屬的所有章節節點（主章節、xchap，各自往上到最上層），不重複。 */
+export function chapterIds(ctx: FilterContext, r: Pick<IndexRow, "chap" | "xchap">): string[] {
+  const up = ctx.chain.get(r.chap) ?? [];
+  if (!r.xchap?.length) return up;
+  const all = new Set(up);
+  for (const x of r.xchap) for (const id of ctx.chain.get(x) ?? []) all.add(id);
+  return [...all];
 }
 
 const FACETS: Facet[] = ["kinds", "schools", "years", "books", "units", "chapters", "status"];
@@ -189,7 +199,7 @@ export function facetCounts(ctx: FilterContext, f: FilterSpec): FacetCounts {
     const book = ctx.bookOf.get(r.sid);
     if (only("books") && book != null) inc(out.books, book);
     if (only("units") && book != null && r.unit != null) inc(out.units, r.unit);
-    if (only("chapters")) for (const id of ctx.chain.get(r.chap) ?? []) inc(out.chapters, id);
+    if (only("chapters")) for (const id of chapterIds(ctx, r)) inc(out.chapters, id);
     if (only("status")) for (const k of STATUS_KEYS) if (hasStatus(ctx.status, r, k.id)) inc(out.status, k.id);
   }
   return out;
@@ -276,21 +286,24 @@ export function describeFilter(ctx: FilterContext, f: FilterSpec, subjectName: s
   return parts.join("・");
 }
 
-/** 依條件排出一場的題目順序。available 為 null 代表每題都有本文。 */
+/**
+ * 依條件排出一場的題目順序。available 為 null 代表每題都有本文。
+ * 題組（第 8A 階段）：篩到任何一小題就整組一起出，組內照原卷題號；題數照小題算，最後一組不拆（可能多出幾題）。
+ */
 export function pickItems(ctx: FilterContext, f: FilterSpec, available: Set<string> | null, random: () => number = Math.random): string[] {
   let rows = matchRows(ctx, f);
   if (available) rows = rows.filter((r) => available.has(r.id));
-  if (f.order === "random") {
-    rows = rows.slice();
-    for (let i = rows.length - 1; i > 0; i--) {
-      const j = Math.floor(random() * (i + 1));
-      [rows[i], rows[j]] = [rows[j], rows[i]];
-    }
-  } else {
+  if (f.order !== "random") {
     // 原順序：同一份考卷或同一本書排在一起，題號由小到大
     const cmp = new Intl.Collator("zh-Hant", { numeric: true });
     rows = rows.slice().sort((a, b) => cmp.compare(a.sid, b.sid) || cmp.compare(a.label, b.label));
   }
-  const n = f.count === "all" ? rows.length : Math.min(f.count, rows.length);
-  return rows.slice(0, n).map((r) => r.id);
+  const units = expandUnits(rows, ctx.rows, available);
+  if (f.order === "random") {
+    for (let i = units.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [units[i], units[j]] = [units[j], units[i]];
+    }
+  }
+  return takeUnits(units, f.count === "all" ? Infinity : f.count);
 }

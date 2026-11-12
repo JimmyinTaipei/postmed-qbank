@@ -90,3 +90,11 @@ back = ["Part of Speech", "Meaning and Definition", "Sentence", "Derivative", "M
 "Synonyms" = "同義字"
 "Antonyms" = "反義字"
 "Prefix & Roots" = "字根字首"
+
+# 第 8A 階段：「共用格式」的科目（英文；之後生物、化學的新題庫也加在這裡，app/ 與 worker/ 不用改）。
+# 主檔格式見 01_題庫製作/共用規格/README.md；轉接器 tools/pmq/pmq/adapters/shared.py，唯讀。
+[subjects.ENG]
+name = "英文"
+format = "shared"
+path = "01_題庫製作/英文"
+id_pattern = "^ENG-\\d{6}$"

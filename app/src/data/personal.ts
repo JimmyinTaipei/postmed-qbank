@@ -5,6 +5,7 @@
 import { ulid } from "@/lib/ulid";
 import { content } from "./content";
 import { db } from "./db";
+import { clusterItems } from "./group-core";
 import { judge } from "./question";
 import { prefs } from "./prefs";
 import { applyAttempts, srsKey } from "./srs";
@@ -146,6 +147,9 @@ export const attempts = {
 
 export const sessions = {
   async create(input: { mode: SessionMode; filter: Session["filter"]; items: string[]; timeLimitS?: number | null }): Promise<Session> {
+    // 題組（第 8A 階段）：同一篇文章的小題排在一起，畫面才能放在同一頁
+    const rows = new Map((await Promise.all(input.items.map((id) => content.row(id).catch(() => null)))).filter((r) => r != null).map((r) => [r.id, r]));
+    input = { ...input, items: clusterItems(input.items, (id) => rows.get(id)) };
     const t = now();
     const row: Session = {
       id: ulid(t),
@@ -197,28 +201,40 @@ export interface ExamPicks {
   ms: Record<string, number>; // 題目 ID → 停留時間（交卷時寫進 attempt.elapsed_ms）
 }
 
+/** 模擬考作答是「讀整份 → 改一格 → 寫回」：同時有好幾個寫入（題組頁一次記 5 小題的時間、連續點選項）要排隊，否則會互相蓋掉。 */
+let examQueue: Promise<unknown> = Promise.resolve();
+function serial<T>(fn: () => Promise<T>): Promise<T> {
+  const run = examQueue.then(fn, fn);
+  examQueue = run.catch(() => undefined);
+  return run;
+}
+
 export const exam = {
   key: (sessionId: string) => `exam.${sessionId}`,
   async get(sessionId: string): Promise<ExamPicks> {
     return (await settings.get<ExamPicks>(exam.key(sessionId))) ?? { picks: {}, ms: {} };
   },
-  async pick(sessionId: string, id: string, chosen: string[]): Promise<void> {
-    const cur = await exam.get(sessionId);
-    const picks = { ...cur.picks };
-    if (chosen.length) picks[id] = chosen;
-    else delete picks[id];
-    await settings.set(exam.key(sessionId), { ...cur, picks });
+  pick(sessionId: string, id: string, chosen: string[]): Promise<void> {
+    return serial(async () => {
+      const cur = await exam.get(sessionId);
+      const picks = { ...cur.picks };
+      if (chosen.length) picks[id] = chosen;
+      else delete picks[id];
+      await settings.set(exam.key(sessionId), { ...cur, picks });
+    });
   },
-  async addTime(sessionId: string, id: string, ms: number): Promise<void> {
-    if (ms < 500) return;
-    const cur = await exam.get(sessionId);
-    await settings.set(exam.key(sessionId), { ...cur, ms: { ...cur.ms, [id]: Math.round((cur.ms[id] ?? 0) + ms) } });
+  addTime(sessionId: string, id: string, ms: number): Promise<void> {
+    if (ms < 500) return Promise.resolve();
+    return serial(async () => {
+      const cur = await exam.get(sessionId);
+      await settings.set(exam.key(sessionId), { ...cur, ms: { ...cur.ms, [id]: Math.round((cur.ms[id] ?? 0) + ms) } });
+    });
   },
   /** 交卷：有作答的題目各記一筆 attempt（mode = exam）並判對錯，然後結束這一場。 */
   async submit(sessionId: string): Promise<void> {
     const s = await db.session.get(sessionId);
     if (!s || s.ended_at) return;
-    const cur = await exam.get(sessionId);
+    const cur = await serial(() => exam.get(sessionId)); // 等還沒寫完的作答
     for (const id of s.items) {
       const chosen = cur.picks[id];
       if (!chosen?.length) continue;

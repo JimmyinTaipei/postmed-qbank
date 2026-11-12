@@ -106,9 +106,11 @@ interface Props {
   chapter?: string;
   /** 快捷鍵 A–H 作答、空白鍵顯示答案、Enter 送出。同一畫面只能有一個 QuestionView 開著。 */
   hotkeys?: boolean;
+  /** 標題列右邊的按鈕（題組頁每一小題自己的星號與 ⋯） */
+  headerExtra?: ReactNode;
 }
 
-export function QuestionView({ q, flow, attempt, chapter, hotkeys }: Props) {
+export function QuestionView({ q, flow, attempt, chapter, hotkeys, headerExtra }: Props) {
   const choice = isChoice(q);
   const multi = isMulti(q);
   const parts = choice ? splitQuestion(q) : null;
@@ -149,6 +151,8 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys }: Props) {
         </h2>
         {chapter && <span className="text-meta text-ink-muted">{chapter}</span>}
         <PatchBadge q={q} />
+        {q.answer.note === "送分" && <Badge tone="warning">送分</Badge>}
+        {headerExtra && <span className="ml-auto flex items-center">{headerExtra}</span>}
       </header>
 
       {parts ? (
@@ -263,7 +267,8 @@ function Result({ q, flow, attempt }: { q: Question; flow: AnswerFlow; attempt: 
       )}
 
       {pending && <Notice tone="warning" icon="alert">這題的答案還沒定案，下面的內容僅供參考。</Notice>}
-      {q.answer.mode === "any" && <Notice>{q.answer.note ? `${q.answer.note}：` : ""}這題有不只一個答案算對（{q.answer.keys.join("、")}）。</Notice>}
+      {q.answer.mode === "any" && (q.answer.note === "送分" ? <Notice>送分題：任何作答都算對。</Notice> : <Notice>{q.answer.note ? `${q.answer.note}：` : ""}這題有不只一個答案算對（{q.answer.keys.join("、")}）。</Notice>)}
+      {q.answer.mode === "text" && q.answer.note && <Notice>{q.answer.note}</Notice>}
       {q.source_answer && (
         <p className="text-meta text-ink-muted">
           教材原答：{Array.isArray(q.source_answer.value) ? q.source_answer.value.join("、") : q.source_answer.value}

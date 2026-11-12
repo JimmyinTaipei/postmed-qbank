@@ -78,6 +78,8 @@
 }
 
 @custom-variant coarse (@media (pointer: coarse));
+/* 題組左右並排（第 8A 階段）：電腦與 iPad 橫向；iPad 直向、手機是上下 */
+@custom-variant split (@media (min-width: 64rem) and (orientation: landscape));
 
 /* ---------- 基礎 ---------- */
 
@@ -790,4 +792,41 @@
   width: auto;
   table-layout: auto;
   overflow: visible;
+}
+
+/* ---------- 題組（第 8A 階段，ui/content/GroupView.tsx） ---------- */
+
+/* 克漏字段落的空格編號：點了捲到那一小題 */
+.cloze-blank {
+  display: inline-flex;
+  min-width: 2.4em;
+  justify-content: center;
+  margin: 0 0.15em;
+  padding: 0 0.35em;
+  border-bottom: 2px solid var(--blue-deep);
+  border-radius: 2px;
+  background: var(--blue-light);
+  color: var(--blue-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.cloze-blank:hover {
+  background: var(--blue-mid);
+}
+.group-item-flash {
+  animation: group-flash 1.2s ease-out;
+}
+@keyframes group-flash {
+  from {
+    box-shadow: 0 0 0 3px var(--blue-mid);
+  }
+  to {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .group-item-flash {
+    animation: none;
+  }
 }

@@ -19,6 +19,7 @@ def main(argv=None):
     chk = sub.add_parser("check", help="讀全部主檔、轉成內容契約、驗證；只出報告")
     chk.add_argument("what", nargs="?", choices=["all", "math", "answers"], default="all")
     chk.add_argument("--no-math", action="store_true", help="略過公式檢查")
+    chk.add_argument("--subject", help="只讀這一科的主檔（例如 ENG）；其他科的主檔在 iCloud 是雲端佔位時用")
     sub.add_parser("sample", help="產生介面開發用樣本到 app/fixtures/")
     pub = sub.add_parser("publish", help="驗證後上傳有變動的內容包與圖，最後換 manifest")
     pub.add_argument("--subject", help="只發佈這一科（例如 PHY）；其他科沿用線上版本")
@@ -67,7 +68,12 @@ def main(argv=None):
     if args.cmd == "check":
         from .check import run_check
         from .report import write_report
-        c, result = run_check(cfg, with_math=not args.no_math, answers_file=answers_file)
+        c, result = run_check(cfg, with_math=not args.no_math, answers_file=answers_file, only=args.subject)
+        if args.subject:
+            from .report import write_subject_report
+            (cfg.reports / f"check_{args.subject}.json").write_text(json.dumps(result, ensure_ascii=False, indent=1), "utf-8")
+            print(write_subject_report(cfg, c, result))
+            return 1 if result["errors"] else 0
         if args.what == "math":
             result = {"math": result["math"], "generated": result["generated"], "elapsed_s": result["elapsed_s"]}
             (cfg.reports / "math.json").write_text(json.dumps(result, ensure_ascii=False, indent=1), "utf-8")

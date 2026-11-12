@@ -42,6 +42,9 @@ def write_report(cfg, c, r):
     add("")
     nerr = len(r["errors"])
     add(f"- 題數：物理 **{r['counts']['PHY']:,}**（基準 {base['PHY']['questions']:,}）、生化 **{r['counts']['BCH']:,}**（基準 {base['BCH']['questions']:,}）。")
+    for sj in c.subjects[2:]:   # 共用格式的科目（英文…，第 8A 階段）
+        b = base.get(sj["id"], {}).get("questions")
+        add(f"- {sj['name']} **{r['counts'].get(sj['id'], 0):,}**" + (f"（基準 {b:,}）" if b is not None else "（還沒有基準）") + f"；細節見 `bin/pmq check --subject {sj['id']}`。")
     add(f"- 擋發佈的錯誤：**{nerr}** 筆。JSON Schema：題目不過 {r['schema']['questions_failed']}、索引列不過 {r['schema']['index_rows_failed']}、taxonomy 錯誤 {r['schema']['taxonomy_errors']}。")
     add(f"- 章節樹 {r['chapters']} 個節點；來源 {r['sources']} 份。圖檔 {r['assets']['files']} 個（SVG {r['assets']['svg']}、點陣 {r['assets']['raster']}），共 {r['assets']['bytes'] / 1e6:.1f} MB。")
     if r["math"]["stats"]:
@@ -249,3 +252,35 @@ def write_report(cfg, c, r):
     md = "\n".join(L) + "\n"
     (cfg.reports / "驗證報告.md").write_text(md, "utf-8")
     return md
+
+
+def write_subject_report(cfg, c, r):
+    """pmq check --subject：只讀一科時的簡短報告（reports/驗證報告_<科>.md），回傳要印在終端機的摘要。"""
+    subject = r["only"]
+    base = json.loads(cfg.baseline.read_text("utf-8")).get(subject, {})
+    name = next((s["name"] for s in c.subjects if s["id"] == subject), subject)
+    n = r["counts"].get(subject, 0)
+    b = base.get("questions")
+    L = [f"# 驗證報告（只看{name}）", "",
+         f"產生時間 {r['generated']}；耗時 {r['elapsed_s']} 秒。由 `bin/pmq check --subject {subject}` 產生；只讀主檔。", "",
+         f"- 題數：{name} **{n:,}**" + (f"（基準 {b:,}{'，相同' if b == n else '，不同'}）" if b is not None else "（還沒有基準）"),
+         f"- 擋發佈的錯誤：**{len(r['errors'])}** 筆。JSON Schema：題目不過 {r['schema']['questions_failed']}、索引列不過 {r['schema']['index_rows_failed']}。",
+         f"- 章節 {r['chapters']} 個；來源 {r['sources']} 份。"]
+    T = r["tallies"]
+    papers = T.get(f"{subject.lower()}_papers", {})
+    if papers:
+        L += ["", "## 各卷題數", "", _table([[k, v] for k, v in papers.items()], ["卷", "題數"])]
+    g = T.get("shared_group", {})
+    if g:
+        sizes = T.get("shared_group_size", {})
+        L += ["", "## 題組", "", f"在題組裡的小題 {g.get('in_group', 0)} 題、單題 {g.get('single', 0)} 題；題組大小："
+              + "、".join(f"{k} 題 × {v}" for k, v in sorted(sizes.items(), key=lambda x: int(x[0]))) + "。",
+              f"克漏字空格連結：{T.get('shared_blank_links', {}).get('linked', 0)} 個，找不到 {T.get('shared_blank_links', {}).get('not_found', 0)} 個。"]
+    if r["errors"]:
+        L += ["", "## 擋發佈的錯誤", ""] + [f"- {json.dumps(e, ensure_ascii=False)}" for e in r["errors"][:50]]
+    if r["warnings"]:
+        L += ["", "## 警告", ""] + [f"- `{k}` {len(v)} 筆：" + "；".join(json.dumps(x, ensure_ascii=False) for x in v[:5]) for k, v in r["warnings"].items()]
+    md = "\n".join(L) + "\n"
+    out = cfg.reports / f"驗證報告_{subject}.md"
+    out.write_text(md, "utf-8")
+    return "\n".join(L[4:7]) + f"\n報告：{out}"

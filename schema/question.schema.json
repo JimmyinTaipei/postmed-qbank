@@ -47,7 +47,8 @@
         "gid": {"type": "string"},
         "stem": {"type": ["string", "null"], "description": "共用題幹 md；物理的共用條件已引在 ques 內，故為 null"},
         "order": {"type": ["integer", "null"]},
-        "parts": {"type": "array", "items": {"type": "string"}, "description": "同一題內的小題代號（物理 subquestions）"}
+        "parts": {"type": "array", "items": {"type": "string"}, "description": "同一題內的小題代號（物理 subquestions）"},
+        "members": {"type": "array", "items": {"type": "string"}, "description": "共用格式（第 8A 階段）：同一組全部小題的 ID，照原卷題號排"}
       }
     },
     "ques": {"type": "string", "description": "題幹與選項的 Markdown；圖已改寫成 ![alt](fig:<fid>)，其餘與主檔相同"},

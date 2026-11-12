@@ -8,6 +8,7 @@ import { QuestionView, useAnswerFlow } from "@/ui/content/QuestionView";
 import { Markdown } from "@/ui/content/Markdown";
 import { SourceBadges } from "@/ui/content/SourceBadges";
 import { VocabCard } from "@/ui/content/VocabCard";
+import { GroupItem, GroupLayout } from "@/ui/content/GroupView";
 import type { CardFields } from "@/data";
 import { Icon, ICON_NAMES } from "@/ui/icons";
 import { Dialog, Menu, Sheet, useToast, type MenuItem } from "@/ui/overlays";
@@ -362,6 +363,10 @@ export default function UiGallery() {
         <EditorDemo />
       </Group>
 
+      <Group title="題組（第 8A 階段）" note="同一篇文章的小題放在同一頁：電腦與 iPad 橫向左邊文章、右邊小題，各自捲動；iPad 直向與手機文章在上，捲到小題時收成上緣一列，點一下展開。克漏字的空格編號點了捲到那一小題。文章上的螢光掛在題組（g:<gid>）上。">
+        <GroupDemo />
+      </Group>
+
       <Group title="狀態" note="載入用骨架（形狀已知）或轉圈（按鈕內）；空白與錯誤都要說明發生什麼事、接下來能做什麼。">
         <Pair>
           <Card className="p-4"><Skeleton lines={4} /></Card>
@@ -474,6 +479,37 @@ function EditorDemo() {
           <pre className="overflow-x-auto rounded-btn bg-hover p-3 font-mono text-meta whitespace-pre-wrap">{out.md || "（空白）"}</pre>
         </Card>
       )}
+    </div>
+  );
+}
+
+const GROUP_PASSAGE = `The rise of synthetic biology has sparked intense debate. Advancements in genetic engineering have allowed scientists to <span class="cloze-blank">21</span> entirely new strands of DNA. This breakthrough, <span class="cloze-blank">22</span> a dramatic reduction in the cost of gene sequencing, has accelerated medical research.
+
+However, ethicists warn that the autonomy given to private laboratories could be <span class="cloze-blank">23</span> by unregulated entities, and that it costs \\$3 billion a year to monitor them.`;
+
+/** /dev/ui 的題組展示：一般（克漏字 3 題）與最壞情況（很長的文章、10 小題） */
+function GroupDemo() {
+  const [worst, setWorst] = useState(false);
+  const passage = worst ? Array.from({ length: 12 }, () => GROUP_PASSAGE).join("\n\n") : GROUP_PASSAGE;
+  const n = worst ? 10 : 3;
+  return (
+    <div className="space-y-3">
+      <Segmented label="展示資料" value={worst ? "worst" : "normal"} onChange={(v) => setWorst(v === "worst")} options={[{ value: "normal", label: "一般" }, { value: "worst", label: "最壞情況" }]} />
+      <div className="rounded-card border border-line bg-page p-4">
+        <GroupLayout gid="dev-ui-demo" passage={passage} figs={[]} label={`第 21–${20 + n} 題`}>
+          {Array.from({ length: n }, (_, i) => (
+            <GroupItem key={i} order={21 + i}>
+              <div className="space-y-2">
+                <p className="text-ui font-semibold text-ink-strong">展示 115 {21 + i}<span className="mx-1 text-ink-muted">｜</span><span className="font-normal text-ink-muted">ENG-DEMO-{21 + i}</span></p>
+                <p className="text-body">第 {21 + i} 空（見共用文章）</p>
+                {["create", "creating", "created", "to create"].map((o, j) => (
+                  <OptionRow key={j} letter={"ABCD"[j]} state="idle" onSelect={() => {}}>{o}</OptionRow>
+                ))}
+              </div>
+            </GroupItem>
+          ))}
+        </GroupLayout>
+      </div>
     </div>
   );
 }

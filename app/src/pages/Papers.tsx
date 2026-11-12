@@ -3,7 +3,7 @@
 
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { content, sessions, useEndedSessions, useFilterContext, useTaxonomy, type FilterContext, type IndexRow, type SubjectId } from "@/data";
+import { content, sessions, useEndedSessions, useFilterContext, useTaxonomy, type FilterContext, type IndexRow, useSubjectChoice } from "@/data";
 import { formatAgo, formatDuration } from "@/lib/format";
 import { Dialog } from "@/ui/overlays";
 import { Button, Card, EmptyState, Segmented, Skeleton } from "@/ui/primitives";
@@ -43,7 +43,7 @@ const LIMITS = [0, 60, 80, 100, 120] as const;
 export function PapersPage() {
   const nav = useNavigate();
   const tax = useTaxonomy().data;
-  const [subject, setSubject] = useState<SubjectId>("PHY");
+  const [subject, setSubject] = useSubjectChoice();
   const [group, setGroup] = useState<Group>("postmed");
   const ctxQ = useFilterContext(subject);
   const ctx = ctxQ.data?.subject === subject ? ctxQ.data : undefined;

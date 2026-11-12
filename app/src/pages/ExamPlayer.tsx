@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { content, exam, sessions, isChoice, isMulti, qKey, splitQuestion, useExamPicks, useFlags, useQuestion, flags, type Question, type Session } from "@/data";
+import { content, exam, sessions, isChoice, isMulti, pageAt, pageLabel, qKey, splitQuestion, useExamPicks, useFlags, useQuestion, flags, type ItemPage, type Question, type Session } from "@/data";
 import { useSwipe } from "@/lib/useSwipe";
 import { Markdown } from "@/ui/content/Markdown";
 import { Handwriting, useInkAttemptReset } from "@/ui/ink/Handwriting";
@@ -13,7 +13,8 @@ import { Icon } from "@/ui/icons";
 import { Dialog, useToast } from "@/ui/overlays";
 import { Button, EmptyState, IconButton, Notice, OptionRow, Skeleton } from "@/ui/primitives";
 import { ExamTimerBar } from "@/ui/templates";
-import { BottomBar, Frame } from "./SessionPlayer";
+import { BottomBar, Frame, useSessionPages } from "./SessionPlayer";
+import { GroupItem, GroupLayout } from "@/ui/content/GroupView";
 
 function useNow(ms = 1000): number {
   const [t, setT] = useState(Date.now());
@@ -25,13 +26,24 @@ function useNow(ms = 1000): number {
 }
 
 export function ExamPlayer({ session }: { session: Session }) {
+  const pages = useSessionPages(session.items);
+  if (!pages) return <Frame><Skeleton lines={6} className="mt-6" /></Frame>;
+  return <PagedExam session={session} pages={pages} />;
+}
+
+/** 題組（第 8A 階段）佔一頁；答案卡仍是一題一格，點了跳到它所在的那一頁；得分照小題算。 */
+function PagedExam({ session, pages }: { session: Session; pages: ItemPage[] }) {
   const nav = useNavigate();
   const toast = useToast();
   const picks = useExamPicks(session.id);
   const now = useNow();
   const total = session.items.length;
   const cursor = Math.min(Math.max(0, session.cursor), total - 1);
-  const id = session.items[cursor];
+  const pi = pageAt(pages, cursor);
+  const page = pages[pi];
+  const ids = session.items.slice(page.start, page.end);
+  const group = !!page.gid;
+  const id = ids[0];
   const item = qKey(id);
   const flag = useFlags(item);
   const [confirm, setConfirm] = useState(false);
@@ -45,11 +57,15 @@ export function ExamPlayer({ session }: { session: Session }) {
   const elapsedS = Math.floor((now - session.started_at) / 1000);
   const answered = picks ? Object.keys(picks.picks).filter((k) => session.items.includes(k)).length : 0;
 
+  const idsKey = ids.join(",");
   const leave = useCallback(() => {
     const ms = Date.now() - enteredAt.current;
     enteredAt.current = Date.now();
-    void exam.addTime(session.id, id, Math.min(ms, 30 * 60_000));
-  }, [session.id, id]);
+    // 題組頁：停留時間平分給這一頁的每一小題
+    const each = Math.min(ms, 30 * 60_000) / Math.max(1, ids.length);
+    for (const x of ids) void exam.addTime(session.id, x, each);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id, idsKey]);
 
   const submit = useCallback(async () => {
     if (submitted.current) return;
@@ -68,20 +84,23 @@ export function ExamPlayer({ session }: { session: Session }) {
     }
   }, [remainingS, picks, submit, toast]);
 
+  const isLast = pi === pages.length - 1;
   const go = useCallback(
     (to: number) => {
-      if (to < 0 || to >= total || to === cursor) return;
+      if (to < 0 || to >= pages.length || to === pi) return;
       leave();
-      void sessions.setCursor(session.id, to);
+      void sessions.setCursor(session.id, pages[to].start);
       window.scrollTo({ top: 0 });
-      const ahead = session.items[to + 1];
-      if (ahead) void content.question(ahead);
+      const ahead = pages[to + 1];
+      if (ahead) void content.question(session.items[ahead.start]);
     },
-    [cursor, total, leave, session.id, session.items],
+    [pi, pages, leave, session.id, session.items],
   );
-  const prev = useCallback(() => go(cursor - 1), [go, cursor]);
-  const next = useCallback(() => (cursor < total - 1 ? go(cursor + 1) : setConfirm(true)), [go, cursor, total]);
-  useSwipe(swipeRef, { onPrev: prev, onNext: () => cursor < total - 1 && go(cursor + 1) });
+  /** 答案卡：點第 i 題 → 跳到它所在的那一頁 */
+  const goItem = useCallback((i: number) => go(pageAt(pages, i)), [go, pages]);
+  const prev = useCallback(() => go(pi - 1), [go, pi]);
+  const next = useCallback(() => (!isLast ? go(pi + 1) : setConfirm(true)), [go, pi, isLast]);
+  useSwipe(swipeRef, { onPrev: prev, onNext: () => !isLast && go(pi + 1) });
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -103,18 +122,20 @@ export function ExamPlayer({ session }: { session: Session }) {
 
   const top = (
     <header className="pt-safe sticky top-0 z-20 border-b border-line bg-card">
-      <div className="px-safe mx-auto flex h-14 max-w-3xl items-center gap-1 lg:px-8">
+      <div className={"px-safe mx-auto flex h-14 items-center gap-1 lg:px-8 " + (group ? "max-w-3xl split:max-w-7xl" : "max-w-3xl")}>
         <IconButton label="離開（計時不會暫停；可從今日頁續考）" className="-ml-2" onClick={() => { leave(); nav("/"); }}>
           <Icon name="arrowLeft" />
         </IconButton>
         <h1 className="min-w-0 flex-1 truncate text-ui font-semibold text-ink-strong">
-          <span className="tabular-nums">{cursor + 1}</span> <span className="font-normal text-ink-muted">/ {total}・{session.filter.label}</span>
+          <span className="tabular-nums">{pageLabel(page)}</span> <span className="font-normal text-ink-muted">/ {total}・{session.filter.label}</span>
         </h1>
-        <IconButton label={flag.star ? "取消星號" : "加星號"} pressed={flag.star} onClick={() => void flags.set(item, "star", !flag.star)}>
-          <Icon name={flag.star ? "starFilled" : "star"} />
-        </IconButton>
+        {!group && (
+          <IconButton label={flag.star ? "取消星號" : "加星號"} pressed={flag.star} onClick={() => void flags.set(item, "star", !flag.star)}>
+            <Icon name={flag.star ? "starFilled" : "star"} />
+          </IconButton>
+        )}
       </div>
-      <div className="px-safe mx-auto max-w-3xl px-4 pb-2 lg:px-8">
+      <div className={"px-safe mx-auto px-4 pb-2 lg:px-8 " + (group ? "max-w-3xl split:max-w-7xl" : "max-w-3xl")}>
         <ExamTimerBar remainingS={remainingS} totalS={session.time_limit_s} elapsedS={elapsedS} answered={answered} total={total} onSubmit={() => setConfirm(true)} />
       </div>
     </header>
@@ -123,11 +144,12 @@ export function ExamPlayer({ session }: { session: Session }) {
   return (
     <>
       <Frame
+        wide={group}
         top={top}
         bottom={
           <BottomBar>
-            <Button variant="ghost" icon="arrowLeft" disabled={cursor === 0} onClick={prev}>上一題</Button>
-            {cursor < total - 1 ? (
+            <Button variant="ghost" icon="arrowLeft" disabled={pi === 0} onClick={prev}>上一題</Button>
+            {!isLast ? (
               <Button variant="secondary" iconEnd="arrowRight" onClick={next}>下一題</Button>
             ) : (
               <Button variant="primary" onClick={() => setConfirm(true)}>交卷</Button>
@@ -136,9 +158,13 @@ export function ExamPlayer({ session }: { session: Session }) {
         }
       >
         <div ref={swipeRef}>
-          <ExamQuestion key={id} id={id} chosen={picks?.picks[id] ?? []} onPick={(c) => void exam.pick(session.id, id, c)} />
+          {group ? (
+            <ExamGroup key={page.start} ids={ids} picks={picks?.picks ?? {}} onPick={(x, c) => void exam.pick(session.id, x, c)} />
+          ) : (
+            <ExamQuestion key={id} id={id} chosen={picks?.picks[id] ?? []} onPick={(c) => void exam.pick(session.id, id, c)} />
+          )}
         </div>
-        <Strip items={session.items} picks={picks?.picks ?? {}} cursor={cursor} onGo={go} />
+        <Strip items={session.items} picks={picks?.picks ?? {}} cursor={page.start} end={page.end} onGo={goItem} />
       </Frame>
       {confirm && (
         <Dialog
@@ -159,7 +185,7 @@ export function ExamPlayer({ session }: { session: Session }) {
 }
 
 /** 題號列：看哪幾題還沒作答，點了跳過去。 */
-function Strip({ items, picks, cursor, onGo }: { items: string[]; picks: Record<string, string[]>; cursor: number; onGo: (i: number) => void }) {
+function Strip({ items, picks, cursor, end = cursor + 1, onGo }: { items: string[]; picks: Record<string, string[]>; cursor: number; /** 題組頁：這一頁的範圍 [cursor, end) 都標成目前 */ end?: number; onGo: (i: number) => void }) {
   return (
     <nav aria-label="題號" className="mt-8 border-t border-line pt-4">
       <ol className="flex flex-wrap gap-1.5">
@@ -170,11 +196,11 @@ function Strip({ items, picks, cursor, onGo }: { items: string[]; picks: Record<
               <button
                 type="button"
                 onClick={() => onGo(i)}
-                aria-current={i === cursor ? "step" : undefined}
+                aria-current={i >= cursor && i < end ? "step" : undefined}
                 aria-label={`第 ${i + 1} 題${done ? "，已作答" : "，未作答"}`}
                 className={
                   "flex size-(--tap) items-center justify-center rounded-btn border text-meta tabular-nums transition-colors duration-(--dur-fast) " +
-                  (i === cursor ? "border-blue-deep bg-blue-deep text-on-deep" : done ? "border-blue-deep bg-blue-light text-blue-ink" : "border-line text-ink hover:bg-hover")
+                  (i >= cursor && i < end ? "border-blue-deep bg-blue-deep text-on-deep" : done ? "border-blue-deep bg-blue-light text-blue-ink" : "border-line text-ink hover:bg-hover")
                 }
               >
                 {i + 1}
@@ -187,16 +213,33 @@ function Strip({ items, picks, cursor, onGo }: { items: string[]; picks: Record<
   );
 }
 
-function ExamQuestion({ id, chosen, onPick }: { id: string; chosen: string[]; onPick: (c: string[]) => void }) {
+/** 模擬考的題組頁：文章＋這一組的小題；快捷鍵 A–H 給第一個還沒作答的小題。 */
+function ExamGroup({ ids, picks, onPick }: { ids: string[]; picks: Record<string, string[]>; onPick: (id: string, c: string[]) => void }) {
+  const head = useQuestion(ids[0]);
+  const q0 = head.data && typeof head.data === "object" ? head.data : null;
+  const firstOpen = ids.find((x) => !picks[x]?.length) ?? null;
+  if (head.loading && head.data === undefined) return <Skeleton lines={7} className="mt-4" />;
+  const list = ids.map((x) => <ExamQuestion key={x} id={x} chosen={picks[x] ?? []} onPick={(c) => onPick(x, c)} hotkeys={x === firstOpen} inGroup />);
+  if (!q0?.group) return <div className="space-y-8">{list}</div>;
+  const o = q0.group.order;
+  return (
+    <GroupLayout gid={q0.group.gid} passage={q0.group.stem} figs={q0.figs} label={o != null ? `第 ${o}–${o + ids.length - 1} 題` : undefined}>
+      {list}
+    </GroupLayout>
+  );
+}
+
+function ExamQuestion({ id, chosen, onPick, hotkeys = true, inGroup }: { id: string; chosen: string[]; onPick: (c: string[]) => void; hotkeys?: boolean; inGroup?: boolean }) {
   const q = useQuestion(id);
   if (q.loading && q.data === undefined) return <Skeleton lines={7} className="mt-4" />;
   if (q.error) return <EmptyState tone="error" title="讀不到這一題" action={<Button onClick={q.reload}>再試一次</Button>}>{q.error.message}</EmptyState>;
   if (q.data === "missing") return <EmptyState icon="cloudOff" title="本文未下載">這一題（{id}）的本文不在這台裝置上，現在也連不上伺服器。</EmptyState>;
   if (!q.data) return <EmptyState title="此題已下架">題庫裡已經沒有 {id}。</EmptyState>;
-  return <Body q={q.data} chosen={chosen} onPick={onPick} />;
+  const body = <Body q={q.data} chosen={chosen} onPick={onPick} hotkeys={hotkeys} />;
+  return inGroup ? <GroupItem order={q.data.group?.order}>{body}</GroupItem> : body;
 }
 
-function Body({ q, chosen, onPick }: { q: Question; chosen: string[]; onPick: (c: string[]) => void }) {
+function Body({ q, chosen, onPick, hotkeys }: { q: Question; chosen: string[]; onPick: (c: string[]) => void; hotkeys: boolean }) {
   const choice = isChoice(q);
   const multi = isMulti(q);
   const parts = choice ? splitQuestion(q) : null;
@@ -209,7 +252,7 @@ function Body({ q, chosen, onPick }: { q: Question; chosen: string[]; onPick: (c
     [chosen, multi, onPick],
   );
   useEffect(() => {
-    if (!parts) return;
+    if (!parts || !hotkeys) return;
     const key = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
       if ((e.target as HTMLElement).closest("input, textarea, select, [contenteditable]") || document.querySelector("[aria-modal='true'], [role='menu']")) return;

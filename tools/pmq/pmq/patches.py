@@ -555,7 +555,9 @@ def list_patches(cfg, url, show_all=False):
 def pull(cfg, url, dry_run=False):
     remote = Remote(url)
     ps = remote._req("GET", "/api/admin/patches?status=pending")["patches"]
-    todo, kb_todo, skipped = [], [], []
+    todo, kb_todo, skipped, shared = [], [], [], []
+    # 共用格式的科目（英文）：寫回主檔的程式還沒做（要先給 Fable 審，規格書 §9.11「8A」）——修訂留在佇列裡，不動
+    shared_pat = [re.compile(x["id_pattern"]) for x in cfg.shared_subjects]
     for p in ps:
         n = _note(p)
         if n.get("written") and n.get("wv") == sha1(p["value"]):
@@ -566,9 +568,14 @@ def pull(cfg, url, dry_run=False):
         if not _qid(p):
             skipped.append(p)             # 圖：第 7 階段
             continue
+        if any(x.match(_qid(p)) for x in shared_pat):
+            shared.append(p)
+            continue
         todo.append(p)
     if skipped:
         print(f"略過 {len(skipped)} 筆圖的修訂（圖的寫回在第 7 階段）。")
+    if shared:
+        print(f"略過 {len(shared)} 筆英文（共用格式）題目的修訂：寫回這種主檔的程式還沒做，修訂留在佇列裡、網站上照常生效。")
     if not todo and not kb_todo:
         print("沒有待寫回的修訂。")
         return 0

@@ -3,7 +3,7 @@
 // 物理原有的各章公式與易錯提示在第 7 階段補上。
 
 import { useMemo, useState } from "react";
-import { chapterLevel, useFilterContext, useTaxonomy, type FilterContext, type IndexRow, type SubjectId } from "@/data";
+import { chapterLevel, useFilterContext, useTaxonomy, type FilterContext, type IndexRow, useSubjectChoice } from "@/data";
 import { Button, Card, Chip, EmptyState, Segmented, Skeleton } from "@/ui/primitives";
 import { Page } from "@/ui/shell";
 import { BarList, ChartCard, HeatTable } from "@/ui/templates";
@@ -14,15 +14,20 @@ type Shown = "count" | "pct";
 
 const pct = (n: number, t: number) => (t ? Math.round((n / t) * 1000) / 10 : 0);
 
-function rowKey(ctx: FilterContext, r: IndexRow, level: Level): string {
-  if (level === "chapter") return chapterLevel(ctx, r.chap);
-  const up = ctx.chain.get(r.chap) ?? [r.chap];
+function levelKey(ctx: FilterContext, chap: string, level: Level): string {
+  if (level === "chapter") return chapterLevel(ctx, chap);
+  const up = ctx.chain.get(chap) ?? [chap];
   return up[up.length - 1];
+}
+
+/** 一題屬於多個章節（主章節＋xchap，第 8A 階段）：在它的每個章節各算一次；總題數只算一次。 */
+function rowKeys(ctx: FilterContext, r: IndexRow, level: Level): string[] {
+  return [...new Set([r.chap, ...(r.xchap ?? [])].filter((c) => ctx.chain.has(c) || c === r.chap).map((c) => levelKey(ctx, c, level)))];
 }
 
 export function AnalysisPage() {
   const tax = useTaxonomy().data;
-  const [subject, setSubject] = useState<SubjectId>("PHY");
+  const [subject, setSubject] = useSubjectChoice();
   const [group, setGroup] = useState<Group>("postmed");
   const [schools, setSchools] = useState<string[]>([]);
   const [level, setLevel] = useState<Level>("top");
@@ -49,20 +54,21 @@ export function AnalysisPage() {
     const span = { all: 0, ten: 0, five: 0 };
     const spanBy = new Map<string, { all: number; ten: number; five: number }>();
     for (const r of rows) {
-      const k = rowKey(ctx, r, level);
-      keys.set(k, order.get(k) ?? 1e9);
-      cell.set(`${k}|${r.year}`, (cell.get(`${k}|${r.year}`) ?? 0) + 1);
       yearTotal.set(r.year!, (yearTotal.get(r.year!) ?? 0) + 1);
-      if (r.school) {
-        bySchool.set(`${k}|${r.school}`, (bySchool.get(`${k}|${r.school}`) ?? 0) + 1);
-        schoolTotal.set(r.school, (schoolTotal.get(r.school) ?? 0) + 1);
-      }
-      const s = spanBy.get(k) ?? { all: 0, ten: 0, five: 0 };
-      s.all++;
+      if (r.school) schoolTotal.set(r.school, (schoolTotal.get(r.school) ?? 0) + 1);
       span.all++;
-      if (r.year! > maxY - 10) { s.ten++; span.ten++; }
-      if (r.year! > maxY - 5) { s.five++; span.five++; }
-      spanBy.set(k, s);
+      if (r.year! > maxY - 10) span.ten++;
+      if (r.year! > maxY - 5) span.five++;
+      for (const k of rowKeys(ctx, r, level)) {
+        keys.set(k, order.get(k) ?? 1e9);
+        cell.set(`${k}|${r.year}`, (cell.get(`${k}|${r.year}`) ?? 0) + 1);
+        if (r.school) bySchool.set(`${k}|${r.school}`, (bySchool.get(`${k}|${r.school}`) ?? 0) + 1);
+        const s = spanBy.get(k) ?? { all: 0, ten: 0, five: 0 };
+        s.all++;
+        if (r.year! > maxY - 10) s.ten++;
+        if (r.year! > maxY - 5) s.five++;
+        spanBy.set(k, s);
+      }
     }
     const list = [...keys].sort((a, b) => a[1] - b[1]).map(([k]) => k);
     return { allSchools, rows, years, maxY, list, cell, bySchool, yearTotal, schoolTotal, span, spanBy, schoolsShown: schools.length ? schools : allSchools };

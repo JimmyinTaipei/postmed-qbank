@@ -18,5 +18,9 @@
     "by_kind": {"postmed_w": 1491, "postmed_c": 387, "postmed_v": 720, "private_med": 160, "national": 984},
     "img_refs": 83
   },
+  "ENG": {
+    "questions": 927,
+    "note": "2026-11-12 第 8A 階段第一次上站時的數字：16 份考卷 802 題（114、115 年的後西醫、後中醫、私醫；114 私醫與 114 義守是當天下午新增的）＋ 旋元佑 B1 文法講義 Ch01–Ch03 125 題。另一套工具（scripts/題庫/bank.py）還在持續加題，題數變多是正常的；主檔 README 當時寫 702 題（還沒算進新增的卷與講義）。"
+  },
   "structure_db": {"molecules": 390, "reactions": 220, "pathways": 366}
 }

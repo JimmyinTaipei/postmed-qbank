@@ -6,6 +6,7 @@ import re
 from .adapters.biochem import BiochemAdapter
 from .adapters.common import Assets, Report
 from .adapters.physics import PhysicsAdapter
+from .adapters.shared import SharedAdapter
 from .cache import HashCache
 
 SUBJECTS = [
@@ -27,8 +28,14 @@ SOURCE_KINDS = [
 ADAPTERS = [PhysicsAdapter, BiochemAdapter]
 
 
+def subjects_of(cfg):
+    """物理、生化（各自的轉接器）＋ pmq.toml [subjects.*] 的共用格式科目。"""
+    return SUBJECTS + [{"id": s["id"], "name": s["name"], "id_pattern": s["id_pattern"], "ink": s["ink"]} for s in cfg.shared_subjects]
+
+
 class Contract:
-    def __init__(self, cfg):
+    def __init__(self, cfg, only=None):
+        """only：只讀這一科的主檔（pmq check／publish --subject；iCloud 其他科是雲端佔位時用）。"""
         self.cfg = cfg
         self.cache = HashCache(cfg.cache)
         self.report = Report()
@@ -36,6 +43,14 @@ class Contract:
         self.questions = []
         self.chapters = []
         self.adapters = [A(cfg, self.cache, self.report, self.assets) for A in ADAPTERS]
+        self.adapters += [SharedAdapter(cfg, self.cache, self.report, self.assets, s) for s in cfg.shared_subjects]
+        self.subjects = subjects_of(cfg)
+        self.only = only
+        if only:
+            if only not in {x["id"] for x in self.subjects}:
+                raise SystemExit(f"沒有這一科：{only}（可用：{'、'.join(x['id'] for x in self.subjects)}）")
+            self.adapters = [a for a in self.adapters if a.subject == only]
+            self.subjects = [x for x in self.subjects if x["id"] == only]
 
     def run(self):
         for a in self.adapters:
@@ -45,7 +60,7 @@ class Contract:
                 q["pack"] = pack_of(q)
             self.questions += qs
         self.sources = build_sources(self.questions)
-        self.taxonomy = {"subjects": SUBJECTS, "chapters": self.chapters, "source_kinds": SOURCE_KINDS,
+        self.taxonomy = {"subjects": self.subjects, "chapters": self.chapters, "source_kinds": SOURCE_KINDS,
                          "sources": self.sources}
         return self
 
@@ -60,10 +75,17 @@ class Contract:
                 if t not in tags:
                     tags.append(t)
         s = q["source"]
-        return {"id": q["id"], "label": q["label"], "sid": s["sid"], "kind": s["kind"], "school": s["school"],
+        g = q.get("group")
+        row = {"id": q["id"], "label": q["label"], "sid": s["sid"], "kind": s["kind"], "school": s["school"],
                 "year": s["year"], "unit": s["unit"], "chap": q["chap"], "xchap": q["xchap"], "tags": tags,
                 "qtype": q["qtype"], "has_fig": bool(q["figs"]), "trust": q["answer"]["trust"],
                 "human_verified": q["sol_meta"]["human_verified"], "pack": q["pack"], "canonical": q["canonical"]}
+        if g and g.get("gid") and g["gid"] != q["id"]:
+            # 題組（第 8A 階段）：出題時整組一起出、同一組放在同一頁；go＝組內順序
+            row["gid"] = g["gid"]
+            if g.get("order") is not None:
+                row["go"] = g["order"]
+        return row
 
     def index(self, subject):
         return [self.index_row(q) for q in self.questions if q["subject"] == subject]

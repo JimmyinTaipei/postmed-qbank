@@ -15,6 +15,8 @@
     "trust": {"enum": ["official", "key", "teacher", "ai", "pending"]},
     "human_verified": {"type": "boolean"},
     "pack": {"type": "string", "description": "<SUBJECT>/<章>，對應 c/pack/<SUBJECT>/<章>-<hash>.json"},
-    "canonical": {"type": "string"}
+    "canonical": {"type": "string"},
+    "gid": {"type": "string", "description": "題組 id（第 8A 階段）：同一組的題目出題時整組一起出、放在同一頁"},
+    "go": {"type": "integer", "description": "題組內的順序（原卷題號）"}
   }
 }
