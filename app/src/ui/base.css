@@ -663,3 +663,131 @@
     height: auto !important;
   }
 }
+
+/* ---------- 所見即所得編輯器（第 3B 階段，app/src/ui/editor/） ---------- */
+
+.ed {
+  outline: none;
+  min-height: 1.6em;
+  caret-color: var(--blue-deep);
+  -webkit-user-select: text;
+  user-select: text;
+}
+.ed-box {
+  /* 正在編輯的那一段：淡淡的外框，看得出「現在改的是這裡」 */
+  border-radius: var(--r-btn);
+  box-shadow: 0 0 0 2px var(--blue-mid);
+  padding: 0.25rem 0.5rem;
+  margin: 0 -0.5rem;
+  background: var(--card);
+}
+.ed-box.ed-page {
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+}
+.ed .ProseMirror-selectednode {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+.ed-math {
+  cursor: pointer;
+  border-radius: 4px;
+}
+.ed-math:hover {
+  background: var(--blue-light);
+}
+.ed-math.ed-math-d {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  vertical-align: middle;
+}
+.ed-math-d .katex-display {
+  margin: 0.2em 0;
+}
+.ed-math-empty {
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+  padding: 0 0.4em;
+}
+.ed-raw {
+  position: relative;
+  margin: 0.7em 0;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-btn);
+  padding: 1.4em 0.6em 0.4em;
+  cursor: pointer;
+}
+.ed-raw-tag {
+  position: absolute;
+  top: 0.2em;
+  left: 0.6em;
+  font-size: var(--fs-meta);
+  line-height: 1.2;
+  color: var(--text-muted);
+}
+.ed-raw-body > :first-child {
+  margin-top: 0;
+}
+.ed-raw-body > :last-child {
+  margin-bottom: 0;
+}
+.ed .card-label {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.ed td,
+.ed th {
+  min-width: 4em;
+  position: relative;
+}
+.ed td > p,
+.ed th > p {
+  margin: 0;
+}
+.ed .selectedCell::after {
+  background: var(--blue-light);
+  opacity: 0.6;
+}
+.ed .ProseMirror-gapcursor::after {
+  border-top-color: var(--text-strong);
+}
+.ed-tool {
+  display: inline-flex;
+  min-width: var(--tap);
+  height: var(--tap);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-btn);
+  color: var(--text);
+  font-size: var(--fs-ui);
+}
+.ed-tool:hover {
+  background: var(--hover);
+}
+.ed-tool:disabled {
+  opacity: 0.35;
+}
+.ed-tool-on {
+  background: var(--blue-light);
+  color: var(--blue-ink);
+}
+.ed-kbbar {
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+}
+/* 就地編輯一個列點：編輯器自己的圓點放在原本圓點的位置，字不移動 */
+.ed-li .ed > ul,
+.ed-li .ed > ol {
+  margin-left: -1.5em;
+}
+/* 表格套件預設把表格撐滿整欄；編輯時和閱讀頁一樣寬 */
+.ed table {
+  width: auto;
+  table-layout: auto;
+  overflow: visible;
+}

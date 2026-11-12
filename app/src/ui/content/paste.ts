@@ -97,6 +97,22 @@ export function htmlToMarkdown(html: string): string {
     t.replaceWith(frag);
   }
 
+  // 4. 沒有表頭列的表格（Google 試算表、Excel 複製出來的）：第一列當表頭，才轉得成 Markdown 表格
+  for (const table of Array.from(doc.querySelectorAll("table"))) {
+    const first = table.rows[0];
+    if (!first || Array.from(first.cells).every((c) => c.tagName === "TH")) continue;
+    if (table.querySelector("[colspan],[rowspan]")) continue; // 合併儲存格：Markdown 表格表達不了，留著
+    for (const c of Array.from(first.cells)) {
+      const th = doc.createElement("th");
+      th.innerHTML = c.innerHTML;
+      c.replaceWith(th);
+    }
+    // gfm 外掛要表頭列在 <thead> 裡或是第一個 <tbody> 的第一列
+    const head = doc.createElement("thead");
+    head.appendChild(first);
+    table.insertBefore(head, table.firstChild);
+  }
+
   let md = service().turndown(doc.body.innerHTML);
   md = md.replace(PH_RE, (_, i) => {
     const m = math[Number(i)];

@@ -33,7 +33,8 @@ import { Icon } from "@/ui/icons";
 import { Dialog, Menu, Sheet, useToast, type MenuItem } from "@/ui/overlays";
 import { Badge, Button, Card, EmptyState, IconButton, LinkButton, ListCard, ListRow, Notice, SectionTitle, Segmented, Select, Skeleton, TextField } from "@/ui/primitives";
 import { Page } from "@/ui/shell";
-import { EditPanel, KbBlocks, MarkdownEditor } from "@/ui/templates";
+import { KbBlocks, MarkdownEditor } from "@/ui/templates";
+import { RichEditor, type EditResult } from "@/ui/RichEditorLazy";
 import { InkScope } from "@/ui/ink/FigInk";
 import { LostMarks } from "@/ui/ink/LostMarks";
 import { createPortal } from "react-dom";
@@ -328,7 +329,7 @@ export function KbReaderPage() {
   const [editing, setEditing] = useState(false);
   const [noteMode, setNoteMode] = useState(false);
   const [toc, setToc] = useState(false);
-  const [target, setTarget] = useState<EditTarget | null>(null);
+  const [inline, setInline] = useState<InlineTarget | null>(null);
   const [deleting, setDeleting] = useState<KbBlock | null>(null);
   const [noteFor, setNoteFor] = useState<KbBlock | null>(null);
   const article = useRef<HTMLElement>(null);
@@ -347,10 +348,51 @@ export function KbReaderPage() {
   const save = async (fn: () => Promise<"ok" | "conflict" | void>) => {
     const r = await fn();
     toast(r === "conflict" ? CONFLICT : SAVED);
-    setTarget(null);
   };
 
-  // 選字框的「編輯」：直接開這個區塊的編輯面板（和區塊選單的「編輯內容」同一套規則）
+  /** 這個列點下面已經有一個還沒寫回的新列點（同一個位置一次只能有一個，見 kb-core 的 applyKbPatches） */
+  const pendingInsert = (b: KbBlock, child: boolean) =>
+    !!key && !!rows?.some((p) => p.target === `kb:${key}#${b.bid}` && p.field === (child ? "insert_child" : "insert_after") && (p.status === "pending" || p.status === "conflict"));
+
+  const startInline = (t: InlineTarget) => {
+    if (t.insert && t.base && pendingInsert(t.base, t.insert === "child")) {
+      toast(t.insert === "child" ? "這個列點底下已經有一個還沒寫回的新子列點；請改那一個" : "這個列點下面已經有一個還沒寫回的新列點；請改那一個");
+      return;
+    }
+    setInline(t);
+  };
+
+  // 就地編輯存檔：有改才存成修訂；跳出「已存成修訂」與「復原」
+  const saveInline = async (t: InlineTarget, r: EditResult) => {
+    setInline(null);
+    if (!key || !r.changed) return;
+    if (t.patch) {
+      const before = t.patch.value;
+      await kbPatches.editInserted(t.patch, r.md);
+      toast(SAVED, { action: { label: "復原", run: () => void kbPatches.editInserted({ ...t.patch!, value: r.md, updated_at: Date.now() }, before) } });
+      return;
+    }
+    const base = t.base!;
+    const res: ("ok" | "conflict")[] = [];
+    const undo: (() => Promise<unknown>)[] = [];
+    if (r.md !== t.b.md) {
+      res.push(await kbPatches.edit(key, base, r.md));
+      const before = t.b.md;
+      undo.push(() => kbPatches.edit(key, base, before));
+    }
+    if (r.insert) {
+      const child = r.insert.child;
+      if (pendingInsert(base, child)) toast("這個列點下面已經有一個還沒寫回的新列點，這次新增的沒有存；請改原本那一個");
+      else {
+        res.push(await kbPatches.insert(key, base, child, r.insert.md));
+        undo.push(() => kbPatches.insert(key, base, child, ""));
+      }
+    }
+    if (res.includes("conflict")) toast(CONFLICT);
+    else if (res.length) toast(SAVED, { action: { label: "復原", run: () => void Promise.all(undo.map((f) => f())).then(() => toast("已復原")) } });
+  };
+
+  // 選字框的「編輯」：直接就地編輯這個區塊（和區塊選單的「編輯內容」同一套規則）
   const editBlock = (bid: string) => {
     const b = doc && findBlock(doc.blocks, bid);
     if (!b) return;
@@ -366,7 +408,7 @@ export function KbReaderPage() {
       const p = ms[0]?.patch;
       if (!p) return [];
       return [
-        { label: "編輯新列點", icon: "edit", onSelect: () => setTarget({ mode: "new", b, patch: p }) },
+        { label: "編輯新列點", icon: "edit", onSelect: () => startInline({ b, patch: p }) },
         isWritten(p)
           ? { label: "取消新增", icon: "trash", disabledReason: "已寫回 Mac；要刪掉請在 Mac 上改" }
           : { label: "取消新增", icon: "trash", danger: true, onSelect: () => void patches.discard(p.id).then(() => toast("已取消新增")) },
@@ -376,12 +418,12 @@ export function KbReaderPage() {
     const del = ms.find((m) => m.kind === "delete" && m.state !== "conflict");
     const items: MenuItem[] = [
       KB_EDITABLE.has(b.type)
-        ? { label: "編輯內容", icon: "edit", onSelect: () => (conflict ? toast(CONFLICT) : setTarget({ mode: "md", b, base })) }
+        ? { label: "編輯內容", icon: "edit", onSelect: () => (conflict ? toast(CONFLICT) : startInline({ b, base })) }
         : { label: "編輯內容", icon: "edit", disabledReason: "圖、程式碼、表格群組請在 Mac 上用 Typora 改" },
     ];
     if (b.type === "list_item") {
-      items.push({ label: "在下面插入列點", icon: "plus", onSelect: () => setTarget({ mode: "insert_after", b, base }) });
-      items.push({ label: "插入子列點", icon: "plus", onSelect: () => setTarget({ mode: "insert_child", b, base }) });
+      items.push({ label: "在下面插入列點", icon: "plus", onSelect: () => (conflict ? toast(CONFLICT) : startInline({ b, base, insert: "after" })) });
+      items.push({ label: "插入子列點", icon: "plus", onSelect: () => (conflict ? toast(CONFLICT) : startInline({ b, base, insert: "child" })) });
     }
     if (del) items.push({ label: "復原（不刪了）", icon: "undo", onSelect: () => void patches.discard(del.patch.id).then(() => toast("已復原")) });
     else if (KB_DELETABLE.has(b.type)) items.push({ label: "刪除這個區塊", icon: "trash", danger: true, onSelect: () => setDeleting(base) });
@@ -487,7 +529,7 @@ export function KbReaderPage() {
           </div>
           {editing && (
             <Notice icon="edit">
-              編輯模式：點區塊右邊的筆，可以改內容、在列點下面插入新列點、刪除區塊。存檔後進修訂佇列，在 Mac 上執行 bin/pmq patches pull 寫回筆記檔。圖、程式碼請在 Mac 上用 Typora 改。
+              編輯模式：點區塊右邊的筆，可以改內容、在列點下面插入新列點、刪除區塊（電腦上也可以在區塊上按兩下直接改；列點裡按 Enter 是在下面新增一個列點）。存檔後進修訂佇列，在 Mac 上執行 bin/pmq patches pull 寫回筆記檔。圖、程式碼請在 Mac 上用 Typora 改。
             </Notice>
           )}
           {ov && ov.unanchored.length > 0 && (
@@ -516,7 +558,48 @@ export function KbReaderPage() {
           <InkScope value={inkScope}>
             <Card as="article" className="kb-article p-4 sm:p-6" aria-label={doc.title}>
               <section ref={article}>
-                <KbBlocks key={printing ? "print" : depth} doc={doc} openDepth={printing ? 9 : depth} editing={editing} editMenu={menu} marks={uiMarks} notes={blockNotes} noteMode={noteMode} onNote={setNoteFor} />
+                <KbBlocks
+                  key={printing ? "print" : depth}
+                  doc={doc}
+                  openDepth={printing ? 9 : depth}
+                  editing={editing}
+                  editMenu={menu}
+                  marks={uiMarks}
+                  notes={blockNotes}
+                  noteMode={noteMode}
+                  onNote={setNoteFor}
+                  onOpen={(b, at) => {
+                    if (!KB_EDITABLE.has(b.type)) return;
+                    const ms = uiMarks?.get(b.bid) ?? [];
+                    if (ms.some((m) => m.state === "conflict")) return toast(CONFLICT);
+                    if (isNewBid(b.bid)) {
+                      if (ms[0]) startInline({ b, patch: ms[0].patch, at });
+                    } else startInline({ b, base: ov?.base.get(b.bid) ?? b, at });
+                  }}
+                  inline={
+                    inline && {
+                      bid: inline.b.bid,
+                      node: (
+                        <RichEditor
+                          key={inline.b.bid + (inline.insert ?? "")}
+                          initial={inline.patch ? inline.patch.value : inline.b.md}
+                          mode={inline.b.type === "heading" ? "heading" : inline.b.type === "list_item" ? "list_item" : "doc"}
+                          ordered={inline.b.ordered}
+                          num={inline.b.num}
+                          startInsert={inline.insert}
+                          allowInsert={!inline.patch}
+                          at={inline.at}
+                          figs={doc.figs}
+                          role="kb"
+                          label={inline.b.type === "heading" ? "編輯標題" : "編輯這個區塊"}
+                          onNotice={(t) => toast(t)}
+                          onCancel={() => setInline(null)}
+                          onDone={(r) => void saveInline(inline, r)}
+                        />
+                      ),
+                    }
+                  }
+                />
               </section>
             </Card>
           </InkScope>
@@ -573,34 +656,6 @@ export function KbReaderPage() {
           document.body,
         )}
       {noteFor && key && <BlockNoteSheet docKey={key} b={noteFor} doc={doc!} initial={blockNotes?.get(noteFor.bid)?.body_md ?? ""} onClose={() => setNoteFor(null)} onSaved={(msg) => toast(msg)} />}
-      {target && doc && key && (
-        <EditPanel
-          title={EDIT_TITLE[target.mode]}
-          initial={target.mode === "md" ? target.b.md : target.mode === "new" ? target.patch!.value : (rows?.find((p) => p.target === `kb:${key}#${target.b.bid}` && p.field === target.mode)?.value ?? "")}
-          figs={doc.figs}
-          role="kb"
-          onClose={() => setTarget(null)}
-          notice={
-            target.mode !== "md" && target.mode !== "new" ? (
-              <blockquote className="rounded-btn border border-line px-3 py-2 text-ui text-ink-muted">
-                <span className="text-meta">{target.mode === "insert_child" ? "插在這個列點底下（第一個子項）：" : "插在這個列點後面（同一層）："}</span>
-                <Markdown text={target.b.md} figs={doc.figs} role="kb" tight />
-              </blockquote>
-            ) : target.mode === "md" && target.b.type === "heading" ? (
-              <p className="text-meta text-ink-muted">標題只改文字：維持一行，開頭的 # 數量不要變。</p>
-            ) : undefined
-          }
-          onSave={(v) =>
-            void save(() =>
-              target.mode === "md"
-                ? kbPatches.edit(key, target.base!, v)
-                : target.mode === "new"
-                  ? kbPatches.editInserted(target.patch!, v)
-                  : kbPatches.insert(key, target.base!, target.mode === "insert_child", v),
-            )
-          }
-        />
-      )}
       {deleting && key && (
         <Dialog
           title="刪除這個區塊？"
@@ -619,9 +674,8 @@ export function KbReaderPage() {
   );
 }
 
-type EditTarget = { mode: "md" | "insert_after" | "insert_child"; b: KbBlock; base: KbBlock; patch?: undefined } | { mode: "new"; b: KbBlock; patch: ContentPatch; base?: undefined };
-
-const EDIT_TITLE: Record<EditTarget["mode"], string> = { md: "編輯區塊", insert_after: "在下面插入列點", insert_child: "插入子列點", new: "編輯新列點" };
+/** 就地編輯的區塊（第 3B 階段）。base＝內容包裡原本的區塊；patch＝網站上新增、還沒寫回的列點；insert＝一開始就在下面新增一個列點 */
+type InlineTarget = { b: KbBlock; base?: KbBlock; patch?: ContentPatch; insert?: "after" | "child"; at?: { x: number; y: number } };
 
 const countAll = (bs: KbBlock[]): number => bs.reduce((n, b) => n + 1 + countAll(b.children), 0);
 

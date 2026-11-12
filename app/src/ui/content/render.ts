@@ -2,28 +2,12 @@
 // 步驟：先把公式抽成佔位字（公式判定與 Python 端同規則）→ markdown-it → DOMPurify 白名單
 // → 把佔位字換成 KaTeX 與題圖。KaTeX 與題圖的 HTML 是這裡自己產生的，所以放在清理之後才插入。
 
-import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import katex from "katex";
 import "katex/contrib/mhchem";
-import { mathRanges } from "@schema/ts/options.ts";
 import macros from "@schema/katex-macros.json";
 import type { Fig } from "@/data";
-
-const md = new MarkdownIt({ html: true, breaks: true, linkify: false, typographer: false });
-
-// 圖：![alt](fig:<fid>) → 佔位字；卡片的圖 ![](m/<sha256>.<副檔名>)（第 5 階段）→ 另一種佔位字；
-// 其他來源的圖一律不顯示（主檔的相對路徑在網站上無效）
-const MEDIA = /^m\/[0-9a-f]{64}\.[a-z0-9]{2,5}$/;
-md.renderer.rules.image = (tokens, idx) => {
-  const src = String(tokens[idx].attrGet("src") ?? "");
-  const m = /^fig:([0-9A-Za-z_-]+)$/.exec(src);
-  if (m) return `@@F${m[1]}@@`;
-  return MEDIA.test(src) ? `@@G${src.slice(2)}@@` : "";
-};
-
-// 卡片的聲音：[sound:m/<sha256>.mp3] → 播放鈕（點了才下載，不進離線快取，規格書 §9.5）
-const SOUND = /\[sound:(m\/[0-9a-f]{64}\.[a-z0-9]{2,5})\]/g;
+import { preRender } from "./md-core";
 
 const ALLOWED_TAGS = [
   "p", "br", "strong", "b", "em", "i", "u", "s", "del", "sub", "sup", "mark", "code", "pre", "blockquote",
@@ -37,7 +21,8 @@ const SPEAKER = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="tr
 
 const mathCache = new Map<string, string>();
 
-function renderMath(tex: string, display: boolean): string {
+/** 一個公式 → HTML（閱讀頁與編輯器共用；排不出來顯示原始碼加紅色波浪底線） */
+export function renderMath(tex: string, display: boolean): string {
   const key = (display ? "D" : "I") + tex;
   let html = mathCache.get(key);
   if (html === undefined) {
@@ -87,25 +72,9 @@ function renderFig(fid: string, o: RenderOptions): string {
 
 export function renderMarkdown(text: string, o: RenderOptions): string {
   if (!text.trim()) return "";
-  // 1. 公式 → 佔位字
-  const maths: { tex: string; display: boolean }[] = [];
-  let src = "";
-  let last = 0;
-  for (const [a, b, display] of mathRanges(text)) {
-    const tex = display ? text.slice(a + 2, b - 2) : text.slice(a + 1, b - 1);
-    if (!tex.trim()) continue;
-    src += text.slice(last, a) + `@@M${maths.length}@@`;
-    maths.push({ tex, display });
-    last = b;
-  }
-  src += text.slice(last);
-  src = src.replace(SOUND, (_, m: string) => `@@S${m.slice(2)}@@`);
-
-  // 2. Markdown → HTML
-  let html = md.render(src);
-  html = html
-    .replace(/==([^=\n<>]+)==/g, "<mark>$1</mark>")
-    .replace(/ style="text-align:(left|center|right)"/g, ' class="ta-$1"');
+  // 1–2. 公式 → 佔位字 → Markdown → HTML（與編輯器共用，md-core.ts）
+  const { html: raw, maths } = preRender(text);
+  let html = raw;
 
   // 3. 白名單清理
   html = DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR, ALLOW_DATA_ATTR: false, ALLOWED_URI_REGEXP: /^https?:\/\//i });

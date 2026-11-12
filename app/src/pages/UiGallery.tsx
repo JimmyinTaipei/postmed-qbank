@@ -16,6 +16,7 @@ import {
   SectionTitle, Segmented, Skeleton, Select, Spinner, Stat, Switch, Tabs, TextField, type OptionState,
 } from "@/ui/primitives";
 import { Page, SyncStatus } from "@/ui/shell";
+import { RichEditor, preloadEditor, type EditorMode } from "@/ui/RichEditorLazy";
 import { BarList, ChartCard, ColumnChart, EditPanel, ExamTimerBar, HighlightPalette, KbBlocks, ReviewCard, SearchBar, type KbBlockMark } from "@/ui/templates";
 import type { KbDoc } from "@/data";
 
@@ -357,6 +358,10 @@ export default function UiGallery() {
         {edit && <EditPanel title="編輯詳解（展示）" initial={MD_SAMPLE} onClose={() => setEdit(false)} saveDisabledReason="展示頁不會存檔；貼上 AI 回覆可測試自動轉換" />}
       </Group>
 
+      <Group title="編輯器（第 3B 階段）" note="所見即所得：打 ### 、- 、1. 、> 、**粗體**、$x^2$ 當場變成排好的樣子；/ 叫出插入選單（表格、公式…）；表格裡 Tab 換格、最後一格 Tab 加列。存的仍是 Markdown，沒改到的地方原文一字不動。展示頁不會存檔，按「完成」後下面顯示存出來的 Markdown。">
+        <EditorDemo />
+      </Group>
+
       <Group title="狀態" note="載入用骨架（形狀已知）或轉圈（按鈕內）；空白與錯誤都要說明發生什麼事、接下來能做什麼。">
         <Pair>
           <Card className="p-4"><Skeleton lines={4} /></Card>
@@ -422,5 +427,53 @@ export default function UiGallery() {
         )}
       </Group>
     </Page>
+  );
+}
+
+const ED_SAMPLES: { id: string; label: string; mode: EditorMode; md: string }[] = [
+  { id: "blank", label: "空白", mode: "doc", md: "" },
+  { id: "long", label: "長內容", mode: "doc", md: MD_SAMPLE },
+  { id: "table", label: "寬表格", mode: "doc", md: "| 酵素 | 位置 | 輔酶 | 調控 | 抑制劑 | 缺乏症 | 備註 |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| PDH | Mit. matrix | TPP、Lipoate、CoA、FAD、NAD⁺ | NADH、Acetyl-CoA 抑制 | Arsenite | Lactic acidosis | **E1 需要 TPP** |\n| α-KGDH | Mit. matrix | 同上 | Succinyl-CoA 抑制 | Arsenite | — | 結構與 PDH 相似 |" },
+  { id: "math", label: "公式", mode: "doc", md: "動能 $K=\\tfrac12 mv^2$，位能 $U=mgh$。\n\n$$\n\\oint \\vec B\\cdot d\\vec l=\\mu_0 i_{\\text{in}}\n$$\n\n化學式 $\\ce{2H2 + O2 -> 2H2O}$。" },
+  { id: "raw", label: "原始碼區塊", mode: "doc", md: '<style>\n@media print { h2 { break-after: avoid; } }\n</style>\n\n可以改的段落。\n\n<table><tr><td colspan="2">合併儲存格</td></tr><tr><td>a</td><td>b</td></tr></table>\n\n```\npH < pI → +1\n```' },
+  { id: "li", label: "列點（就地）", mode: "list_item", md: "Acetyl-CoA ⇒ **TCA cycle**（$2\\text{CO}_2$）" },
+  { id: "h", label: "標題（就地）", mode: "heading", md: "### C. The <u>***signal termination***</u> of GPCR" },
+];
+
+function EditorDemo() {
+  const [id, setId] = useState("long");
+  const [editing, setEditing] = useState(false);
+  const [out, setOut] = useState<{ md: string; changed: boolean; insert?: string } | null>(null);
+  const toast = useToast();
+  const sample = ED_SAMPLES.find((x) => x.id === id)!;
+  const text = out?.md ?? sample.md;
+  return (
+    <div className="space-y-3">
+      <Segmented label="範例" value={id} onChange={(v) => { setId(v); setEditing(false); setOut(null); }} options={ED_SAMPLES.map((x) => ({ value: x.id, label: x.label }))} />
+      <Card className="p-4">
+        {editing ? (
+          <RichEditor
+            key={id}
+            initial={text}
+            mode={sample.mode}
+            label="展示用編輯器"
+            onNotice={(t) => toast(t)}
+            onCancel={() => setEditing(false)}
+            onDone={(r) => { setEditing(false); setOut({ md: r.md, changed: r.changed, insert: r.insert && `${r.insert.child ? "子列點" : "下面的列點"}：${r.insert.md}` }); }}
+          />
+        ) : (
+          <div className="space-y-3">
+            {text.trim() ? <Markdown text={sample.mode === "heading" ? text.replace(/^#+\s*/, "") : text} /> : <p className="text-ui text-ink-muted">（空白）</p>}
+            <Button icon="edit" onMouseEnter={preloadEditor} onClick={() => setEditing(true)}>編輯</Button>
+          </div>
+        )}
+      </Card>
+      {out && (
+        <Card className="space-y-2 p-4">
+          <p className="text-meta text-ink-muted">{out.changed ? "有改（會存成修訂）" : "沒有改（不會產生修訂）"}{out.insert ? `；新增${out.insert}` : ""}</p>
+          <pre className="overflow-x-auto rounded-btn bg-hover p-3 font-mono text-meta whitespace-pre-wrap">{out.md || "（空白）"}</pre>
+        </Card>
+      )}
+    </div>
   );
 }

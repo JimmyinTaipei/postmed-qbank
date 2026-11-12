@@ -1,7 +1,7 @@
 // 頁面樣板（規格書 §13.4）：第 2 階段以後的頁面從這裡的元件開始接功能，不重新設計版面。
 // 這裡只有版面與互動，沒有資料邏輯；資料由頁面傳進來。
 
-import { useId, useMemo, useRef, useState, type ClipboardEvent, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, type ClipboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { Fig, FieldMark, KbBlock, KbDoc } from "@/data";
 import { Markdown } from "./content/Markdown";
@@ -324,6 +324,22 @@ interface KbProps {
   /** 筆記模式：每個區塊右邊出現「寫筆記」 */
   noteMode?: boolean;
   onNote?: (b: KbBlock) => void;
+  /** 正在就地編輯的區塊（第 3B 階段）：原本那段字藏起來但留在頁面上（螢光才不會失聯），編輯器放在它的位置 */
+  inline?: { bid: string; node: ReactNode } | null;
+  /** 電腦上在區塊上按兩下：就地編輯這個區塊 */
+  onOpen?: (b: KbBlock, at: { x: number; y: number }) => void;
+}
+
+/** 有滑鼠的電腦（按兩下編輯、滑過出現 ⋯ 只在這種裝置上） */
+const finePointer = () => typeof matchMedia !== "undefined" && matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+/** 區塊上按兩下（圖、連結、按鈕上不算） */
+function dbl(b: KbBlock, s: Shared) {
+  return (e: ReactMouseEvent) => {
+    if (!s.onOpen || !finePointer() || (e.target as HTMLElement).closest(".fig, a, button, .snd")) return;
+    window.getSelection()?.removeAllRanges();
+    s.onOpen(b, { x: e.clientX, y: e.clientY });
+  };
 }
 
 /** 筆記的區塊樹：標題與有子項的列點都可收合；編輯模式下每個區塊右邊有 ✎ 選單、筆記模式下有 💬。
@@ -454,11 +470,12 @@ function ListItem({ b, n, ...s }: { b: KbBlock; n: number } & Shared) {
             <Icon name="chevronRight" size={15} className={cx("transition-transform duration-(--dur-fast)", open && "rotate-90")} />
           </button>
         ) : null}
-        <span className={cx("h-7 min-w-6 shrink-0 items-center justify-center text-ink-muted", kids.length ? "hidden print:flex" : "flex")} aria-hidden="true">{b.ordered ? `${n}.` : "•"}</span>
+        <span className={cx("h-7 min-w-6 shrink-0 items-center justify-center text-ink-muted", kids.length || s.inline?.bid === b.bid ? "hidden print:flex" : "flex")} aria-hidden="true">{b.ordered ? `${n}.` : "•"}</span>
         <div className="min-w-0 flex-1">
-          <div data-hl-bid={b.bid}>
+          <div data-hl-bid={b.bid} hidden={s.inline?.bid === b.bid} onDoubleClick={dbl(b, s)}>
             <Markdown text={stripRefs(b.md, r)} figs={s.doc.figs} role="kb" tight />
           </div>
+          {s.inline?.bid === b.bid && s.inline.node}
           <Marks list={m} />
           <RefChips refs={r} />
           <BlockNote b={b} s={s} />
@@ -487,17 +504,19 @@ function Block({ b, ...s }: { b: KbBlock } & Shared) {
     if (level === 1) return <BlockList blocks={b.children} {...s} />; // 文件標題已在頁首
     const m = s.marks?.get(b.bid);
     return (
-      <details id={`b-${b.bid}`} open={level <= s.openDepth} className="kb-block group/h">
+      <details id={`b-${b.bid}`} open={level <= s.openDepth || s.inline?.bid === b.bid} className="kb-block group/h">
         <summary className={cx("flex min-h-(--tap) items-center gap-2 rounded-btn hover:bg-hover", level === 2 ? "mt-4 border-b border-line" : "mt-2")}>
           <Icon name="chevronRight" size={18} className="text-ink-muted transition-transform duration-(--dur-fast) group-open/h:rotate-90 print:hidden" />
           <H className={cx("min-w-0 flex-1 font-semibold text-ink-strong", level === 2 ? "text-title" : "text-body")}>
-            <span data-hl-bid={b.bid} className="block">
+            <span data-hl-bid={b.bid} className="block" onDoubleClick={(e) => (e.preventDefault(), dbl(b, s)(e))}>
               <Markdown text={text} tight className={level === 2 ? "text-title!" : undefined} />
             </span>
           </H>
           <span onClick={(e) => e.preventDefault()}><Handles b={b} s={s} /></span>
         </summary>
         <div className="space-y-2 py-2 pl-1.5">
+          {/* 標題的編輯器不放在 <summary> 裡（在裡面打空白會收合） */}
+          {s.inline?.bid === b.bid && <div className={level === 2 ? "text-title font-semibold" : "font-semibold"}>{s.inline.node}</div>}
           <Marks list={m} />
           <BlockNote b={b} s={s} />
           <BlockList blocks={b.children} {...s} />
@@ -511,9 +530,10 @@ function Block({ b, ...s }: { b: KbBlock } & Shared) {
     <div id={`b-${b.bid}`} className={cx("kb-block", isDeleted(m) && "kb-deleted")}>
       <div className="flex items-start gap-1">
         <div className="min-w-0 flex-1">
-          <div data-hl-bid={b.bid}>
+          <div data-hl-bid={b.bid} hidden={s.inline?.bid === b.bid} onDoubleClick={dbl(b, s)}>
             <Markdown text={stripRefs(b.md, r)} figs={s.doc.figs} role="kb" />
           </div>
+          {s.inline?.bid === b.bid && s.inline.node}
           <Marks list={m} />
           <RefChips refs={r} />
           <BlockNote b={b} s={s} />
