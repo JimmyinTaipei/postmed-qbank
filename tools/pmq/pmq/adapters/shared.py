@@ -44,6 +44,18 @@ SECTION_NAME = {
 TRUST = {"school_key": "official", "school_corrected": "official", "publisher_key": "key", "missing": "pending"}
 
 
+def paper_name(fmeta):
+    """考科（題目瀏覽的「整份考卷」用來跨科目合併；物理、生化的轉接器寫的是「物理化學」「生物生化」）。
+    合科卷的標題各校寫法不同：「物理及化學｜化學部分」「化學與物理」「普通生物及生化概論」「生物與生化」。
+    單科卷（「115中興化學」「115中國後中醫生物」）回 None：網站用科目名。"""
+    t = (fmeta.get("title") or "").split("｜")[0]
+    if "物理" in t and "化學" in t:
+        return "物理化學"
+    if "生物" in t and "生化" in t:
+        return "生物生化"
+    return None
+
+
 class SharedAdapter:
     """一科一個實例；subject、資料夾、章節名稱都從 pmq.toml 的 [subjects.<ID>] 來。"""
 
@@ -424,7 +436,7 @@ class SharedAdapter:
             "subject": self.subject,
             "label": label or qid,
             "source": {"sid": fmeta.get("id") or f"{self.subject}-SRC-{path.stem}", "kind": kind, "school": school if sk == "exam" else None,
-                       "year": year, "paper": None, "book": book_name, "unit": unit, "qno": qno},
+                       "year": year, "paper": paper_name(fmeta) if sk == "exam" else None, "book": book_name, "unit": unit, "qno": qno},
             "alt_sources": [],
             "canonical": qid,
             "chap": f"{self.subject}:{chapter}" if chapter else None,

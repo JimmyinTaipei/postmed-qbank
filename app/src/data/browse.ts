@@ -38,6 +38,8 @@ export interface PaperInfo {
   name: string;
   subjects: SubjectId[];
   rows: IndexRow[];
+  /** 兩科都有同一個原卷題號時（生化題庫裡混了生物題、生物題庫是整份卷），沒採用的那一題 */
+  dupes: IndexRow[];
 }
 
 const byQno = (a: IndexRow, b: IndexRow) => (qnoOf(a) ?? 1e9) - (qnoOf(b) ?? 1e9) || cmp.compare(a.label, b.label) || cmp.compare(a.id, b.id);
@@ -48,18 +50,34 @@ export function buildPapers(tax: Taxonomy, ctxs: Map<SubjectId, FilterContext>):
   const subjName = new Map(tax.subjects.map((s) => [s.id, s.name]));
   const group = new Map(tax.source_kinds.map((k) => [k.id, k.group]));
   const out = new Map<string, PaperInfo>();
-  for (const [subject, ctx] of ctxs) {
+  // 照 taxonomy 的科目順序：同一個題號兩科都有時，先出現的科目（物理、生化：有詳解）優先
+  const order = [...tax.subjects.map((s) => s.id).filter((id) => ctxs.has(id)), ...[...ctxs.keys()].filter((id) => !tax.subjects.some((s) => s.id === id))];
+  for (const subject of order) {
+    const ctx = ctxs.get(subject)!;
     for (const r of ctx.rows) {
       if (!r.school || !r.year) continue;
       const name = paperName(src.get(r.sid)?.paper, subjName.get(subject) ?? subject);
       const scope = `p:${[r.kind, r.school, r.year, name].join("~")}`;
       let p = out.get(scope);
-      if (!p) out.set(scope, (p = { scope, kind: r.kind, group: group.get(r.kind) ?? "self", school: r.school, year: r.year, name, subjects: [], rows: [] }));
+      if (!p) out.set(scope, (p = { scope, kind: r.kind, group: group.get(r.kind) ?? "self", school: r.school, year: r.year, name, subjects: [], rows: [], dupes: [] }));
       if (!p.subjects.includes(subject)) p.subjects.push(subject);
       p.rows.push(r);
     }
   }
-  for (const p of out.values()) p.rows.sort(byQno);
+  for (const p of out.values()) {
+    const seen = new Map<number, SubjectId>();
+    const keep: IndexRow[] = [];
+    for (const r of p.rows) {
+      const n = qnoOf(r);
+      const subj = r.id.slice(0, r.id.indexOf("-"));
+      if (n == null) keep.push(r);
+      else if (!seen.has(n) || seen.get(n) === subj) {
+        seen.set(n, subj);
+        keep.push(r);
+      } else p.dupes.push(r);
+    }
+    p.rows = keep.sort(byQno);
+  }
   return out;
 }
 

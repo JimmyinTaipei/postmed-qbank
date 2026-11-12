@@ -111,5 +111,14 @@ class Remote:
     def get_cards(self):
         return self._req("GET", "/api/admin/cards")
 
+    def list_assets(self):
+        return self._req("GET", "/api/admin/list?prefix=a/")["objects"]
+
+    def delete_assets(self, keys):
+        n = 0
+        for i in range(0, len(keys), 1000):
+            n += self._req("POST", "/api/admin/delete", {"keys": keys[i:i + 1000]})["deleted"]
+        return n
+
     def get_blob(self, key):
         return self._req("GET", "/api/admin/blob/" + urllib.parse.quote(key, safe="/"), raw=True)

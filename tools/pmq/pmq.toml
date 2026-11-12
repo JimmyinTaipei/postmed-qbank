@@ -114,3 +114,16 @@ id_pattern = "^ENG-\\d{6}$"
 # 分類檔只放考古題；講義題（book.chapter）直接用它所在的章。檔案格式見 tools/pmq/pmq/adapters/shared.py 的 load_xchap。
 xchap_file = "01_來源索引/grammar_chapters.json"
 xchap_parent = "EN02"
+
+# 2026-11-12：化學、生物（共用格式，和英文同一個轉接器）。題目瀏覽的「整份考卷」靠它們把物理化學、生物生化合卷。
+[subjects.CHE]
+name = "化學"
+format = "shared"
+path = "01_題庫製作/化學"
+id_pattern = "^CHE-\\d{6}$"
+
+[subjects.BIO]
+name = "生物"
+format = "shared"
+path = "01_題庫製作/生物"
+id_pattern = "^BIO-\\d{6}$"

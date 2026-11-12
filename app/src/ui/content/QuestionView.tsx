@@ -70,7 +70,12 @@ export function useAnswerFlow(q: Question, attempt: Attempt | null | undefined, 
 }
 
 function optionState(letter: string, flow: AnswerFlow, q: Question, attempt: Attempt | null | undefined, reveal: boolean): OptionState {
-  if (flow.phase === "read") return reveal && q.answer.keys.includes(letter) ? "missed" : "idle";
+  if (flow.phase === "read") {
+    // 題目瀏覽：點了選項就對答案（不記錄）；沒點、只是顯示答案時把正解框出來
+    const key = q.answer.keys.includes(letter);
+    if (flow.picked.length) return flow.picked.includes(letter) ? (key ? "correct" : "incorrect") : key ? "missed" : "dimmed";
+    return reveal && key ? "missed" : "idle";
+  }
   if (flow.phase !== "done") return flow.picked.includes(letter) ? "selected" : "idle";
   const chosen = attempt?.chosen ?? [];
   const key = q.answer.keys.includes(letter);
@@ -172,7 +177,7 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys, headerExtra, 
           {multi && !done && !read && <p className="text-meta text-ink-muted">複選題：選好所有答案後按「送出」。</p>}
           <div role={multi ? "group" : "radiogroup"} aria-label="選項" className="space-y-2">
             {parts.options.map((o) => (
-              <OptionRow key={o.letter} letter={o.letter} multi={multi} locked={done || read} state={optionState(o.letter, flow, q, attempt, showAnswer)} onSelect={() => flow.select(o.letter)}>
+              <OptionRow key={o.letter} letter={o.letter} multi={multi} locked={done || (read && (flow.picked.length > 0 || !choice))} state={optionState(o.letter, flow, q, attempt, showAnswer)} onSelect={() => flow.select(o.letter)}>
                 <Markdown text={o.md} figs={q.figs} role="q" tight />
               </OptionRow>
             ))}
@@ -200,7 +205,6 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys, headerExtra, 
   );
 }
 
-const READ_FLOW: AnswerFlow = { phase: "read", picked: [], canSubmit: false, select: () => {}, submit: () => {}, reveal: () => {}, grade: () => {} };
 
 /**
  * 題目瀏覽用的唯讀顯示（第 2B 階段，規格書 §9.9）：題幹、選項、螢光、手寫、答案、詳解都和作答畫面是同一份，
@@ -208,11 +212,24 @@ const READ_FLOW: AnswerFlow = { phase: "read", picked: [], canSubmit: false, sel
  */
 export function QuestionRead({ q, show, chapter, headerExtra }: { q: Question; show: "q" | "a" | "all"; chapter?: string; headerExtra?: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
   useEffect(() => setOpen(false), [show]);
   const eff = open ? "all" : show;
+  // 點選項＝自己對答案：標出對錯、展開答案與詳解，但不寫 attempt（2026-11-12 使用者：可以點，預設不紀錄）
+  const flow = useMemo<AnswerFlow>(
+    () => ({ phase: "read", picked, canSubmit: false, select: (l) => { setPicked([l]); setOpen(true); }, submit: () => {}, reveal: () => {}, grade: () => {} }),
+    [picked],
+  );
+  const right = picked.length > 0 && judge(q, picked);
   return (
     <div className="space-y-3">
-      <QuestionView q={q} flow={READ_FLOW} attempt={null} chapter={chapter} headerExtra={headerExtra} show={eff} />
+      {picked.length > 0 && (
+        <p role="status" className={cx("text-ui font-medium", right ? "text-correct-ink" : "text-incorrect-ink")}>
+          你選 {picked.join("、")}：{right ? "答對" : "答錯"}（瀏覽模式不記錄作答）
+          <Button variant="ghost" className="ml-2" onClick={() => { setPicked([]); setOpen(false); }}>重選</Button>
+        </p>
+      )}
+      <QuestionView q={q} flow={flow} attempt={null} chapter={chapter} headerExtra={headerExtra} show={eff} />
       {show !== "all" && (
         <Button variant="ghost" icon={open ? "eyeOff" : "eye"} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
           {open ? (show === "q" ? "收起答案與詳解" : "收起詳解") : show === "q" ? "看這一題的答案與詳解" : "看這一題的詳解"}

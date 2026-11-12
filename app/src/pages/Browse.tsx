@@ -257,6 +257,7 @@ export function PaperDialog({ p, last, onClose }: { p: PaperInfo; last?: Session
         <p className="text-ui text-ink">
           題庫裡有 {p.rows.length} 題{p.subjects.length > 1 || missing.length ? `（${subjNames.join("、")}）` : ""}。
           {missing.length > 0 && <>原卷第 {rangesText(missing)} 題還沒有（那幾科還沒上站，或不是這一科的題目）。</>}
+          {p.dupes.length > 0 && <>另有 {p.dupes.length} 題兩科題庫都有同一個題號，用的是{subjNames[0]}題庫的那一題。</>}
         </p>
         {last && (
           <p className="text-ui text-ink">

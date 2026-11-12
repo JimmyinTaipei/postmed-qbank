@@ -4,7 +4,7 @@
 // 沒有有效 cookie 時，除了登入頁與它需要的幾個靜態檔，其他一律 401（網頁導覽則轉到 /login）。
 
 import { Hono } from "hono";
-import { backupNow, exportCards, getBlob, exportZip, getManifest, have, importRows, listPatches, putBlob, putManifest, restoreRoute, updatePatches, usage } from "./admin";
+import { backupNow, deleteObjects, exportCards, listObjects, getBlob, exportZip, getManifest, have, importRows, listPatches, putBlob, putManifest, restoreRoute, updatePatches, usage } from "./admin";
 import { checkAdmin, checkSession, listDevices, login, loginStatus, logout, revokeDevice } from "./auth";
 import { buildExportZip, nightlyBackup } from "./backup";
 import type { App, Env } from "./env";
@@ -66,6 +66,8 @@ api.get("/api/admin/export", exportZip);
 api.post("/api/admin/restore", restoreRoute);
 api.post("/api/admin/backup", backupNow);
 api.get("/api/admin/usage", usage);
+api.get("/api/admin/list", listObjects);
+api.post("/api/admin/delete", deleteObjects);
 api.get("/api/admin/patches", listPatches);
 api.post("/api/admin/patches", updatePatches);
 api.post("/api/admin/rows", importRows);

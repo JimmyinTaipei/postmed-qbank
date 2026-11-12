@@ -141,6 +141,37 @@ export async function usage(c: Context<App>): Promise<Response> {
   return c.json({ d1_bytes: d1Bytes, r2_bytes: total, r2: prefixes });
 }
 
+// ---------- 清掉沒用到的圖（pmq prune） ----------
+
+/** GET /api/admin/list?prefix=a/ → {objects:[[key, size, uploaded(ms)], …]}。只開放 a/（內容圖）。 */
+export async function listObjects(c: Context<App>): Promise<Response> {
+  const prefix = c.req.query("prefix") ?? "";
+  if (prefix !== "a/") return c.json({ error: "bad_prefix" }, 400);
+  const objects: [string, number, number][] = [];
+  let cursor: string | undefined;
+  do {
+    const list = await c.env.R2.list({ prefix, cursor, limit: 1000 });
+    for (const o of list.objects) objects.push([o.key, o.size, o.uploaded.getTime()]);
+    cursor = list.truncated ? list.cursor : undefined;
+  } while (cursor);
+  return c.json({ objects });
+}
+
+const ASSET_KEY = /^a\/[0-9a-f]{64}\.[a-z0-9]{2,5}$/;
+
+/** POST /api/admin/delete {keys:[…]}：刪內容圖（只收 a/<sha>.<ext>，一次最多 1000 個）。哪些沒用到由 pmq 從目前的 manifest 算。 */
+export async function deleteObjects(c: Context<App>): Promise<Response> {
+  let keys: unknown;
+  try {
+    keys = ((await c.req.json()) as { keys?: unknown }).keys;
+  } catch {
+    return c.json({ error: "bad_json" }, 400);
+  }
+  if (!Array.isArray(keys) || keys.length > 1000 || !keys.every((k) => typeof k === "string" && ASSET_KEY.test(k))) return c.json({ error: "bad_keys" }, 400);
+  if (keys.length) await c.env.R2.delete(keys as string[]);
+  return c.json({ ok: true, deleted: keys.length });
+}
+
 // ---------- 修訂佇列（規格書 §7.3；pmq patches list／pull／resolve 用） ----------
 
 const PATCH_COLS = ["id", "target", "field", "base_h", "value", "status", "note", "device", "created_at", "updated_at"];

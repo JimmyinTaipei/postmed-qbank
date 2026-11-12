@@ -136,7 +136,8 @@ class PhysicsAdapter:
                         counts["svg"] += 1
                         self.report.count("fig_dest", "svg")
                         fid = master["id"]
-                        self._add_fig(figs, fid, role, info, png, alt or "題圖")
+                        # 有核可的 SVG 就只用 SVG：原始 PNG 不當備援、不上傳（規格書：PNG 只給沒有 SVG 的圖）
+                        self._add_fig(figs, fid, role, info, None, alt or "題圖")
                         if master.get("manual_edit"):
                             self.report.count("fig_manual_edit_used", "yes")
                         return f"![{alt}](fig:{fid})"

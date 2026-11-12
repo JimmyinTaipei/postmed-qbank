@@ -10,6 +10,7 @@
 """
 import hashlib
 import json
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -193,6 +194,65 @@ def usage(cfg, url, remote=None):
         print(f"  {p:<10} {e['objects']:>6} 個  {e['bytes'] / 1e6:8.1f} MB")
     over = (d1 or 0) > LIMITS["d1"] or r2 > LIMITS["r2"]
     if over:
-        print("⚠ 超過規格書 §11-6 的用量上限：停止，不要再發佈；請先清理舊檔（pmq publish --prune 還沒做，見第 1B 階段驗收紀錄）或調整上限。")
+        print("⚠ 超過規格書 §11-6 的用量上限：停止，不要再發佈；請先清理舊檔（pmq prune 清掉沒用到的圖）或調整上限。")
         return 2
     return 0
+
+
+ASSET_RE = re.compile(rb"a/[0-9a-f]{64}\.[a-z0-9]{2,5}")
+
+
+def _strings(obj):
+    if isinstance(obj, str):
+        yield obj
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            yield from _strings(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _strings(v)
+
+
+def prune(cfg, url, yes=False, min_age_h=24, remote=None, workers=8):
+    """pmq prune：R2 上目前 manifest 沒用到的內容圖（a/…）列出來；--yes 才刪。
+
+    「用到」＝目前 manifest 列的每一個內容檔（題目包、筆記、索引…）裡出現的 a/<sha>.<ext>，
+    包括 figs 的 src 與 fallback。不讀主檔。m/（Anki 媒體）、c/、備份都不動。
+    最近 min_age_h 小時內上傳的不刪（可能是正在發佈、manifest 還沒換）。
+    """
+    remote = remote or Remote(url)
+    m = remote.get_manifest()
+    if not m:
+        print("線上還沒有 manifest（沒發佈過）：不清。")
+        return 1
+    keys = sorted({k for k in _strings(m.get("files", {})) if k.startswith("c/")})
+    print(f"目前的 manifest：{m.get('generated', '?')}，內容檔 {len(keys)} 個；讀取中…")
+    used = set()
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        for data in ex.map(remote.get_blob, keys):
+            used.update(x.decode() for x in ASSET_RE.findall(data))
+    objs = remote.list_assets()
+    now = time.time() * 1000
+    unused = [(k, size, up) for k, size, up in objs if k not in used]
+    recent = [o for o in unused if now - o[2] < min_age_h * 3600 * 1000]
+    drop = [o for o in unused if o not in recent]
+    by_ext = {}
+    for k, size, _ in drop:
+        e = by_ext.setdefault(k.rsplit(".", 1)[1], [0, 0])
+        e[0] += 1
+        e[1] += size
+    total = sum(o[1] for o in objs)
+    print(f"R2 的內容圖 {len(objs)} 個（{total / 1e6:.1f} MB）；用到的 {len(used)} 個；沒用到的 {len(unused)} 個")
+    if recent:
+        print(f"  其中 {len(recent)} 個是 {min_age_h} 小時內才上傳的，先不刪")
+    if not drop:
+        print("沒有要刪的。")
+        return 0
+    for ext, (n, b) in sorted(by_ext.items()):
+        print(f"  可以刪：{ext:<4} {n:>6} 個  {b / 1e6:8.1f} MB")
+    if not yes:
+        print("這次只列出來（沒有刪）。確定要刪：加 --yes 再跑一次。")
+        return 0
+    n = remote.delete_assets([o[0] for o in drop])
+    print(f"已刪除 {n} 個（{sum(o[1] for o in drop) / 1e6:.1f} MB）。")
+    return usage(cfg, url, remote)
