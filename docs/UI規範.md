@@ -75,6 +75,7 @@
 | `GroupLayout` + `GroupItem` | content/GroupView.tsx | **題組**（第 8A 階段）：同一篇文章的小題放在同一頁。電腦與 iPad 橫向（variant `split:`＝寬 ≥ 64rem 且橫向）左文章右小題、各自捲動；直向文章在上、捲到小題時收成上緣一列。每一小題包一個 `GroupItem`（給 `order`＝原卷題號，克漏字空格 `.cloze-blank` 點了捲過去）。文章的螢光掛在 `g:<gid>/stem`。刷題、模擬考、錯題與複習、單題頁共用；一頁的小題由 `pagesOf()`（`data/group-core.ts`）切 |
 | `RichEditor` | RichEditorLazy.tsx（本體在 `editor/`，進入編輯才下載） | 所見即所得的 Markdown 編輯器（第 3B 階段）。所有可編輯的 Markdown 都用它，三種放法：就地（`placement="inline"`：筆記區塊、題目的題幹／思路／詳解、區塊筆記、題目的我的筆記；點外面或「完成」＝存、Esc＝取消）、註記卡（`"card"`）、整頁（`"page"`：新增的筆記、卡片編輯）。外面自己存檔時給 `onChange`＋`actions={false}`。沒改到的地方原文一字不動 |
 | `NoteCard` | NoteCard.tsx | 註記卡（第 3B 階段）：螢光的註記、克漏字小卡、查單字。電腦貼著被標的字（放不下放上方、捲動跟著走）；觸控固定在畫面下緣、可向下滑關閉。不變暗、不鎖捲動；點外面、Esc、「完成」關閉，關閉時由外面存。`HoverPreview`：電腦上滑過有註記的字 0.3 秒浮出預覽 |
+| 克漏字與膠帶 | content/Cloze.tsx、base.css 的 `.cloze-mark`／`.cloze-tape` | 第 5B 階段。原文上的克漏字是淺藍底＋底線（`.cloze-mark`）；膠帶模式（容器加 `.tape-mode`）與卡片複習（`clozeSide` 產生的 `.cloze-tape`）蓋上膠帶，顏色照答錯次數（`data-tape` 0/1/2 或 `tape-blue/orange/red`），提示寫在膠帶上（`data-hint`）。撕開加 `.torn`（虛線框、不位移）。點擊區用 `::before` 外擴到 44 px。示範在 `/dev/ui` |
 
 ## 4. 頁面樣板（`app/src/ui/templates.tsx`、`app/src/pages/Templates.tsx`）
 

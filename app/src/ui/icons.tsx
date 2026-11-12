@@ -185,6 +185,14 @@ const ICONS = {
     </>
   ),
   note: P("M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"),
+  /** 克漏字／膠帶（第 5B 階段）：一條文字被一塊膠帶蓋住 */
+  tape: (
+    <>
+      {P("M3 7h4M17 7h4M3 17h18")}
+      <rect x="8" y="4" width="8" height="6" rx="1" fill="currentColor" stroke="none" opacity="0.85" />
+      {P("M3 12h18")}
+    </>
+  ),
   download: (
     <>
       {P("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4")}

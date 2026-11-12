@@ -13,7 +13,8 @@ const ALLOWED_TAGS = [
   "p", "br", "strong", "b", "em", "i", "u", "s", "del", "sub", "sup", "mark", "code", "pre", "blockquote",
   "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "table", "thead", "tbody", "tr", "th", "td", "span", "div", "a",
 ];
-const ALLOWED_ATTR = ["href", "colspan", "rowspan", "class", "start", "title"];
+// data-hint、role：克漏字膠帶（card-core clozeSide）的提示與「圖」角色。data-hint 是一般文字，要另外標成 URI_SAFE（否則會被當網址檢查而拿掉）
+const ALLOWED_ATTR = ["href", "colspan", "rowspan", "class", "start", "title", "data-hint", "role"];
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -77,7 +78,7 @@ export function renderMarkdown(text: string, o: RenderOptions): string {
   let html = raw;
 
   // 3. 白名單清理
-  html = DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR, ALLOW_DATA_ATTR: false, ALLOWED_URI_REGEXP: /^https?:\/\//i });
+  html = DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR, ALLOW_DATA_ATTR: false, ADD_URI_SAFE_ATTR: ["data-hint"], ALLOWED_URI_REGEXP: /^https?:\/\//i });
 
   // 3b. 只有圖的段落（一張或並排幾張）：標記起來，資料庫閱讀頁讓它置中
   html = html.replace(/<p>((?:\s|<br>|@@[FG][0-9A-Za-z_.-]+@@)+)<\/p>/g, (all, inner: string) => (/@@[FG]/.test(inner) ? `<p class="fig-row">${inner}</p>` : all));

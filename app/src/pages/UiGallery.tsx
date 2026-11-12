@@ -362,6 +362,10 @@ export default function UiGallery() {
         <NoteCardDemo />
       </Group>
 
+      <Group title="克漏字與膠帶（第 5B 階段）" note="筆記裡挖空的字平常是淡藍底＋底線（不遮）。膠帶模式或卡片複習時蓋上膠帶：藍＝沒答錯過、橘＝重來過一次、紅＝兩次以上；在不同的兩天答對降一級。有提示的膠帶上寫提示。點膠帶撕開（虛線框），再點貼回。">
+        <TapeDemo />
+      </Group>
+
       <Group title="編輯器（第 3B 階段）" note="所見即所得：打 ### 、- 、1. 、> 、**粗體**、$x^2$ 當場變成排好的樣子；/ 叫出插入選單（表格、公式…）；表格裡 Tab 換格、最後一格 Tab 加列。存的仍是 Markdown，沒改到的地方原文一字不動。展示頁不會存檔，按「完成」後下面顯示存出來的 Markdown。">
         <EditorDemo />
       </Group>
@@ -549,6 +553,40 @@ function GroupDemo() {
             </GroupItem>
           ))}
         </GroupLayout>
+      </div>
+    </div>
+  );
+}
+
+function TapeDemo() {
+  const [torn, setTorn] = useState<Record<string, boolean>>({});
+  const t = (id: string, level: 0 | 1 | 2, ans: ReactNode, hint?: string) => (
+    <span
+      key={id}
+      className={`cloze-mark${torn[id] ? " torn" : ""}`}
+      data-tape={level}
+      data-hint={hint}
+      role="button"
+      tabIndex={0}
+      aria-label={torn[id] ? `撕開的克漏字：${typeof ans === "string" ? ans : "公式"}` : `膠帶${hint ? `（提示：${hint}）` : ""}`}
+      onClick={() => setTorn((p) => ({ ...p, [id]: !p[id] }))}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setTorn((p) => ({ ...p, [id]: !p[id] })); } }}
+    >
+      {ans}
+    </span>
+  );
+  return (
+    <div className="space-y-4">
+      <p className="text-body text-ink">
+        平常（沒開膠帶模式）：PDH 的輔酶有 <span className="cloze-mark">TPP</span>、<span className="cloze-mark">Lipoate</span>，抑制劑是 <span className="cloze-mark">arsenite</span>。
+      </p>
+      <p className="tape-mode text-body text-ink">
+        膠帶模式：PDH 的輔酶有 {t("a", 0, "TPP")}、{t("b", 1, "Lipoate", "含硫")}，抑制劑是 {t("c", 2, "arsenite")}；{t("d", 2, "FAD", "B2")} 也是。
+      </p>
+      <p className="text-meta text-ink-muted">左到右：藍、橘（有提示）、紅、紅（有提示）。點一下撕開，再點貼回。</p>
+      <div className="rounded-card border border-line p-4">
+        <div className="mb-2 text-meta font-semibold text-ink-muted">卡片複習的正面（三種顏色）</div>
+        <Markdown text={'TCA 的第一步：<span class="cloze-tape tape-blue" role="img" aria-label="空格">citrate synthase</span>；限速：<span class="cloze-tape tape-orange" role="img" aria-label="空格（提示：IDH）" data-hint="IDH">isocitrate DH</span>；<span class="cloze-tape tape-red" role="img" aria-label="空格">α-KGDH</span> 也需要 TPP。'} />
       </div>
     </div>
   );

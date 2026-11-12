@@ -5,12 +5,12 @@ import assert from "node:assert/strict";
 import { aiAfterEdit, cardFaces, cleanFields, clozeNumbers, clozeSide, interleave, maskChinese, mdToAnkiHtml, parseTsv, pickCards, splitNote, stripSounds, toTsv, vocabMd, vocabSounds } from "./card-core.ts";
 import type { SrsState } from "./types.ts";
 
-test("克漏字：遮第 n 個，其他直接顯示", () => {
+test("克漏字：遮第 n 個（膠帶，第 5B 階段），其他照常顯示（淺藍底）", () => {
   const md = "The {{c2:: nucleoid }} region is found in {{c1::prokaryotes::eu or pro?}}";
   assert.deepEqual(clozeNumbers(md), [1, 2]);
-  assert.equal(clozeSide(md, 1, "front"), 'The  nucleoid  region is found in <span class="cloze">[eu or pro?]</span>');
-  assert.equal(clozeSide(md, 2, "front"), 'The <span class="cloze">[⋯]</span> region is found in prokaryotes');
-  assert.equal(clozeSide(md, 1, "back"), 'The  nucleoid  region is found in <span class="cloze-a">prokaryotes</span>');
+  assert.equal(clozeSide(md, 1, "front"), 'The <span class="cloze-o"> nucleoid </span> region is found in <span class="cloze-tape tape-blue" role="img" aria-label="空格（提示：eu or pro?）" data-hint="eu or pro?">prokaryotes</span>');
+  assert.equal(clozeSide(md, 2, "front", 2), 'The <span class="cloze-tape tape-red" role="img" aria-label="空格"> nucleoid </span> region is found in <span class="cloze-o">prokaryotes</span>');
+  assert.equal(clozeSide(md, 1, "back"), 'The <span class="cloze-o"> nucleoid </span> region is found in <span class="cloze-a">prokaryotes</span>');
 });
 
 test("克漏字在公式裡：改用 KaTeX 寫法", () => {
@@ -20,13 +20,13 @@ test("克漏字在公式裡：改用 KaTeX 寫法", () => {
   const two = "${{c1::\\ln(x^{r})}}={{c2::r\\ln(x)}}$";
   assert.equal(clozeSide(two, 2, "front"), "$\\ln(x^{r})=\\boxed{\\text{?}}$");
   // 公式在答案裡（$ 在克漏字裡面）：照一般文字遮
-  assert.equal(clozeSide("h = {{c1::$6.6$}}", 1, "front"), 'h = <span class="cloze">[⋯]</span>');
+  assert.equal(clozeSide("h = {{c1::$6.6$}}", 1, "front", 1), 'h = <span class="cloze-tape tape-orange" role="img" aria-label="空格">$6.6$</span>');
 });
 
 test("cardFaces：克漏字的 ord 決定遮哪一個", () => {
   const f = cardFaces({ kind: "cloze", front_md: "{{c1::a}} {{c2::b}}", back_md: "x", origin: { from: "anki", ord: 1 } });
-  assert.equal(f.front, 'a <span class="cloze">[⋯]</span>');
-  assert.equal(f.reveal, 'a <span class="cloze-a">b</span>');
+  assert.equal(f.front, '<span class="cloze-o">a</span> <span class="cloze-tape tape-blue" role="img" aria-label="空格">b</span>');
+  assert.equal(f.reveal, '<span class="cloze-o">a</span> <span class="cloze-a">b</span>');
   assert.equal(f.back, "x");
 });
 

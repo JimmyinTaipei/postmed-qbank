@@ -44,7 +44,8 @@ export function ReviewCard({ front, back, figs, flipped, onFlip, ratings, onRate
   return (
     <div className="space-y-3">
       <Card as="article" className="flex min-h-64 flex-col">
-        <div className="flex-1 p-5 sm:p-6">
+        {/* 克漏字的膠帶：點膠帶就翻面（和「顯示答案」相同） */}
+        <div className="flex-1 p-5 sm:p-6" onClick={(e) => { if (!flipped && (e.target as HTMLElement).closest(".cloze-tape")) onFlip(); }}>
           {body ?? (
             <>
               <Markdown text={front} figs={figs} role="q" className={bigFront ? "text-display font-semibold text-ink-strong" : undefined} />

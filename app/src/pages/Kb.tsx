@@ -1,7 +1,7 @@
 // 資料庫（講義筆記，規格書 §9.4、第 4 階段）：目錄、閱讀頁（收合、螢光與註記、區塊筆記、目錄跳轉、匯出 .md、列印）、
 // 區塊編輯（改內容、插入列點、刪除區塊；走修訂佇列，Mac 上 pmq patches pull 寫回 .md）、新增一份筆記（寫回 _收件匣/）。
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   applyKbPatches,
@@ -22,12 +22,20 @@ import {
   useKbHighlights,
   useKbNotes,
   useKbPatches,
+  clozes,
+  comboOf,
+  startOfDay,
+  useClozeCards,
+  useClozeKeys,
+  useClozeMarksUnder,
+  type ClozeSource,
   type ContentPatch,
   type KbBlock,
   type KbCatalog,
   type KbDoc,
 } from "@/data";
 import { KbHighlightLayer } from "@/ui/content/Highlights";
+import { KbClozeLayer, pathOf, pickOf } from "@/ui/content/Cloze";
 import { Markdown } from "@/ui/content/Markdown";
 import { Icon } from "@/ui/icons";
 import { Dialog, Menu, Sheet, useToast, type MenuItem } from "@/ui/overlays";
@@ -352,6 +360,14 @@ export function KbReaderPage() {
   };
   const article = useRef<HTMLElement>(null);
   const hls = useKbHighlights(key);
+  // 克漏字與膠帶（第 5B 階段）
+  const czMarks = useClozeMarksUnder(key ? `kb:${key}#` : undefined);
+  const czInfo = useClozeCards(czMarks);
+  const clozeKeys = useClozeKeys();
+  const [tape, setTape] = useState(false);
+  const [torn, setTorn] = useState({ torn: 0, total: 0 });
+  const [resetTorn, setResetTorn] = useState(0);
+  const onTorn = useCallback((t: number, total: number) => setTorn((p) => (p.torn === t && p.total === total ? p : { torn: t, total })), []);
   const blockNotes = useKbNotes(key);
   const rows = useKbPatches(key);
   // 套上還沒寫回（或已寫回、待發佈）的修訂
@@ -458,6 +474,59 @@ export function KbReaderPage() {
   const subj = cat.data?.subjects.find((s) => s.id === subject);
   const group = subj?.groups.find((g) => g.docs.some((d) => d.key === key) || `${subj.id}/${g.id}` === key);
 
+  const mdOf = useCallback((bid: string) => (doc ? (findBlock(doc.blocks, bid)?.md ?? null) : null), [doc]);
+  const clozeSrc = useCallback(
+    (bid: string): ClozeSource | null => {
+      const b = doc && findBlock(doc.blocks, bid);
+      if (!doc || !b || !key) return null;
+      return {
+        target: `kb:${key}#${bid}`,
+        md: b.md,
+        deck: ["筆記", subj?.name ?? subject ?? "", group?.title ?? "", doc.title].filter(Boolean),
+        origin: { doc: key, bid, path: pathOf(doc, bid) },
+      };
+    },
+    [doc, key, subj?.name, subject, group?.title],
+  );
+  // 選字 → 克漏字（選字框的鈕與 ⌘⇧C／⌘⌥⇧C）
+  const makeCloze = async (p: { bid: string; s: number; e: number }, mode: "new" | "same"): Promise<boolean> => {
+    const b = doc && findBlock(doc.blocks, p.bid);
+    const el = article.current?.querySelector<HTMLElement>(`[data-hl-bid="${CSS.escape(p.bid)}"]`);
+    const src = clozeSrc(p.bid);
+    if (!b || !el || !src) return false;
+    if (b.type === "html" || b.type === "code" || b.type === "figure") {
+      toast("這種區塊不能挖空");
+      return false;
+    }
+    const pick = pickOf(el, p.s, p.e);
+    if (!pick) return false;
+    const r = await clozes.create(src, { ...pick, mode });
+    if (!r.ok) {
+      if (r.fallback !== undefined) {
+        toast(r.reason);
+        nav("/cards/new", { state: { kind: "cloze", front: r.fallback, back: "", origin: { from: "kb", doc: key, bid: p.bid, path: src.origin.path } } });
+        return true;
+      }
+      toast(r.reason);
+      return false;
+    }
+    toast(`已做成克漏字卡（c${r.n}）`, { action: { label: "復原", run: () => void r.undo().then(() => toast("已取消這個克漏字")) } });
+    return true;
+  };
+  // 這份筆記的卡：張數、今天到期、牌組（「複習這份筆記」）
+  const docCards = useMemo(() => {
+    if (!czInfo) return null;
+    const all = [...czInfo.byNote.values()].flatMap((m) => [...m.values()]);
+    if (!all.length) return null;
+    const tomorrow = startOfDay() + 86_400_000;
+    const due = all.filter((c) => {
+      const st = czInfo.state.get(c.id);
+      return st && !st.suspended && st.state !== 0 && st.due < tomorrow;
+    }).length;
+    const fresh = all.filter((c) => czInfo.state.get(c.id)?.state === 0).length;
+    return { total: all.length, due, fresh, deck: all[0].deck_id };
+  }, [czInfo]);
+
   // 從題目的「相關筆記」連過來（#b-<bid>）：展開並捲到那個區塊
   useEffect(() => {
     const m = /^#b-([0-9a-f]{12})$/.exec(loc.hash);
@@ -521,6 +590,11 @@ export function KbReaderPage() {
             <IconButton label="目錄" onClick={() => setToc(true)}>
               <Icon name="list" />
             </IconButton>
+            {(czMarks?.length ?? 0) > 0 && (
+              <IconButton label={tape ? "結束膠帶模式" : "膠帶模式（蓋住克漏字自我測驗，不算複習）"} pressed={tape} onClick={() => setTape((v) => !v)}>
+                <Icon name="tape" />
+              </IconButton>
+            )}
             <IconButton label={editing ? "結束編輯" : "編輯（點區塊就能改）"} pressed={editing} onClick={() => setEditing((v) => !v)}>
               <Icon name="edit" />
             </IconButton>
@@ -545,8 +619,29 @@ export function KbReaderPage() {
         <>
           <div className="flex flex-wrap items-center gap-3 print:hidden">
             <Segmented label="展開到第幾層" value={depth} onChange={setDepth} options={[{ value: 2, label: "大標" }, { value: 3, label: "小標" }, { value: 9, label: "全部" }]} />
-            <p className="text-meta text-ink-muted">選字可以畫螢光、加註；電腦上按兩下區塊就能改</p>
+            <p className="text-meta text-ink-muted">選字可以畫螢光、加註、挖克漏字；電腦上按兩下區塊就能改</p>
           </div>
+          {docCards && !tape && (
+            <div className="flex flex-wrap items-center gap-2 text-ui print:hidden">
+              <Icon name="tape" size={18} className="text-ink-muted" />
+              <span className="text-ink">
+                這份筆記 {docCards.total} 張卡・今天到期 {docCards.due}
+                {docCards.fresh ? `・新卡 ${docCards.fresh}` : ""}
+              </span>
+              <LinkButton to={`/cards/review?deck=${encodeURIComponent(docCards.deck)}`} variant="secondary" icon="repeat">複習這份筆記</LinkButton>
+            </div>
+          )}
+          {tape && (
+            <div role="status" className="sticky top-[calc(env(safe-area-inset-top)+3.75rem)] z-20 flex flex-wrap items-center gap-2 rounded-btn border border-line bg-card px-3 py-1.5 shadow-pop print:hidden">
+              <Icon name="tape" size={18} className="text-ink-muted" />
+              <span className="text-ui text-ink-strong">膠帶模式：共 {torn.total} 處・已撕 {torn.torn}</span>
+              <span className="text-meta text-ink-muted">點膠帶撕開、再點貼回；這裡撕開不算複習</span>
+              <span className="ml-auto flex gap-1">
+                <Button variant="ghost" disabled={!torn.torn} onClick={() => setResetTorn((n) => n + 1)}>全部貼回</Button>
+                <Button variant="secondary" onClick={() => setTape(false)}>結束</Button>
+              </span>
+            </div>
+          )}
           {editing && (
             <Notice icon="edit">
               編輯中：點任何區塊就在原地修改；區塊右邊的 ⋯ 可以插入列點、寫筆記、刪除。列點裡按 Enter 是在下面新增一個列點。存檔後進修訂佇列，在 Mac 上執行 bin/pmq patches pull 寫回筆記檔。圖、程式碼請在 Mac 上用 Typora 改。
@@ -557,7 +652,8 @@ export function KbReaderPage() {
               有 {ov.unanchored.length} 筆修訂對不到區塊（Mac 上改過這份筆記）。到修訂佇列看內容，決定要不要放棄。
             </Notice>
           )}
-          <KbHighlightLayer docKey={key!} root={article} list={hls} figs={doc.figs} version={version} onEdit={editBlock} />
+          <KbHighlightLayer docKey={key!} root={article} list={hls} figs={doc.figs} version={version} onEdit={editBlock} onCloze={tape ? undefined : makeCloze} />
+          <KbClozeLayer docKey={key!} doc={doc} root={article} marks={czMarks} info={czInfo} version={version} tape={tape} onTorn={onTorn} resetTorn={resetTorn} mdOf={mdOf} src={clozeSrc} />
           {orphanNotes.length > 0 && (
             <details className="rounded-btn border border-line bg-card print:hidden">
               <summary className="flex min-h-(--tap) items-center gap-2 px-3 text-meta text-ink-muted">
@@ -628,6 +724,12 @@ export function KbReaderPage() {
                           role="kb"
                           label={inline.b.type === "heading" ? "編輯標題" : "編輯這個區塊"}
                           onNotice={(t) => toast(t)}
+                          onKey={(e) => {
+                            const c = comboOf(e);
+                            if (c !== clozeKeys.new && c !== clozeKeys.same) return false;
+                            toast("先按完成，再選字挖空");
+                            return true;
+                          }}
                           onCancel={() => setInline(null)}
                           onDone={(r) => void saveInline(inline, r)}
                         />

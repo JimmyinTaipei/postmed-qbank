@@ -6,9 +6,9 @@
 // 取前後文最像的那一個；找不到 → 進「失聯的螢光」清單（不刪）。
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type RefObject } from "react";
-import { highlights, ink, lookupable, sentenceAt, useHighlights, useInkRows, useInkUnder, useVocabMarks, useVocabMarksUnder, useVocabSubjects, type Fig, type Highlight, type HighlightColor, type VocabMark } from "@/data";
+import { comboLabel, comboOf, highlights, ink, lookupable, useClozeKeys, sentenceAt, useHighlights, useInkRows, useInkUnder, useVocabMarks, useVocabMarksUnder, useVocabSubjects, type Fig, type Highlight, type HighlightColor, type VocabMark } from "@/data";
 import { Icon } from "../icons";
-import { Dialog } from "../overlays";
+import { Dialog, useToast } from "../overlays";
 import { Button, cx } from "../primitives";
 import { HighlightPalette } from "../templates";
 import { HoverPreview, NoteCard, NoteCardDelete } from "../NoteCard";
@@ -470,9 +470,15 @@ interface LayerProps {
 }
 
 /** 筆記閱讀頁的螢光層：包螢光、選字浮出色票、點螢光開註記面板、失聯清單。 */
-export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit }: LayerProps & { /** 選字框的「編輯」：編輯這個區塊 */ onEdit?: (bid: string) => void }) {
+export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit, onCloze }: LayerProps & {
+  /** 選字框的「編輯」：編輯這個區塊 */
+  onEdit?: (bid: string) => void;
+  /** 選字框的「克漏字」與快捷鍵（第 5B 階段）：mode＝new（⌘⇧C）或 same（⌘⌥⇧C）。回傳 false＝沒挖成（選字框留著） */
+  onCloze?: (p: { bid: string; s: number; e: number }, mode: "new" | "same") => Promise<boolean>;
+}) {
   const [orphans, setOrphans] = useState<Highlight[]>([]);
-  const [pick, setPick] = useState<{ bid: string; s: number; e: number; quote: string; prefix: string; suffix: string; x: number; y: number } | null>(null);
+  const [pick, setPick] = useState<{ bid: string; s: number; e: number; quote: string; prefix: string; suffix: string; x: number; y: number; cross?: boolean } | null>(null);
+  const clozeKeys = useClozeKeys();
   const [open, setOpen] = useState<string | null>(null);
   const [openStart, setOpenStart] = useState<"text" | "ink" | undefined>();
   const prefix = `kb:${docKey}#`;
@@ -542,10 +548,11 @@ export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit }: 
     const { text: t, pieces } = textIndex(block);
     const s = offsetOf(pieces, r.startContainer, r.startOffset, block);
     // 跨區塊的選取：只標到這個區塊的結尾
-    const e = block.contains(r.endContainer) ? offsetOf(pieces, r.endContainer, r.endOffset, block) : t.length;
+    const cross = !block.contains(r.endContainer);
+    const e = cross ? t.length : offsetOf(pieces, r.endContainer, r.endOffset, block);
     if (s === null || e === null || e <= s || !t.slice(s, e).trim()) return setPick(null);
     const rect = r.getBoundingClientRect();
-    setPick({ bid: block.dataset.hlBid!, s, e, quote: t.slice(s, e), prefix: t.slice(Math.max(0, s - CTX), s), suffix: t.slice(e, e + CTX), x: rect.left + rect.width / 2, y: rect.bottom });
+    setPick({ bid: block.dataset.hlBid!, s, e, quote: t.slice(s, e), prefix: t.slice(Math.max(0, s - CTX), s), suffix: t.slice(e, e + CTX), x: rect.left + rect.width / 2, y: rect.bottom, cross });
   }, [root]);
 
   useEffect(() => {
@@ -595,12 +602,52 @@ export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit }: 
     }
   };
 
+  const cloze = async (mode: "new" | "same") => {
+    if (!pick || !onCloze) return;
+    if (pick.cross) return toastRef.current("一次只能挖同一個列點裡的字");
+    if (await onCloze(pick, mode)) {
+      window.getSelection()?.removeAllRanges();
+      setPick(null);
+    }
+  };
+  const clozeRef = useRef(cloze);
+  clozeRef.current = cloze;
+  const toastRef = useRef(useToast());
+  // 快捷鍵（照 Anki）：⌘⇧C 新的編號、⌘⌥⇧C 沿用這個區塊最大的編號。有選字時才攔。
+  useEffect(() => {
+    if (!onCloze || !pick) return;
+    const key = (e: KeyboardEvent) => {
+      const c = comboOf(e);
+      if (c !== clozeKeys.new && c !== clozeKeys.same) return;
+      if ((e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable=true]")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void clozeRef.current(c === clozeKeys.same ? "same" : "new");
+    };
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
+  }, [onCloze, pick, clozeKeys]);
+
   const current = open ? (list ?? []).find((h) => h.id === open) : undefined;
   return (
     <>
       {pick && (
         <div className="fixed z-40 print:hidden" style={paletteAt(pick)} onPointerDown={(e) => e.preventDefault()}>
           <HighlightPalette
+            extra={
+              onCloze && (
+                <Button
+                  variant="ghost"
+                  icon="tape"
+                  aria-disabled={pick.cross || undefined}
+                  title={pick.cross ? "一次只能挖同一個列點裡的字" : `做成克漏字卡（${comboLabel(clozeKeys.new)}；和上一處一起遮 ${comboLabel(clozeKeys.same)}）`}
+                  className={pick.cross ? "opacity-50" : undefined}
+                  onClick={() => void cloze("new")}
+                >
+                  克漏字
+                </Button>
+              )
+            }
             onPick={(c) => void add(c, false)}
             onNote={() => void add("none", "text")}
             onInk={() => void add("none", "ink")}

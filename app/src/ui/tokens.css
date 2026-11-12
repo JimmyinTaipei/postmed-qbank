@@ -55,6 +55,15 @@
   --hl-green: #bdffb6;
   --hl-orange: #ffb9b8;
 
+  /* 克漏字與膠帶（第 5B 階段，規格書 §9.8、§13.1）。膠帶顏色代表答錯幾次（藍 0、橘 1、紅 2 次以上），深淺色相同；
+     膠帶上的提示字：藍、橘用 --paper-ink（7.1、6.8:1），紅用白字（5.6:1） */
+  --tape-blue: #53bdeb;
+  --tape-orange: #f59a23;
+  --tape-red: #d20000;
+  /* 平常模式的克漏字：比 --hl-blue（#87eaff，偏青）淡、偏藍，加一條細底線，和藍色螢光分得出來 */
+  --cloze-bg: #e4ecf8;
+  --cloze-line: #6592cd;
+
   /* 手寫與圖上標記的筆色（第 6 階段，規格書 §9.6、§13.1）：只畫在白色紙面或圖上，深淺色相同；預設藍 */
   --ink-blue: #3355bb;
   --ink-red: #d20000;
@@ -111,6 +120,10 @@
     --blue-light: #1f3152;
     --blue-mid: #2e4a7a;
     --blue-accent: #8fb3e8;
+  --cloze-bg: #1f3152;
+  --cloze-line: #8fb3e8;
+    --cloze-bg: #1f3152;
+    --cloze-line: #8fb3e8;
     --blue-deep: #a9c6f0;
     --blue-ink: #e3edfb;
     --on-deep: #0e2240;
@@ -142,6 +155,8 @@
   --blue-light: #1f3152;
   --blue-mid: #2e4a7a;
   --blue-accent: #8fb3e8;
+  --cloze-bg: #1f3152;
+  --cloze-line: #8fb3e8;
   --blue-deep: #a9c6f0;
   --blue-ink: #e3edfb;
   --on-deep: #0e2240;

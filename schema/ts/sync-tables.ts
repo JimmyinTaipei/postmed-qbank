@@ -122,6 +122,15 @@ export const SYNC_TABLES: SyncTable[] = [
     order: ["updated_at", "card"],
   },
   {
+    // 第 5B 階段：克漏字在原文上的位置（migration 0003）。較新者勝。
+    name: "cloze_mark",
+    pk: ["id"],
+    cols: ["id", "target", "quote", "prefix", "suffix", "start", "end", "note", "n", "hint", "updated_at", "deleted"],
+    json: [],
+    kind: "lww",
+    order: ["updated_at", "n"],
+  },
+  {
     name: "media",
     pk: ["sha"],
     cols: ["sha", "mime", "bytes", "created_at"],

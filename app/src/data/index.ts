@@ -10,6 +10,7 @@ export { cards, decks, tsv, cardQueue, ratingPreview, deckSubtree, flattenDecks,
 export { patches, notes, highlights, applyPatches, answerValue, fieldValue, fieldHash, markOf, patchNote, isWritten, FIELD_NAME, type AnswerValue } from "./patches";
 export { kbPatches, applyKbPatches, useKbPatches, useKbDrafts, useKbDraft, draftName, isNewBid, kbTarget, KB_EDITABLE, KB_DELETABLE, KB_BAD_NAME, type KbMark, type KbOverlay } from "./kbPatches";
 export { DEFAULT_SRS, ratingOf, startOfDay, localDay } from "./srs-core";
+export { comboOf, comboLabel, useClozeKeys, CLOZE_KEYS_DEFAULT, type ClozeKeys } from "./prefs";
 export { prefs, useInkToolPref, usePencilOnFigures, INK_TOOL_DEFAULT, type InkToolPref, useCardAutoplay, useDeviceName, useFigInvert, useOfflinePref, useShowUnverified, useThemePref } from "./prefs";
 export { startSync, syncNow, useSyncDetail, useSyncState } from "./sync";
 export { auth, type DeviceSession, type LoginResult } from "./auth";
@@ -38,4 +39,5 @@ export { isChoice, isMulti, judge, splitQuestion, answerText } from "./question"
 export { clusterItems, expandUnits, groupsOf, pageAt, pageLabel, pagesOf, takeUnits, type Page as ItemPage } from "./group-core";
 export { useSearch, searchText, prepareSearch, type SearchHit, type SearchState } from "./search";
 export { pushRecent, kbRecent, useKbRecent, KB_RECENT, type KbRecent } from "./recent";
+export { clozes, useClozeMarksUnder, useClozeCards, useTapeLevel, tapeLevel, buildFront, findInMd, mdPlain, squash, tableRowOf, maxCloze, MATH, TAPE_CLASS, TAPE_NAME, type ClozeCardInfo, type ClozePick, type ClozeResult, type ClozeSource, type TapeLevel } from "./cloze";
 export { vocabMarks, useVocabCards, useVocabIndex, useVocabMarks, useVocabMarksUnder, useAllVocabMarks, useVocabSubjects, lookupable, lemmasOf, wordKey, cardsFor, statusOf, statusLine, STATUS_NAME, WHERE_NAME, splitAt, vocabDeck, sentenceAt, boldIn, lemmasInQuestion, vocabRows, isWeakCommon, scoreOf, VOCAB_DECK, type VocabCards, type VocabRow, type VocabStatus } from "./vocab";

@@ -235,9 +235,18 @@ export const cards = {
    * 改一張卡（連同同一則筆記的其他卡）。front／back 是使用者在編輯器裡看到的那一則筆記的內容
    * （正反卡是第一張的正面與背面）。
    */
-  async edit(id: string, front: string, back: string, tags: string[] | null, deckId?: string, fields?: CardFields): Promise<void> {
+  async edit(id: string, front: string, back: string, tags: string[] | null, deckId?: string, fields?: CardFields, opts?: { /** 克漏字跟著原文自動更新（第 5B 階段）：不算使用者改過 */ auto?: boolean; stale?: boolean }): Promise<void> {
     const card = await db.card.get(id);
     if (!card) return;
+    // 由筆記挖空的卡：使用者在卡片編輯器改過內文 → 之後原文改版不再自動更新（規格書 §9.8）
+    const fromText = card.origin?.from === "kb" || (card.origin?.from === "q" && !!card.origin?.path);
+    const mark = (o: CardOrigin | null): CardOrigin | null => {
+      if (!o) return o;
+      const out = { ...o };
+      if (!opts?.auto && fromText && front !== card.front_md) out.edited = true;
+      if (opts?.stale !== undefined) out.stale = opts.stale || undefined;
+      return out;
+    };
     if (card.kind === "vocab") {
       const f = cleanFields(fields ?? card.fields);
       const md = vocabMd(f);
@@ -247,7 +256,11 @@ export const cards = {
       return;
     }
     const key = noteKey(card);
-    const siblings = (await db.card.toArray()).filter((c) => noteKey(c) === key);
+    const siblings = (
+      card.origin?.guid ? await db.card.where("origin.guid").equals(card.origin.guid).toArray()
+      : card.origin?.note ? await db.card.where("origin.note").equals(card.origin.note).toArray()
+      : [card]
+    ).filter((c) => noteKey(c) === key);
     const t = now();
     await db.transaction("rw", TABLES(), async () => {
       if (card.kind === "cloze") {
@@ -255,7 +268,7 @@ export const cards = {
         for (const s of siblings) {
           const ord = s.origin?.ord ?? 0;
           if (want.has(ord)) {
-            await putCard({ ...s, front_md: front, back_md: back, tags, deck_id: deckId ?? s.deck_id, deleted: 0, updated_at: t });
+            await putCard({ ...s, origin: mark(s.origin), front_md: front, back_md: back, tags, deck_id: deckId ?? s.deck_id, deleted: 0, updated_at: t });
             if (s.deleted) await setSuspended(s.id, 0, t);
             want.delete(ord);
           } else if (!s.deleted) {
@@ -265,7 +278,7 @@ export const cards = {
         }
         for (const p of want.values()) {
           const nid = `${card.id.replace(/-\d+$/, "")}-${p.ord}`;
-          await putCard({ id: nid, deck_id: deckId ?? card.deck_id, kind: "cloze", front_md: front, back_md: back, tags, origin: { ...card.origin, from: card.origin?.from ?? "site", ord: p.ord } as CardOrigin, updated_at: t, deleted: 0 });
+          await putCard({ id: nid, deck_id: deckId ?? card.deck_id, kind: "cloze", front_md: front, back_md: back, tags, origin: mark({ ...card.origin, from: card.origin?.from ?? "site", ord: p.ord } as CardOrigin), updated_at: t, deleted: 0 });
           await newState(nid, t);
         }
       } else if (card.kind === "reverse") {
@@ -331,14 +344,23 @@ export const cards = {
     return n;
   },
 
-  /** 刪除一張卡（同一則筆記的其他卡不動）。 */
-  async remove(id: string): Promise<void> {
+  /** 刪除一張卡（同一則筆記的其他卡不動）。由筆記挖空的卡：原文上那個編號的克漏字一起拿掉（第 5B 階段）。 */
+  async remove(id: string, opts?: { keepMarks?: boolean }): Promise<void> {
     const t = now();
-    await db.transaction("rw", TABLES(), async () => {
+    await db.transaction("rw", [...TABLES(), db.cloze_mark], async () => {
       const c = await db.card.get(id);
       if (!c) return;
       await putCard({ ...c, deleted: 1, updated_at: t });
       await setSuspended(id, 1, t);
+      const note = c.origin?.note;
+      if (!opts?.keepMarks && note && c.kind === "cloze") {
+        const n = (c.origin?.ord ?? 0) + 1;
+        for (const m of await db.cloze_mark.where("note").equals(note).toArray()) {
+          if (m.deleted || m.n !== n) continue;
+          await db.cloze_mark.put({ ...m, deleted: 1, updated_at: t });
+          await enqueue("cloze_mark", m.id);
+        }
+      }
     });
     kick();
   },

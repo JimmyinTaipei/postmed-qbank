@@ -18,23 +18,27 @@ export function clozeNumbers(md: string): number[] {
 
 const texText = (s: string) => s.replace(/[\\{}$&#%_^~]/g, (c) => (c === "\\" ? "\\backslash " : `\\${c}`));
 
+const escAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
 /**
  * 克漏字卡的一面。n：要遮的編號（ord + 1）。
- * - 正面：第 n 個換成 [提示] 或 [⋯]，其他編號直接顯示答案。
- * - 背面：第 n 個的答案上色標出。
- * 在公式（$…$）裡的克漏字改用 KaTeX 的寫法，公式才排得出來。
+ * - 正面：第 n 個蓋上膠帶（第 5B 階段，規格書 §9.8；寬度＝答案原本的寬度，有提示寫在膠帶上，
+ *   顏色照答錯次數 tape：0 藍、1 橘、2 紅）；其他編號直接顯示答案（淺藍底）。
+ * - 背面：第 n 個的答案上色標出（淺藍底）。
+ * 在公式（$…$）裡的克漏字改用 KaTeX 的寫法（方框問號），公式才排得出來。
  */
-export function clozeSide(md: string, n: number, side: "front" | "back"): string {
+export function clozeSide(md: string, n: number, side: "front" | "back", tape: 0 | 1 | 2 = 0): string {
   const ranges = mathRanges(md);
   const inMath = (pos: number) => ranges.some(([a, b]) => a < pos && pos < b);
   return md.replace(CLOZE, (_all, num: string, ans: string, hint: string | undefined, pos: number) => {
-    if (Number(num) !== n) return ans;
+    if (Number(num) !== n) return inMath(pos) ? ans : `<span class="cloze-o">${ans}</span>`;
     if (inMath(pos)) {
       if (side === "back") return `{\\color{#2f6fde}${ans}}`;
       return `\\boxed{\\text{${hint ? texText(hint) : "?"}}}`;
     }
     if (side === "back") return `<span class="cloze-a">${ans}</span>`;
-    return `<span class="cloze">[${hint ? hint : "⋯"}]</span>`;
+    const cls = ["tape-blue", "tape-orange", "tape-red"][tape];
+    return `<span class="cloze-tape ${cls}" role="img" aria-label="${hint ? `空格（提示：${escAttr(hint)}）` : "空格"}"${hint ? ` data-hint="${escAttr(hint)}"` : ""}>${ans}</span>`;
   });
 }
 
@@ -141,14 +145,14 @@ export function vocabSounds(f: CardFields): string[] {
 export const stripSounds = (md: string) => md.replace(SOUND_RE, "").trim();
 
 /** 一張卡顯示用的正面與背面（背面＝翻面後正面下方多出來的部分）。 */
-export function cardFaces(c: Pick<Card, "kind" | "front_md" | "back_md" | "origin"> & { fields?: CardFields | null }): { front: string; reveal: string; back: string } {
+export function cardFaces(c: Pick<Card, "kind" | "front_md" | "back_md" | "origin"> & { fields?: CardFields | null }, tape: 0 | 1 | 2 = 0): { front: string; reveal: string; back: string } {
   if (c.kind === "vocab" && c.fields) {
     const v = vocabMd(c.fields);
     return { front: v.front_md, reveal: v.front_md, back: v.back_md };
   }
   if (c.kind === "cloze") {
     const n = (c.origin?.ord ?? 0) + 1;
-    return { front: clozeSide(c.front_md, n, "front"), reveal: clozeSide(c.front_md, n, "back"), back: c.back_md };
+    return { front: clozeSide(c.front_md, n, "front", tape), reveal: clozeSide(c.front_md, n, "back"), back: c.back_md };
   }
   return { front: c.front_md, reveal: c.front_md, back: c.back_md };
 }

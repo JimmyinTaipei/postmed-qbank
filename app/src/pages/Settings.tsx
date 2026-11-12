@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   auth, prefs, setOffline, syncNow, useAsync, useContentInfo, useContentStatus, useDeviceName, useFigInvert, useOfflinePref, usePencilOnFigures, useShowUnverified,
-  useSyncDetail, useTaxonomy, useThemePref, wipeLocal, settings, srs, useSrsConfig, type Subject, type SrsConfig,
+  useSyncDetail, useTaxonomy, comboLabel, comboOf, useClozeKeys, CLOZE_KEYS_DEFAULT, type ClozeKeys, useThemePref, wipeLocal, settings, srs, useSrsConfig, type Subject, type SrsConfig,
 } from "@/data";
 import { formatAgo } from "@/lib/format";
 import { Dialog, useToast } from "@/ui/overlays";
@@ -105,6 +105,64 @@ function ReviewSettings() {
   );
 }
 
+/** 一個快速鍵：按「錄製」後按下新的組合（要有 ⌘／Ctrl）；Esc 取消。 */
+function KeyRecorder({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [rec, setRec] = useState(false);
+  const [warn, setWarn] = useState("");
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div className="min-w-0">
+        <div className="text-ui text-ink-strong">{label}</div>
+        {warn && <div className="text-meta text-incorrect-ink" role="alert">{warn}</div>}
+      </div>
+      <button
+        type="button"
+        aria-label={`${label}：${rec ? "請按新的組合鍵，Esc 取消" : comboLabel(value)}`}
+        className={`min-h-11 min-w-28 rounded-btn border px-3 font-mono text-ui ${rec ? "border-blue-accent bg-blue-light text-ink-strong" : "border-line bg-card text-ink-strong hover:bg-hover"}`}
+        onClick={() => { setWarn(""); setRec(true); }}
+        onBlur={() => setRec(false)}
+        onKeyDown={(e) => {
+          if (!rec) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.key === "Escape") return setRec(false);
+          if (["Meta", "Control", "Alt", "Shift"].includes(e.key)) return;
+          if (!e.metaKey && !e.ctrlKey) return setWarn("要包含 ⌘ 或 Ctrl，才不會和打字衝突");
+          onChange(comboOf(e));
+          setRec(false);
+        }}
+      >
+        {rec ? "請按組合鍵…" : comboLabel(value)}
+      </button>
+    </div>
+  );
+}
+
+function ClozeKeySettings() {
+  const keys = useClozeKeys();
+  const toast = useToast();
+  const set = (k: keyof ClozeKeys) => (v: string) => {
+    const other = k === "new" ? keys.same : keys.new;
+    if (v === other) return toast("兩個快速鍵不能一樣");
+    prefs.setClozeKeys({ [k]: v });
+    toast(`已改成 ${comboLabel(v)}`);
+  };
+  const changed = keys.new !== CLOZE_KEYS_DEFAULT.new || keys.same !== CLOZE_KEYS_DEFAULT.same;
+  return (
+    <section aria-labelledby="h-keys">
+      <SectionTitle id="h-keys">快速鍵</SectionTitle>
+      <Card className="divide-y divide-line">
+        <KeyRecorder label="克漏字（新的編號）" value={keys.new} onChange={set("new")} />
+        <KeyRecorder label="克漏字（和上一個同一張卡）" value={keys.same} onChange={set("same")} />
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+          <span className="text-meta text-ink-muted">筆記裡選字後按、卡片編輯器裡選字後按都可以。只影響這台裝置。</span>
+          {changed && <Button variant="ghost" className="ml-auto" onClick={() => { prefs.setClozeKeys(null); toast("已恢復預設"); }}>恢復預設</Button>}
+        </div>
+      </Card>
+    </section>
+  );
+}
+
 export function Settings() {
   const theme = useThemePref();
   const invert = useFigInvert();
@@ -151,6 +209,8 @@ export function Settings() {
       </section>
 
       <ReviewSettings />
+
+      <ClozeKeySettings />
 
       <section aria-labelledby="h-device">
         <SectionTitle id="h-device">這台裝置</SectionTitle>

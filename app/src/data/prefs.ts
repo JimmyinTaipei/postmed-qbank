@@ -25,7 +25,42 @@ function write(key: string, value: string) {
 
 if (typeof window !== "undefined") window.addEventListener("storage", emit);
 
+/** 克漏字的快捷鍵（第 5B 階段，照 Anki）。寫法：「Mod+Shift+KeyC」（Mod＝Mac 的 ⌘、其他的 Ctrl；最後是 KeyboardEvent.code） */
+export const CLOZE_KEYS_DEFAULT = { new: "Mod+Shift+KeyC", same: "Mod+Alt+Shift+KeyC" };
+export type ClozeKeys = typeof CLOZE_KEYS_DEFAULT;
+
+/** 按鍵事件 → 「Mod+Alt+Shift+KeyC」 */
+export function comboOf(e: { metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean; code: string }): string {
+  return [e.metaKey || e.ctrlKey ? "Mod" : "", e.altKey ? "Alt" : "", e.shiftKey ? "Shift" : "", e.code].filter(Boolean).join("+");
+}
+
+/** 「Mod+Shift+KeyC」→「⌘⇧C」 */
+export function comboLabel(c: string): string {
+  const mac = typeof navigator !== "undefined" && /Mac|iPad|iPhone/.test(navigator.platform + navigator.userAgent);
+  return c
+    .split("+")
+    .map((k) => (k === "Mod" ? (mac ? "⌘" : "Ctrl+") : k === "Alt" ? (mac ? "⌥" : "Alt+") : k === "Shift" ? (mac ? "⇧" : "Shift+") : k.replace(/^Key|^Digit/, "")))
+    .join("");
+}
+
+let clozeKeysCache: { raw: string | null; v: ClozeKeys } | null = null;
+
 export const prefs = {
+  clozeKeys(): ClozeKeys {
+    const raw = read("pmq.clozeKeys");
+    if (clozeKeysCache && clozeKeysCache.raw === raw) return clozeKeysCache.v;
+    let v = CLOZE_KEYS_DEFAULT;
+    try {
+      if (raw) v = { ...CLOZE_KEYS_DEFAULT, ...JSON.parse(raw) };
+    } catch {
+      /* 壞掉就用預設 */
+    }
+    clozeKeysCache = { raw, v };
+    return v;
+  },
+  setClozeKeys(v: Partial<ClozeKeys> | null) {
+    write("pmq.clozeKeys", v ? JSON.stringify({ ...prefs.clozeKeys(), ...v }) : JSON.stringify(CLOZE_KEYS_DEFAULT));
+  },
   theme(): ThemePref {
     const v = read("pmq.theme");
     return v === "light" || v === "dark" ? v : "system";
@@ -147,4 +182,8 @@ export function useShowUnverified(): boolean {
 }
 export function useCardAutoplay(): boolean {
   return useSyncExternalStore(prefs.subscribe, prefs.cardAutoplay);
+}
+
+export function useClozeKeys(): ClozeKeys {
+  return useSyncExternalStore(prefs.subscribe, prefs.clozeKeys);
 }

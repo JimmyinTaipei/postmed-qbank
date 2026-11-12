@@ -27,6 +27,11 @@ import {
   type CardOrigin,
   type DeckNode,
   type Fig,
+  useTapeLevel,
+  comboOf,
+  comboLabel,
+  maxCloze,
+  useClozeKeys,
 } from "@/data";
 import { htmlToMarkdown } from "@/ui/content/paste";
 import { Markdown } from "@/ui/content/Markdown";
@@ -40,6 +45,10 @@ import { RichEditor } from "@/ui/RichEditorLazy";
 import { InkScope } from "@/ui/ink/FigInk";
 import { VocabCard } from "@/ui/content/VocabCard";
 import { Frame } from "./SessionPlayer";
+import type { Selection as PmSelection } from "prosemirror-state";
+
+/** 筆記的網址（和 Kb.tsx 的 docUrl 相同；不 import 整個筆記頁） */
+const docUrl = (key: string, bid?: string) => `/kb/${key.split("/").map(encodeURIComponent).join("/")}${bid ? `#b-${bid}` : ""}`;
 
 /** 清單用的一行純文字：克漏字顯示答案、去掉公式符號與 HTML、圖與聲音換成記號。 */
 export function cardPlain(md: string): string {
@@ -440,7 +449,13 @@ export function CardPage() {
         {o?.from === "anki" && <div className="text-meta text-ink-muted">從 Anki 搬來：{o.deck}（{o.model}）</div>}
         {o?.from === "ai" && <div className="text-meta text-ink-muted">AI 產生（批次 {o.batch}）{o.ai?.length ? "；標「AI」的欄位還沒改過" : "；全部欄位都改過了"}</div>}
         {o?.from === "q" && o.id && <div className="text-meta text-ink-muted">由題目做成：<a href={`/q/${o.id}`} onClick={(e) => { e.preventDefault(); nav(`/q/${o.id}`); }}>{o.id}</a></div>}
-        {o?.from === "kb" && o.doc && <div className="text-meta text-ink-muted">由筆記做成：<a href={`/kb/${o.doc}${o.bid ? `#b-${o.bid}` : ""}`} onClick={(e) => { e.preventDefault(); nav(`/kb/${o.doc}${o.bid ? `#b-${o.bid}` : ""}`); }}>{o.doc.split("/").pop()}</a></div>}
+        {o?.from === "kb" && o.doc && (
+          <div className="text-meta text-ink-muted">
+            由筆記做成：<a href={docUrl(o.doc, o.bid)} onClick={(e) => { e.preventDefault(); nav(docUrl(o.doc!, o.bid)); }}>{(o.path?.length ? o.path : [o.doc.split("/").pop()]).join(" › ")}</a>
+            {o.stale && <> <Badge tone="warning">原文已改</Badge> 找不到原本挖空的字，卡片保留舊內容</>}
+            {o.edited && "；你改過這張卡，原文更新時不會自動跟著改"}
+          </div>
+        )}
       </Card>
       {moving && tree && <MoveSheet tree={tree} current={card.deck_id} onClose={() => setMoving(false)} onMove={async (d) => { await cards.move([card.id], d); setMoving(false); toast("已移動"); }} />}
       {confirmDel && (
@@ -534,6 +549,31 @@ export function CardEditPage() {
   /** 編輯器重新開的版本（載入那一則筆記、新增後清空時換一個） */
   const [ver, setVer] = useState(0);
   const figs = useCardFigs(draft?.origin ?? row?.card.origin);
+  const clozeKeys = useClozeKeys();
+  // ⌘⇧C 新的克漏字（下一個編號）、⌘⌥⇧C 同一個編號（和 Anki 相同）；選字包成 {{cN::…}}
+  const clozeKey: Parameters<typeof FieldArea>[0]["onKey"] = (e, view) => {
+    const c = comboOf(e);
+    if (c !== clozeKeys.new && c !== clozeKeys.same) return false;
+    if (kind !== "cloze") {
+      if (editing) {
+        toast("這張不是克漏字卡；建立後不能改種類");
+        return true;
+      }
+      setKind("cloze");
+    }
+    const top = maxCloze(front);
+    const n = c === clozeKeys.new ? top + 1 : Math.max(top, 1);
+    const { from, to, empty } = view.state.selection;
+    const text = empty ? "" : view.state.doc.textBetween(from, to, " ");
+    const open = `{{c${n}::`;
+    let tr = view.state.tr.insertText(`${open}${text}}}`, from, to);
+    // 沒選字：游標放在 {{cN::| }} 中間
+    // （Selection 由編輯器那一包提供，這裡不另外載入 prosemirror-state）
+    if (empty) tr = tr.setSelection((view.state.selection.constructor as typeof PmSelection).near(tr.doc.resolve(from + open.length)));
+    view.dispatch(tr);
+    view.focus();
+    return true;
+  };
 
   // 編輯：載入那一則筆記
   useEffect(() => {
@@ -618,7 +658,7 @@ export function CardEditPage() {
             <VocabForm value={fields} onChange={setFields} ver={ver} />
           ) : (
           <>
-          <FieldArea ver={ver} label={kind === "cloze" ? "內文" : "正面"} value={front} onChange={setFront} figs={figs} role="q" big />
+          <FieldArea ver={ver} label={kind === "cloze" ? "內文" : "正面"} value={front} onChange={setFront} figs={figs} role="q" big onKey={clozeKey} hint={`選字後按 ${comboLabel(clozeKeys.new)} 挖空（同一個編號：${comboLabel(clozeKeys.same)}）`} />
           <FieldArea ver={ver} label={kind === "cloze" ? "補充（翻面後顯示，可留空）" : "背面"} value={back} onChange={setBack} figs={figs} role="sol" big />
           </>
           )}
@@ -663,7 +703,9 @@ export function CardReviewPage() {
     void cardQueue(deck).then((q) => setQueue(q.items));
   }, [deck]);
 
-  const faces = row ? cardFaces(row.card) : null;
+  const tape = useTapeLevel(row?.card.kind === "cloze" ? id : undefined);
+  const faces = row ? cardFaces(row.card, tape) : null;
+  const src = row?.card.origin?.from === "kb" ? row.card.origin : null;
   useEffect(() => {
     if (!id) return;
     setFlipped(false);
@@ -761,7 +803,14 @@ export function CardReviewPage() {
             body={row?.card.kind === "vocab" && row.card.fields ? <VocabCard key={row.card.id} fields={row.card.fields} tags={row.card.tags} side={flipped ? "back" : "front"} figs={figs} resetKey={row.card.id} ai={row.card.origin?.ai} /> : undefined}
             bigFront={row?.card.kind !== "cloze" && !faces.front.includes("\n") && cardPlain(faces.front).length <= 40} front={flipped ? faces.reveal : faces.front} back={faces.back} figs={figs} flipped={flipped} onFlip={flip} ratings={ratings} onRate={(v) => void rate(v)} />
           </InkScope>
-          <p className="mt-3 hidden text-center text-meta text-ink-muted lg:block">空白鍵翻面；1 重來、2 困難、3 良好、4 簡單</p>
+          {src?.doc && (
+            <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-muted">
+              <span className="min-w-0 [overflow-wrap:anywhere]">{(src.path?.length ? src.path : [src.doc.split("/").pop()]).join(" › ")}</span>
+              {src.stale && <Badge tone="warning">原文已改</Badge>}
+              {flipped && <a href={docUrl(src.doc, src.bid)} onClick={(e) => { e.preventDefault(); nav(docUrl(src.doc!, src.bid)); }}>看原文</a>}
+            </p>
+          )}
+          <p className="mt-3 hidden text-center text-meta text-ink-muted lg:block">{row?.card.kind === "cloze" ? "點膠帶或按空白鍵翻面" : "空白鍵翻面"}；1 重來、2 困難、3 良好、4 簡單</p>
         </div>
       )}
     </Frame>

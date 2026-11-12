@@ -409,6 +409,12 @@ export interface CardOrigin {
   /** AI 產生的單字卡（第 8B-3 階段 pmq vocab import）：批次名稱、還沒被使用者改過的 AI 欄位（卡片上標「AI」，改過就拿掉） */
   batch?: string;
   ai?: string[];
+  /** 由筆記挖空（第 5B 階段）：當時的路徑（標題＋上層列點），複習時顯示在卡片上方 */
+  path?: string[];
+  /** 使用者在卡片編輯器改過內文：之後原文改版不再自動更新這張卡 */
+  edited?: boolean;
+  /** 原文改版後有克漏字找不到了：卡片保留舊內容，標「原文已改」 */
+  stale?: boolean;
 }
 
 export interface Card {
@@ -421,6 +427,26 @@ export interface Card {
   fields?: CardFields | null;
   tags: string[] | null;
   origin: CardOrigin | null;
+  updated_at: number;
+  deleted: 0 | 1;
+  seq?: number;
+}
+
+/** 克漏字在原文上的位置（第 5B 階段，規格書 §4.6、§9.8）。卡片本身是普通的克漏字卡。 */
+export interface ClozeMark {
+  id: string;
+  /** 'kb:<doc>#<bid>'｜'q:PHY-…/sol'｜'q:PHY-…/idea' */
+  target: string;
+  quote: string;
+  prefix: string | null;
+  suffix: string | null;
+  start: number | null;
+  end: number | null;
+  /** 卡片那一則筆記的鍵（＝card.origin.note） */
+  note: string;
+  /** 克漏字編號（1 起）；同號同一張卡 */
+  n: number;
+  hint: string | null;
   updated_at: number;
   deleted: 0 | 1;
   seq?: number;
