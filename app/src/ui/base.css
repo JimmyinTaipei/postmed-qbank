@@ -259,6 +259,11 @@
   text-decoration: underline dotted var(--text-muted);
   text-underline-offset: 0.2em;
 }
+/* 查過的單字（第 8B-2 階段）：虛線底線，點了開查單字卡。用 border 畫，才不會和註記的點線底線互相蓋掉 */
+.md .vocab-mark {
+  border-bottom: 1.5px dashed var(--blue-accent);
+  cursor: pointer;
+}
 .md code {
   font-family: var(--font-code);
   font-size: 0.9em;

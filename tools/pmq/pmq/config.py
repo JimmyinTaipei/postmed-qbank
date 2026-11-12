@@ -30,6 +30,8 @@ class Config:
         self.sample = data.get("sample", {})
         self.kb = data.get("kb", {})
         self.anki = data.get("anki", {})
+        # 查單字與單字索引（第 8B-2 階段，規格書 §9.11「8B」）：開了的科目
+        self.vocab_subjects = list((data.get("vocab") or {}).get("subjects", ["ENG"]))
         # 共用格式的科目（英文；之後生物、化學）：[subjects.<ID>]，規格書 §9.11「8A」
         self.shared_subjects = []
         for sid, spec in (data.get("subjects") or {}).items():

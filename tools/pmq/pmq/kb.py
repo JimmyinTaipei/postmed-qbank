@@ -355,13 +355,17 @@ def _source_to_id(questions):
     return out
 
 
-def discover(cfg):
+def discover(cfg, only=None):
     """依 pmq.toml [kb] 找出要匯入的筆記。回傳 [(科目, 群組資料夾名, 群組顯示名, [路徑…])]、只建目錄的科目。"""
     kb = cfg.kb
     skip = {"_archive", "pdf", "pdf檔", "assets"}
     exclude = {(cfg.notes / e).resolve() for e in kb.get("exclude", [])}
     groups = []
-    for subj in ("BCH", "PHY"):
+    # 值是清單的科目匯入內容；是字串的只建章節目錄（第 8C 階段起英文也匯入）
+    subjects = [s for s, v in kb.items() if isinstance(v, list) and s != "exclude"]
+    for subj in subjects:
+        if only and subj != only:
+            continue
         for rel in kb.get(subj, []):
             base = cfg.notes / rel
             if not base.is_dir():
@@ -383,9 +387,8 @@ def discover(cfg):
                 if files:
                     groups.append((subj, INBOX, "收件匣", files))
     outline = {}
-    for subj in ("BIO", "CHE", "ENG"):
-        rel = kb.get(subj)
-        if not rel:
+    for subj, rel in kb.items():
+        if not isinstance(rel, str) or (only and subj != only):
             continue
         base = cfg.notes / rel
         names = sorted((d.name for d in base.iterdir() if d.is_dir() and not d.name.startswith((".", "_"))), key=natural_key) if base.is_dir() else []
@@ -409,9 +412,10 @@ def doc_names(groups):
     return doc_keys, doc_of
 
 
-def build_kb(cfg, c):
-    """回傳 (docs {key: doc}, catalog, related {qid: [...]})。c 是 build.Contract（要用題目做出處對照）。"""
-    groups, outline = discover(cfg)
+def build_kb(cfg, c, only=None):
+    """回傳 (docs {key: doc}, catalog, related {qid: [...]})。c 是 build.Contract（要用題目做出處對照）。
+    only：只建這一科的筆記（pmq check／publish --subject；發佈時與線上其他科的筆記合併）。"""
+    groups, outline = discover(cfg, only)
     doc_keys, doc_of = doc_names(groups)
     kbb = KbBuilder(cfg, c.assets, c.report, _source_to_id(c.questions), doc_keys)
     docs = {}

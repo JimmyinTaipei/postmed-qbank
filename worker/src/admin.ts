@@ -59,12 +59,16 @@ interface Manifest {
   version: number;
   generated: string;
   counts: Record<string, number>;
-  files: { taxonomy: string; index: Record<string, string>; packs: Record<string, string>; kb?: Record<string, string>; cases?: string };
+  files: {
+    taxonomy: string; index: Record<string, string>; packs: Record<string, string>; kb?: Record<string, string>; cases?: string;
+    kbcat?: string; kbrel?: string; vocab?: Record<string, string>;
+  };
 }
 
 function manifestFiles(m: Manifest): string[] {
   const f = m.files;
-  return [f.taxonomy, ...Object.values(f.index ?? {}), ...Object.values(f.packs ?? {}), ...Object.values(f.kb ?? {}), ...(f.cases ? [f.cases] : [])];
+  return [f.taxonomy, ...Object.values(f.index ?? {}), ...Object.values(f.packs ?? {}), ...Object.values(f.kb ?? {}), ...(f.cases ? [f.cases] : []),
+    ...(f.kbcat ? [f.kbcat] : []), ...(f.kbrel ? [f.kbrel] : []), ...Object.values(f.vocab ?? {})];
 }
 
 /** POST /api/admin/manifest：確認引用的檔都已上傳，才換版（原子；中途失敗線上仍是舊版）。 */

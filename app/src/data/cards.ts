@@ -7,7 +7,7 @@
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { ulid } from "@/lib/ulid";
-import { cardFaces, cleanFields, formatIvl, interleave, noteKey, parseTsv, pickCards, splitNote, toTsv, vocabMd, type TsvRow } from "./card-core";
+import { cardFaces, cleanFields, formatIvl, interleave, isAskedNew, noteKey, parseTsv, pickCards, splitNote, toTsv, vocabMd, type TsvRow } from "./card-core";
 import { db } from "./db";
 import { prefs } from "./prefs";
 import { review, scheduler, startOfDay, DAY_MS, toCard } from "./srs-core";
@@ -153,6 +153,7 @@ export async function cardQueue(deck: string | null = null, at = now()): Promise
     maxReviews: cfg.maxReviews,
     maxNew: cfg.maxNew,
     tomorrow: today + DAY_MS,
+    asked: (s) => isAskedNew(s, startOfDay),
   });
   return { items: interleave(r.due, r.fresh), dueTotal: r.dueTotal, newTotal: r.newTotal, dueShown: r.due.length, newShown: r.fresh.length, doneToday: { reviews, news }, cfg };
 }
@@ -302,6 +303,31 @@ export const cards = {
     const t = now();
     await db.transaction("rw", TABLES(), () => setSuspended(id, v ? 1 : 0, t));
     kick();
+  },
+
+  /**
+   * 排到今天（第 8B-2 階段「我不會這個字」）：暫停的恢復；新卡排在今天新卡的最前面；學過的卡改成現在到期。
+   * 評分紀錄不動。
+   */
+  async askToday(ids: string[]): Promise<number> {
+    const t = now();
+    const today = startOfDay(t);
+    let n = 0;
+    await db.transaction("rw", TABLES(), async () => {
+      for (const id of ids) {
+        const key = sk(id);
+        const c = await db.card.get(id);
+        if (!c || c.deleted) continue;
+        const cur = await db.srs_state.get(key);
+        const base = cur ?? { item: key, due: t, stability: null, difficulty: null, reps: 0, lapses: 0, state: 0 as const, last_review: null, suspended: 0 as const, updated_at: t };
+        const due = base.state === 0 ? today : Math.min(base.due, t);
+        await db.srs_state.put({ ...base, due, suspended: 0, updated_at: Math.max(t, (cur?.updated_at ?? 0) + 1) });
+        await enqueue("srs_state", key);
+        n++;
+      }
+    });
+    kick();
+    return n;
   },
 
   /** 刪除一張卡（同一則筆記的其他卡不動）。 */

@@ -321,7 +321,7 @@ class KbWriter:
             raise Refuse(f"看不懂的新筆記 {target}")
         subj, name = target[6:].split("/", 1)
         roots = self.cfg.kb.get(subj)
-        if not roots:
+        if not isinstance(roots, list) or not roots:
             raise Refuse(f"{subj} 不是可以新增筆記的科目")
         name = name.strip()
         if not name or BAD_NAME.search(name) or name.startswith(".") or len(name) > 80:

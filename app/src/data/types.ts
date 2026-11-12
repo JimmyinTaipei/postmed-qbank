@@ -440,6 +440,19 @@ export interface VocabMark {
   seq?: number;
 }
 
+/**
+ * 單字索引（第 8B-2 階段，pmq publish 產生；tools/pmq/pmq/vocab.py）。
+ * lemmas：原形 → [考卷數, 題數, 當選項次數, 當答案次數, 出現位置]；出現位置是「題目 ID＋一個字母」
+ * （s 題幹、o 選項、a 正確選項、g 題組的文章，記在該組第一小題）。forms：字形 → 原形（最可能的在前；只列字形 ≠ 原形的）。
+ */
+export interface VocabIndex {
+  v: 1;
+  subject: string;
+  papers: Record<string, string>;
+  lemmas: Record<string, [papers: number, questions: number, options: number, answers: number, at: string[]]>;
+  forms: Record<string, string[]>;
+}
+
 export interface Media {
   sha: string;
   mime: string | null;

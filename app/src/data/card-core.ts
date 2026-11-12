@@ -167,6 +167,16 @@ export interface CardQueueInput {
   maxReviews: number;
   maxNew: number;
   tomorrow: number;
+  /** 使用者指定「排到今天」的新卡（第 8B-2 階段「我不會這個字」）：排在最前面、不受每日新卡上限 */
+  asked?: (s: SrsState) => boolean;
+}
+
+/**
+ * 「排到今天」的新卡：due 剛好是某一天的 0 點（askToday 寫入；一般的新卡 due 是建立的那一刻）。
+ * 還沒學過就一直排在新卡最前面，學過一次（state ≠ 0）就照一般規則。
+ */
+export function isAskedNew(s: SrsState, startOfDay: (t: number) => number): boolean {
+  return s.state === 0 && s.due === startOfDay(s.due);
 }
 
 export function pickCards(i: CardQueueInput): { due: string[]; fresh: string[]; dueTotal: number; newTotal: number } {
@@ -178,9 +188,11 @@ export function pickCards(i: CardQueueInput): { due: string[]; fresh: string[]; 
   const live = i.states.filter(ok);
   const due = live.filter((s) => s.state !== 0 && s.due < i.tomorrow).sort((a, b) => a.due - b.due);
   const fresh = live.filter((s) => s.state === 0).sort((a, b) => a.updated_at - b.updated_at);
+  const asked = i.asked ? fresh.filter(i.asked) : [];
+  const rest = asked.length ? fresh.filter((s) => !asked.includes(s)) : fresh;
   return {
     due: due.slice(0, Math.max(0, i.maxReviews - i.doneToday.reviews)).map((s) => s.item.slice(5)),
-    fresh: fresh.slice(0, Math.max(0, i.maxNew - i.doneToday.news)).map((s) => s.item.slice(5)),
+    fresh: [...asked, ...rest.slice(0, Math.max(0, i.maxNew - i.doneToday.news - asked.length))].map((s) => s.item.slice(5)),
     dueTotal: due.length,
     newTotal: fresh.length,
   };

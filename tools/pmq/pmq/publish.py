@@ -50,6 +50,8 @@ def build_bundle(cfg, c):
     files["kbcat"] = add("kbcat", c.kb_catalog)
     files["kbrel"] = add("kbrel", c.kb_related)
     files["cases"] = add("cases", {"cases": pick_cases(c)})
+    # 單字索引（第 8B-2 階段）：每個開了查單字的科目一份
+    files["vocab"] = {s: add(f"vocab/{s}", ix) for s, ix in sorted(getattr(c, "vocab", {}).items())}
 
     pub = c.assets.published()
     need = set()
@@ -96,11 +98,29 @@ def publish(cfg, url, subject=None, dry_run=False, workers=6):
                                **{k: v for k, v in new.items() if k.startswith(subject + "/") or k == subject}}
         files["index"] = keep(cur["files"]["index"], files["index"])
         files["packs"] = keep(cur["files"]["packs"], files["packs"])
-        # 筆記、筆記互連、特殊情況表：只讀一科時沒有建，沿用線上的
-        files["kb"] = dict(cur["files"].get("kb", {}))
-        for k in ("kbcat", "kbrel", "cases"):
-            if cur["files"].get(k):
-                files[k] = cur["files"][k]
+        # 筆記：換掉這一科的，其他科沿用線上的
+        files["kb"] = keep(cur["files"].get("kb", {}), files["kb"])
+        files["vocab"] = keep(cur["files"].get("vocab", {}), files["vocab"])
+        # 資料庫目錄：線上那份換掉這一科；題目 → 相關筆記：拿掉這一科筆記的段落、加上新的
+        own = lambda k: k.startswith(subject + "/")
+        if cur["files"].get("kbcat"):
+            old_cat = json.loads(remote.get_blob(cur["files"]["kbcat"]))
+            cat = {"subjects": [x for x in old_cat["subjects"] if x["id"] != subject] + c.kb_catalog["subjects"]}
+            files["kbcat"], data = _named("kbcat", cat)
+            blobs[files["kbcat"]] = data
+        if cur["files"].get("kbrel"):
+            old_rel = json.loads(remote.get_blob(cur["files"]["kbrel"]))
+            rel = {}
+            for qid, lst in old_rel.items():
+                lst = [r for r in lst if not own(r["key"])]
+                if lst:
+                    rel[qid] = lst
+            for qid, lst in c.kb_related.items():
+                rel.setdefault(qid, []).extend(lst)
+            files["kbrel"], data = _named("kbrel", rel)
+            blobs[files["kbrel"]] = data
+        if cur["files"].get("cases"):
+            files["cases"] = cur["files"]["cases"]
         # taxonomy：線上那份換掉這一科的科目、章節、來源
         old_tax = json.loads(remote.get_blob(cur["files"]["taxonomy"])) if cur["files"].get("taxonomy") else {"subjects": [], "chapters": [], "sources": []}
         tax = {
@@ -112,7 +132,8 @@ def publish(cfg, url, subject=None, dry_run=False, workers=6):
         files["taxonomy"], data = _named("taxonomy", tax)
         blobs[files["taxonomy"]] = data
         counts = {**cur.get("counts", {}), subject: counts[subject]}
-        wanted = set(files["index"].values()) | set(files["packs"].values()) | {files["taxonomy"], files["kbcat"], files["kbrel"], files["cases"]}
+        wanted = (set(files["index"].values()) | set(files["packs"].values()) | set(files["kb"].values()) | set(files["vocab"].values())
+                  | {files["taxonomy"], files["kbcat"], files["kbrel"], files["cases"]})
         blobs = {k: v for k, v in blobs.items() if k in wanted}
         assets = {k: p for k, p in assets.items()}
 

@@ -38,3 +38,4 @@ export { isChoice, isMulti, judge, splitQuestion, answerText } from "./question"
 export { clusterItems, expandUnits, groupsOf, pageAt, pageLabel, pagesOf, takeUnits, type Page as ItemPage } from "./group-core";
 export { useSearch, searchText, prepareSearch, type SearchHit, type SearchState } from "./search";
 export { pushRecent, kbRecent, useKbRecent, KB_RECENT, type KbRecent } from "./recent";
+export { vocabMarks, useVocabCards, useVocabIndex, useVocabMarks, useVocabMarksUnder, useAllVocabMarks, useVocabSubjects, lookupable, lemmasOf, wordKey, cardsFor, statusOf, statusLine, STATUS_NAME, WHERE_NAME, splitAt, vocabDeck, sentenceAt, boldIn, lemmasInQuestion, vocabRows, isWeakCommon, scoreOf, VOCAB_DECK, type VocabCards, type VocabRow, type VocabStatus } from "./vocab";

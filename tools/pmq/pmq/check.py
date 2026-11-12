@@ -94,8 +94,8 @@ def run_check(cfg, with_math=True, answers_file=None, only=None):
     # ---- 資料庫（講義筆記，第 4 階段）----
     from .kb import build_kb, count_blocks
     if only:
-        # 只看一科：不讀筆記（筆記與題目互連要全部的題目；發佈時沿用線上的筆記）
-        c.kb_docs, c.kb_catalog, c.kb_related = {}, {"subjects": []}, {}
+        # 只看一科：只讀這一科的筆記（別科的筆記可能是 iCloud 雲端佔位）；發佈時與線上其他科的筆記合併
+        c.kb_docs, c.kb_catalog, c.kb_related = build_kb(cfg, c, only=only)
     else:
         note_link_stats(cfg, rep)
         c.kb_docs, c.kb_catalog, c.kb_related = build_kb(cfg, c)
@@ -105,6 +105,14 @@ def run_check(cfg, with_math=True, answers_file=None, only=None):
         if errs:
             kb_fail += 1
             rep.error("筆記 JSON Schema 不過", doc=key, message="; ".join(f"{'/'.join(map(str, e.path))}: {e.message}" for e in errs[:3]))
+    # ---- 單字索引（第 8B-2 階段）----
+    from .build import SOURCE_KINDS
+    from .vocab import build_vocab_index
+    c.vocab = {}
+    for s in cfg.vocab_subjects:
+        if any(x["id"] == s for x in SUBJECTS):
+            c.vocab[s] = build_vocab_index(c.questions, s, SOURCE_KINDS)
+            rep.count("vocab_lemmas", s, len(c.vocab[s]["lemmas"]))
     kb_rows = [{"key": k, "file": d["file"], **count_blocks(d["blocks"]), "refs": len(d["refs"]), "refs_unmapped": sum(1 for r in d["refs"] if not r["qid"])}
                for k, d in c.kb_docs.items()]
     c.cache.save()

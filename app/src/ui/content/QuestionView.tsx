@@ -3,11 +3,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { answerText, attempts, isChoice, isMulti, judge, notes, qKey, splitQuestion, useCareless, useKbRelated, useNote, type Attempt, type FieldMark, type Question } from "@/data";
+import { answerText, attempts, isChoice, isMulti, judge, notes, qKey, splitQuestion, useCareless, useKbRelated, useNote, useVocabSubjects, type Attempt, type FieldMark, type Question } from "@/data";
 import { Icon, type IconName } from "../icons";
 import { useToast } from "../overlays";
 import { Badge, Button, Notice, OptionRow, Segmented, cx, type OptionState } from "../primitives";
 import { HighlightableMarkdown } from "./Highlights";
+import { QuestionWords } from "./VocabLookup";
 import { Markdown } from "./Markdown";
 import { MarkdownEditor } from "../templates";
 import { SourceBadges } from "./SourceBadges";
@@ -324,6 +325,7 @@ function Solution({ q }: { q: Question }) {
       )}
 
       <RelatedNotes id={q.id} />
+      <QuestionWordsIf q={q} />
 
       {/* 第 3 階段：個人筆記（手寫區在題目下方） */}
       <NoteBox q={q} />
@@ -350,6 +352,12 @@ function PatchBadge({ q }: { q: Question }) {
       </Badge>
     </Link>
   );
+}
+
+/** 這一題的單字（第 8B-2 階段）：只在開了查單字的科目出現 */
+function QuestionWordsIf({ q }: { q: Question }) {
+  const subs = useVocabSubjects();
+  return subs?.includes(q.subject) ? <QuestionWords qid={q.id} subject={q.subject} /> : null;
 }
 
 /** 相關筆記（規格書 §9.4）：哪些講義筆記的段落在句尾引用了這一題。點了跳到那個段落。 */

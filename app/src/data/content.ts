@@ -14,7 +14,7 @@ import { db } from "./db";
 import { Offline, request, ServerError } from "./net";
 import { prefs } from "./prefs";
 import { sha256 } from "@/lib/sha256";
-import type { ContentInfo, IndexRow, KbCatalog, KbDoc, KbRelated, Question, SubjectId, Taxonomy } from "./types";
+import type { ContentInfo, IndexRow, KbCatalog, KbDoc, KbRelated, Question, SubjectId, Taxonomy, VocabIndex } from "./types";
 
 export interface Manifest {
   version: number;
@@ -31,6 +31,8 @@ export interface Manifest {
     kbrel?: string;
     sample?: string;
     cases?: string;
+    /** 單字索引（第 8B-2 階段）：開了查單字的科目 → 檔 */
+    vocab?: Record<string, string>;
   };
 }
 
@@ -125,7 +127,7 @@ async function fetchManifest(): Promise<Stored> {
 function essentials(m: Manifest): string[] {
   const f = m.files;
   const kb = f.kbcat ? [f.kbcat, ...(f.kbrel ? [f.kbrel] : [])] : Object.values(f.kb ?? {});
-  return [f.taxonomy, ...Object.values(f.index), ...kb, ...(f.cases ? [f.cases] : []), ...(f.sample ? [f.sample] : [])];
+  return [f.taxonomy, ...Object.values(f.index), ...kb, ...(f.cases ? [f.cases] : []), ...(f.sample ? [f.sample] : []), ...Object.values(f.vocab ?? {})];
 }
 
 /** 某一科的題目包與筆記（離線下載的單位）。 */
@@ -389,6 +391,17 @@ export const content = {
     const m = await manifest();
     if (!m.files.kbrel) return [];
     return (await file<Record<string, KbRelated[]>>(m.files.kbrel))[qid] ?? [];
+  },
+
+  /** 開了查單字的科目（內容包裡有單字索引的科目）。 */
+  async vocabSubjects(): Promise<string[]> {
+    return Object.keys((await manifest()).files.vocab ?? {});
+  },
+
+  /** 某一科的單字索引（第 8B-2 階段）；這一科沒有開查單字回 null。 */
+  async vocab(subject: string): Promise<VocabIndex | null> {
+    const f = (await manifest()).files.vocab?.[subject];
+    return f ? file<VocabIndex>(f) : null;
   },
 
   /** 某一科全部的內容包鍵（搜尋用）。 */

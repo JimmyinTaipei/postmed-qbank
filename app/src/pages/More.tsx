@@ -8,7 +8,10 @@ import { Page } from "@/ui/shell";
 const GROUPS: { title: string; items: { to: string; label: string; meta: string; icon: IconName; stage?: string }[] }[] = [
   {
     title: "卡片",
-    items: [{ to: "/cards", label: "卡片", meta: "Anki 搬來的牌組、自己做的卡片", icon: "list" }],
+    items: [
+      { to: "/cards", label: "卡片", meta: "Anki 搬來的牌組、自己做的卡片", icon: "list" },
+      { to: "/vocab", label: "常考單字", meta: "考古題裡的單字出現幾次、我會不會", icon: "book" },
+    ],
   },
   {
     title: "題目",

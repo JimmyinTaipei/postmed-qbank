@@ -7,7 +7,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { highlights, ink, useHighlights, useInkRows, useInkUnder, type Fig, type Highlight, type HighlightColor } from "@/data";
+import { highlights, ink, lookupable, sentenceAt, useHighlights, useInkRows, useInkUnder, useVocabMarks, useVocabMarksUnder, useVocabSubjects, type Fig, type Highlight, type HighlightColor, type VocabMark } from "@/data";
 import { Icon } from "../icons";
 import { Dialog, Sheet } from "../overlays";
 import { Button, IconButton, cx } from "../primitives";
@@ -15,6 +15,7 @@ import { HighlightPalette, MarkdownEditor } from "../templates";
 import { InkPreview } from "../ink/FigInk";
 import { InkPages } from "../ink/Handwriting";
 import { Markdown } from "./Markdown";
+import { subjectOfTarget, VocabLookup, type LookupReq } from "./VocabLookup";
 
 /** 選字框的「編輯」：給 target（"q:PHY-…/sol"）開那一段的編輯面板。由題目編輯器（EditorProvider）提供。 */
 export const HighlightEdit = createContext<((target: string) => void) | null>(null);
@@ -98,8 +99,8 @@ export function locate(text: string, h: Pick<Highlight, "quote" | "prefix" | "su
   return best;
 }
 
-function unwrap(root: HTMLElement) {
-  for (const m of Array.from(root.querySelectorAll("mark[data-hl]"))) {
+function unwrap(root: HTMLElement, sel = "mark[data-hl]") {
+  for (const m of Array.from(root.querySelectorAll(sel))) {
     const parent = m.parentNode!;
     while (m.firstChild) parent.insertBefore(m.firstChild, m);
     parent.removeChild(m);
@@ -125,6 +126,40 @@ function wrap(pieces: Piece[], s: number, e: number, h: Highlight, inked: boolea
   }
 }
 
+/** 查過的字：虛線底線（第 8B-2 階段）。和螢光一樣用前後文定位；找不到就不畫（不另外列失聯清單）。 */
+function wrapVocab(pieces: Piece[], s: number, e: number, m: VocabMark) {
+  for (const p of pieces) {
+    if (p.end <= s || p.start >= e) continue;
+    let node = p.node;
+    const a = Math.max(0, s - p.start);
+    const b = Math.min(node.data.length, e - p.start);
+    if (b < node.data.length) node.splitText(b);
+    if (a > 0) node = node.splitText(a);
+    const span = document.createElement("span");
+    span.className = "vocab-mark";
+    span.dataset.vm = m.id;
+    node.parentNode!.insertBefore(span, node);
+    span.appendChild(node);
+  }
+}
+
+/** 這段內容可不可以查單字（科目有開查單字） */
+function useLookupOn(target: string): boolean {
+  const subs = useVocabSubjects();
+  return !!subs?.includes(subjectOfTarget(target));
+}
+
+/** 查單字的範圍去掉前後空白（按兩下選字時 Safari 會連後面的空白一起選） */
+function lookupReq(target: string, t: string, s0: number, e0: number): LookupReq {
+  let s = s0;
+  let e = e0;
+  while (s < e && /\s/.test(t[s])) s++;
+  while (e > s && /\s/.test(t[e - 1])) e--;
+  return { target, quote: t.slice(s, e), prefix: t.slice(Math.max(0, s - CTX), s), suffix: t.slice(e, e + CTX), start: s, end: e, sentence: sentenceAt(t, s, e) };
+}
+
+const vmLocate = (m: VocabMark) => ({ quote: m.quote, prefix: m.prefix ?? "", suffix: m.suffix ?? "", start: m.start ?? 0, end: m.end ?? 0 });
+
 interface Props {
   /** "q:PHY-000816/sol" */
   target: string;
@@ -142,6 +177,9 @@ export function HighlightableMarkdown({ target, text, figs, role }: Props) {
   const [open, setOpen] = useState<string | null>(null);
   const inked = useInkedHighlights();
   const editField = useContext(HighlightEdit);
+  const lookupOn = useLookupOn(target);
+  const vmarks = useVocabMarks(lookupOn ? target : undefined);
+  const [look, setLook] = useState<LookupReq | null>(null);
 
   // 把螢光包到畫面上
   useLayoutEffect(() => {
@@ -161,6 +199,18 @@ export function HighlightableMarkdown({ target, text, figs, role }: Props) {
     }
     setOrphans(lost);
   }, [list, text, figs, inked]);
+
+  // 查過的字畫虛線底線
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root || !vmarks) return;
+    unwrap(root, "span[data-vm]");
+    for (const m of vmarks) {
+      const { text: t, pieces } = textIndex(root);
+      const at = locate(t, vmLocate(m));
+      if (at) wrapVocab(pieces, at[0], at[1], m);
+    }
+  }, [vmarks, text, figs, list, inked]);
 
   // 選字 → 色票
   const check = useCallback(() => {
@@ -198,10 +248,30 @@ export function HighlightableMarkdown({ target, text, figs, role }: Props) {
     if (note) setOpen(id);
   };
 
+  const lookup = () => {
+    if (!pick || !ref.current) return;
+    setLook(lookupReq(target, textIndex(ref.current).text, pick.s, pick.e));
+    window.getSelection()?.removeAllRanges();
+    setPick(null);
+    setOpen(null);
+  };
+
   const onClick = (e: MouseEvent) => {
+    if (!window.getSelection()?.isCollapsed) return;
+    const vm = (e.target as HTMLElement).closest<HTMLElement>("span[data-vm]");
+    const hit = vm && vmarks?.find((m) => m.id === vm.dataset.vm);
+    if (hit && ref.current) {
+      e.stopPropagation();
+      const t = textIndex(ref.current).text;
+      const at = locate(t, vmLocate(hit));
+      setOpen(null);
+      setLook({ target, quote: hit.quote, prefix: hit.prefix ?? "", suffix: hit.suffix ?? "", start: hit.start ?? 0, end: hit.end ?? 0, sentence: at ? sentenceAt(t, at[0], at[1]) : "", mark: hit });
+      return;
+    }
     const m = (e.target as HTMLElement).closest<HTMLElement>("mark[data-hl]");
-    if (!m || !window.getSelection()?.isCollapsed) return;
+    if (!m) return;
     e.stopPropagation();
+    setLook(null);
     setOpen(m.dataset.hl ?? null);
   };
 
@@ -218,6 +288,7 @@ export function HighlightableMarkdown({ target, text, figs, role }: Props) {
             onPick={(c) => void add(c, false)}
             onNote={() => void add("none", true)}
             onEdit={editField ? () => { window.getSelection()?.removeAllRanges(); setPick(null); editField(target); } : undefined}
+            onLookup={lookupOn && lookupable(pick.quote) ? lookup : undefined}
           />
         </div>
       )}
@@ -239,6 +310,7 @@ export function HighlightableMarkdown({ target, text, figs, role }: Props) {
         </details>
       )}
       {current && <HighlightPanel key={current.id} h={current} figs={figs} onClose={() => setOpen(null)} />}
+      {look && <VocabLookup key={`${look.target}:${look.start}:${look.mark?.id ?? ""}`} req={look} onClose={() => setLook(null)} />}
     </div>
   );
 }
@@ -437,6 +509,11 @@ export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit }: 
   const [open, setOpen] = useState<string | null>(null);
   const prefix = `kb:${docKey}#`;
   const inked = useInkedHighlights();
+  const lookupOn = useLookupOn(prefix);
+  const vmarks = useVocabMarksUnder(lookupOn ? prefix : undefined);
+  const [look, setLook] = useState<LookupReq | null>(null);
+  const vmRef = useRef(vmarks);
+  vmRef.current = vmarks;
 
   // 用 useEffect 而不是 useLayoutEffect：螢光層排在文章前面，同一次提交裡 layout effect 會比文章的 ref 先執行，
   // 第一次載入時拿到的 root 是空的（2026-11-11 實測：一進頁面螢光不出現）
@@ -471,6 +548,21 @@ export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit }: 
     setOrphans(lost);
   }, [list, version, root, prefix, inked]);
 
+  // 查過的字畫虛線底線（每個區塊自己的文字）
+  useEffect(() => {
+    const el = root.current;
+    if (!el || !vmarks) return;
+    unwrap(el, "span[data-vm]");
+    const all = blockTexts(el);
+    for (const m of vmarks) {
+      const own = all.find((c) => c.bid === m.target.slice(prefix.length));
+      if (!own) continue;
+      const { text: t, pieces } = textIndex(own.el);
+      const at = locate(t, vmLocate(m));
+      if (at) wrapVocab(pieces, at[0], at[1], m);
+    }
+  }, [vmarks, list, version, root, prefix, inked]);
+
   const check = useCallback(() => {
     const el = root.current;
     const sel = window.getSelection();
@@ -497,9 +589,22 @@ export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit }: 
     document.addEventListener("selectionchange", onSel);
     const el = root.current;
     const onClick = (e: globalThis.MouseEvent) => {
+      if (!window.getSelection()?.isCollapsed) return;
+      const vm = (e.target as HTMLElement).closest<HTMLElement>("span[data-vm]");
+      const hit = vm && vmRef.current?.find((x) => x.id === vm.dataset.vm);
+      const block = vm?.closest<HTMLElement>("[data-hl-bid]");
+      if (hit && block) {
+        e.stopPropagation();
+        const t = textIndex(block).text;
+        const at = locate(t, vmLocate(hit));
+        setOpen(null);
+        setLook({ target: hit.target, quote: hit.quote, prefix: hit.prefix ?? "", suffix: hit.suffix ?? "", start: hit.start ?? 0, end: hit.end ?? 0, sentence: at ? sentenceAt(t, at[0], at[1]) : "", mark: hit });
+        return;
+      }
       const m = (e.target as HTMLElement).closest<HTMLElement>("mark[data-hl]");
-      if (!m || !window.getSelection()?.isCollapsed) return;
+      if (!m) return;
       e.stopPropagation();
+      setLook(null);
       setOpen(m.dataset.hl ?? null);
     };
     el?.addEventListener("click", onClick);
@@ -527,11 +632,24 @@ export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit }: 
             onPick={(c) => void add(c, false)}
             onNote={() => void add("none", true)}
             onEdit={onEdit ? () => { const bid = pick.bid; window.getSelection()?.removeAllRanges(); setPick(null); onEdit(bid); } : undefined}
+            onLookup={
+              lookupOn && lookupable(pick.quote)
+                ? () => {
+                    const block = root.current?.querySelector<HTMLElement>(`[data-hl-bid="${CSS.escape(pick.bid)}"]`);
+                    const t = block ? textIndex(block).text : "";
+                    setLook(lookupReq(prefix + pick.bid, t, pick.s, pick.e));
+                    window.getSelection()?.removeAllRanges();
+                    setPick(null);
+                    setOpen(null);
+                  }
+                : undefined
+            }
           />
         </div>
       )}
       {orphans.length > 0 && <OrphanList orphans={orphans} />}
       {current && <HighlightPanel key={current.id} h={current} figs={figs} onClose={() => setOpen(null)} />}
+      {look && <VocabLookup key={`${look.target}:${look.start}:${look.mark?.id ?? ""}`} req={look} onClose={() => setLook(null)} />}
     </>
   );
 }

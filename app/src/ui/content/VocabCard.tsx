@@ -11,6 +11,7 @@ import { Icon } from "../icons";
 import { Badge, Button, IconButton, cx } from "../primitives";
 import { Markdown } from "./Markdown";
 import { playSound } from "./sound";
+import { VocabOccurrences } from "./VocabLookup";
 
 interface Props {
   fields: CardFields;
@@ -139,6 +140,7 @@ export function VocabCard({ fields, tags, side, figs, resetKey }: Props) {
           <Markdown text={source} tight className="vocab-source min-w-0" />
         </div>
       )}
+      <VocabOccurrences word={word} />
       {tagList.length > 0 && <div className="mt-4 border-t border-line pt-4"><Tags tags={tagList} /></div>}
     </div>
   );

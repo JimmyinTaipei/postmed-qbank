@@ -26,6 +26,7 @@ import { StatsPage } from "./pages/Stats";
 import { BrowsePage } from "./pages/Browse";
 import { AnalysisPage } from "./pages/Analysis";
 import { WrongBookPage } from "./pages/WrongBook";
+import { VocabPage } from "./pages/Vocab";
 
 // 展示頁不常開，另外打包
 const UiGallery = lazy(() => import("./pages/UiGallery"));
@@ -65,6 +66,7 @@ export function App() {
               <Route path="/cards/new" element={<CardEditPage />} />
               <Route path="/cards/c/:cardId" element={<CardPage />} />
               <Route path="/cards/c/:cardId/edit" element={<CardEditPage />} />
+              <Route path="/vocab" element={<VocabPage />} />
               <Route path="/more" element={<More />} />
               <Route path="/wrong" element={<WrongBookPage />} />
               <Route path="/browse" element={<BrowsePage />} />
