@@ -1,14 +1,13 @@
 // 頁面樣板（規格書 §13.4）：第 2 階段以後的頁面從這裡的元件開始接功能，不重新設計版面。
 // 這裡只有版面與互動，沒有資料邏輯；資料由頁面傳進來。
 
-import { useId, useMemo, useRef, useState, type ClipboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useMemo, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { Fig, FieldMark, KbBlock, KbDoc } from "@/data";
 import { Markdown } from "./content/Markdown";
-import { pasteText } from "./content/paste";
 import { Icon } from "./icons";
-import { Menu, Sheet, type MenuItem } from "./overlays";
-import { Badge, Button, Card, IconButton, ProgressBar, TextField, cx } from "./primitives";
+import { Menu, type MenuItem } from "./overlays";
+import { Badge, Button, Card, ProgressBar, TextField, cx } from "./primitives";
 
 // ---------- 清單頁：搜尋列 ----------
 
@@ -225,72 +224,13 @@ export function HeatTable({ rows, cols, value, rowLabel, rowName = (r) => r }: {
   );
 }
 
-// ---------- 編輯面板 ----------
-
-/** 編輯一段內容：上面（寬螢幕是左邊）Markdown 原始碼，下面（右邊）即時預覽。 */
-/** Markdown 原始碼＋即時預覽。貼上帶格式的 AI 回覆時自動轉成 Markdown（規格書 §9.4）。 */
-export function MarkdownEditor({ value, onChange, figs, role = "sol", label = "Markdown 原始碼", minRows }: { value: string; onChange: (v: string) => void; figs?: Fig[]; role?: Fig["role"]; label?: string; minRows?: "short" }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const id = useId();
-  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
-    const md = pasteText(e.clipboardData);
-    if (md === null) return;
-    e.preventDefault();
-    const el = e.currentTarget;
-    const a = el.selectionStart;
-    const next = el.value.slice(0, a) + md + el.value.slice(el.selectionEnd);
-    onChange(next);
-    requestAnimationFrame(() => {
-      ref.current?.setSelectionRange(a + md.length, a + md.length);
-    });
-  };
-  return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <div className="min-w-0">
-        <label htmlFor={id} className="mb-1.5 block text-meta font-medium text-ink-muted">{label}</label>
-        <textarea ref={ref} id={id} data-autofocus value={value} onChange={(e) => onChange(e.target.value)} onPaste={onPaste} spellCheck={false} autoCapitalize="none" autoCorrect="off" className={cx("block w-full resize-y rounded-btn border border-line-strong bg-card p-3 font-mono leading-relaxed", minRows === "short" ? "min-h-40" : "min-h-72 lg:min-h-[60dvh]")} />
-        <p className="mt-1.5 text-meta text-ink-muted">從 ChatGPT、Claude 網頁複製的回答，貼上時會自動轉成 Markdown（公式變成 $…$）。</p>
-      </div>
-      <div className="min-w-0">
-        <div className="mb-1.5 text-meta font-medium text-ink-muted">預覽</div>
-        <div className="min-h-24 rounded-btn border border-line p-3" aria-live="polite">
-          <Markdown text={value} figs={figs} role={role} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function EditPanel({ title, initial, figs, role = "sol", onClose, onSave, saveDisabledReason, notice }: { title: string; initial: string; figs?: Fig[]; role?: Fig["role"]; onClose: () => void; onSave?: (md: string) => void; saveDisabledReason?: string; notice?: ReactNode }) {
-  const [text, setText] = useState(initial);
-  return (
-    <Sheet
-      title={title}
-      size="wide"
-      onClose={onClose}
-      footer={
-        <>
-          {saveDisabledReason && <span className="mr-auto self-center text-meta text-ink-muted">{saveDisabledReason}</span>}
-          <Button variant="ghost" onClick={onClose}>取消</Button>
-          <Button variant="primary" disabled={!onSave || text === initial} onClick={() => onSave?.(text)}>儲存</Button>
-        </>
-      }
-    >
-      <div className="space-y-4 p-4">
-        {notice}
-        <MarkdownEditor value={text} onChange={setText} figs={figs} role={role} />
-      </div>
-    </Sheet>
-  );
-}
-
 // ---------- 資料庫閱讀頁 ----------
 
 // 使用者自己的螢光筆六色（順序照使用者給的）
 const HL = [["yellow", "黃", "bg-hl-yellow"], ["blue", "藍", "bg-hl-blue"], ["purple", "紫", "bg-hl-purple"], ["pink", "粉", "bg-hl-pink"], ["green", "綠", "bg-hl-green"], ["orange", "橘", "bg-hl-orange"]] as const;
 
 /** 螢光筆色票（選字後浮出）。 */
-export function HighlightPalette({ onPick, onNote, onEdit, onLookup }: { onPick: (color: (typeof HL)[number][0]) => void; onNote: () => void; /** 編輯這段內容（題目的欄位、筆記的區塊） */ onEdit?: () => void; /** 查單字（第 8B-2 階段；選到英文字才有） */ onLookup?: () => void }) {
+export function HighlightPalette({ onPick, onNote, onInk, onEdit, onLookup, extra }: { onPick: (color: (typeof HL)[number][0]) => void; onNote: () => void; /** 手寫註記：開註記卡並直接展開手寫 */ onInk?: () => void; /** 編輯這段內容（題目的欄位、筆記的區塊） */ onEdit?: () => void; /** 查單字（第 8B-2 階段；選到英文字才有） */ onLookup?: () => void; /** 其他按鈕（5B 的克漏字） */ extra?: ReactNode }) {
   return (
     <div role="toolbar" aria-label="螢光筆" className="inline-flex max-w-[calc(100vw-16px)] flex-wrap items-center gap-1 rounded-btn border border-line bg-card p-1 shadow-pop">
       {HL.map(([id, name, cls]) => (
@@ -299,6 +239,8 @@ export function HighlightPalette({ onPick, onNote, onEdit, onLookup }: { onPick:
         </button>
       ))}
       <Button variant="ghost" icon="note" onClick={onNote}>加註</Button>
+      {onInk && <Button variant="ghost" icon="pencil" onClick={onInk}>手寫</Button>}
+      {extra}
       {onLookup && <Button variant="ghost" icon="book" onClick={onLookup}>查單字</Button>}
       {onEdit && <Button variant="ghost" icon="edit" onClick={onEdit}>編輯</Button>}
     </div>
@@ -322,9 +264,10 @@ interface KbProps {
   marks?: Map<string, KbBlockMark[]>;
   /** 區塊筆記：bid → Markdown */
   notes?: Map<string, { body_md: string }>;
-  /** 筆記模式：每個區塊右邊出現「寫筆記」 */
-  noteMode?: boolean;
+  /** 點區塊筆記：就地編輯它 */
   onNote?: (b: KbBlock) => void;
+  /** 正在就地編輯的區塊筆記：編輯器放在筆記的位置 */
+  noteEditor?: { bid: string; node: ReactNode } | null;
   /** 正在就地編輯的區塊（第 3B 階段）：原本那段字藏起來但留在頁面上（螢光才不會失聯），編輯器放在它的位置 */
   inline?: { bid: string; node: ReactNode } | null;
   /** 電腦上在區塊上按兩下：就地編輯這個區塊 */
@@ -334,16 +277,25 @@ interface KbProps {
 /** 有滑鼠的電腦（按兩下編輯、滑過出現 ⋯ 只在這種裝置上） */
 const finePointer = () => typeof matchMedia !== "undefined" && matchMedia("(hover: hover) and (pointer: fine)").matches;
 
-/** 區塊上按兩下（圖、連結、按鈕上不算） */
-function dbl(b: KbBlock, s: Shared) {
-  return (e: ReactMouseEvent) => {
-    if (!s.onOpen || !finePointer() || (e.target as HTMLElement).closest(".fig, a, button, .snd")) return;
+/** 區塊上按兩下（電腦）；頁首開了「編輯」之後點一下（圖、連結、按鈕上不算） */
+function opener(b: KbBlock, s: Shared) {
+  const go = (e: ReactMouseEvent) => {
+    if (!s.onOpen || (e.target as HTMLElement).closest(".fig, a, button, .snd, mark, [data-vm]")) return false;
     window.getSelection()?.removeAllRanges();
     s.onOpen(b, { x: e.clientX, y: e.clientY });
+    return true;
+  };
+  return {
+    onDoubleClick: (e: ReactMouseEvent) => {
+      if (finePointer()) go(e);
+    },
+    onClick: (e: ReactMouseEvent) => {
+      if (s.editing && window.getSelection()?.isCollapsed !== false && go(e)) e.preventDefault();
+    },
   };
 }
 
-/** 筆記的區塊樹：標題與有子項的列點都可收合；編輯模式下每個區塊右邊有 ✎ 選單、筆記模式下有 💬。
+/** 筆記的區塊樹：標題與有子項的列點都可收合；每個區塊右邊有 ⋯ 選單（電腦上滑過出現；觸控在頁首開「編輯」之後出現）。
  *  每個區塊自己的文字包在 [data-hl-bid] 裡（螢光層用），整個區塊有 id="b-<bid>"（相關筆記的連結跳到這裡）。
  *  收合只是藏起來（hidden），文字仍在頁面上，螢光才找得到。 */
 export function KbBlocks({ doc, ...rest }: KbProps) {
@@ -382,39 +334,34 @@ function BlockList({ blocks, ...s }: { blocks: KbBlock[] } & Shared) {
 }
 
 function Handles({ b, s }: { b: KbBlock; s: Shared }) {
-  if (s.editing)
-    return (
-      <span className="-my-1 text-blue-deep print:hidden">
-        <Menu label="編輯這個區塊" items={s.editMenu(b)}>
-          <Icon name="edit" size={18} />
-        </Menu>
-      </span>
-    );
-  if (s.noteMode && s.onNote)
-    return (
-      <IconButton label={s.notes?.has(b.bid) ? "編輯這個區塊的筆記" : "在這個區塊寫筆記"} className="-my-1 text-blue-deep print:hidden" onClick={() => s.onNote!(b)}>
-        <Icon name="note" size={18} />
-      </IconButton>
-    );
-  return null;
+  const items = s.editMenu(b);
+  if (!items.length) return null;
+  return (
+    <span className={cx("kb-handle -my-1 text-ink-muted print:hidden", s.editing && "kb-handle-on text-blue-deep")}>
+      <Menu label="這個區塊的動作" items={items}>
+        <Icon name="dots" size={18} />
+      </Menu>
+    </span>
+  );
 }
 
-/** 區塊下方的個人筆記。 */
+/** 區塊下方的個人筆記：點一下就地編輯。 */
 function BlockNote({ b, s }: { b: KbBlock; s: Shared }) {
+  if (s.noteEditor?.bid === b.bid) return <div className="mt-1 rounded-btn border border-blue-accent bg-card px-3 py-2">{s.noteEditor.node}</div>;
   const n = s.notes?.get(b.bid);
   if (!n) return null;
   return (
-    <div className="mt-1 flex items-start gap-2 rounded-btn border border-line bg-hover px-3 py-2">
+    <button
+      type="button"
+      onClick={() => s.onNote?.(b)}
+      title="點一下修改這則筆記"
+      className="mt-1 flex w-full items-start gap-2 rounded-btn border border-line bg-hover px-3 py-2 text-left hover:border-blue-accent"
+    >
       <Icon name="note" size={16} className="mt-1 shrink-0 text-blue-deep" />
       <div className="min-w-0 flex-1 text-ui">
         <Markdown text={n.body_md} figs={s.doc.figs} role="kb" tight />
       </div>
-      {s.onNote && (
-        <IconButton label="編輯這則筆記" className="-my-1 print:hidden" onClick={() => s.onNote!(b)}>
-          <Icon name="edit" size={16} />
-        </IconButton>
-      )}
-    </div>
+    </button>
   );
 }
 
@@ -465,7 +412,7 @@ function ListItem({ b, n, ...s }: { b: KbBlock; n: number } & Shared) {
   const m = s.marks?.get(b.bid);
   return (
     <li id={`b-${b.bid}`} className={cx("kb-block", isDeleted(m) && "kb-deleted")}>
-      <div className="flex items-start gap-1">
+      <div className="kb-row flex items-start gap-1">
         {kids.length ? (
           <button type="button" aria-expanded={open} aria-label={open ? "收合子項" : "展開子項"} onClick={() => setOpen((v) => !v)} className="flex h-7 min-w-6 shrink-0 items-center justify-center rounded-chip text-ink-muted hover:bg-hover print:hidden">
             <Icon name="chevronRight" size={15} className={cx("transition-transform duration-(--dur-fast)", open && "rotate-90")} />
@@ -473,7 +420,7 @@ function ListItem({ b, n, ...s }: { b: KbBlock; n: number } & Shared) {
         ) : null}
         <span className={cx("h-7 min-w-6 shrink-0 items-center justify-center text-ink-muted", kids.length || s.inline?.bid === b.bid ? "hidden print:flex" : "flex")} aria-hidden="true">{b.ordered ? `${n}.` : "•"}</span>
         <div className="min-w-0 flex-1">
-          <div data-hl-bid={b.bid} hidden={s.inline?.bid === b.bid} onDoubleClick={dbl(b, s)}>
+          <div data-hl-bid={b.bid} hidden={s.inline?.bid === b.bid} {...opener(b, s)}>
             <Markdown text={stripRefs(b.md, r)} figs={s.doc.figs} role="kb" tight />
           </div>
           {s.inline?.bid === b.bid && s.inline.node}
@@ -506,10 +453,10 @@ function Block({ b, ...s }: { b: KbBlock } & Shared) {
     const m = s.marks?.get(b.bid);
     return (
       <details id={`b-${b.bid}`} open={level <= s.openDepth || s.inline?.bid === b.bid} className="kb-block group/h">
-        <summary className={cx("flex min-h-(--tap) items-center gap-2 rounded-btn hover:bg-hover", level === 2 ? "mt-4 border-b border-line" : "mt-2")}>
+        <summary className={cx("kb-row flex min-h-(--tap) items-center gap-2 rounded-btn hover:bg-hover", level === 2 ? "mt-4 border-b border-line" : "mt-2")}>
           <Icon name="chevronRight" size={18} className="text-ink-muted transition-transform duration-(--dur-fast) group-open/h:rotate-90 print:hidden" />
           <H className={cx("min-w-0 flex-1 font-semibold text-ink-strong", level === 2 ? "text-title" : "text-body")}>
-            <span data-hl-bid={b.bid} className="block" onDoubleClick={(e) => (e.preventDefault(), dbl(b, s)(e))}>
+            <span data-hl-bid={b.bid} className="block" onDoubleClick={(e) => (e.preventDefault(), opener(b, s).onDoubleClick(e))} onClick={(e) => { if (s.editing) { e.preventDefault(); opener(b, s).onClick(e); } }}>
               <Markdown text={text} tight className={level === 2 ? "text-title!" : undefined} />
             </span>
           </H>
@@ -529,9 +476,9 @@ function Block({ b, ...s }: { b: KbBlock } & Shared) {
   const m = s.marks?.get(b.bid);
   return (
     <div id={`b-${b.bid}`} className={cx("kb-block", isDeleted(m) && "kb-deleted")}>
-      <div className="flex items-start gap-1">
+      <div className="kb-row flex items-start gap-1">
         <div className="min-w-0 flex-1">
-          <div data-hl-bid={b.bid} hidden={s.inline?.bid === b.bid} onDoubleClick={dbl(b, s)}>
+          <div data-hl-bid={b.bid} hidden={s.inline?.bid === b.bid} {...opener(b, s)}>
             <Markdown text={stripRefs(b.md, r)} figs={s.doc.figs} role="kb" />
           </div>
           {s.inline?.bid === b.bid && s.inline.node}

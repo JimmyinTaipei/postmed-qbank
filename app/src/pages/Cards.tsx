@@ -35,7 +35,8 @@ import { Icon } from "@/ui/icons";
 import { Dialog, Menu, Sheet, useToast, type MenuItem } from "@/ui/overlays";
 import { Badge, Button, Card, EmptyState, IconButton, LinkButton, ListCard, ListRow, Notice, ProgressBar, SectionTitle, Segmented, Select, Skeleton, Stat, TextField, cx } from "@/ui/primitives";
 import { Page } from "@/ui/shell";
-import { MarkdownEditor, ReviewCard, SearchBar, type Rating } from "@/ui/templates";
+import { ReviewCard, SearchBar, type Rating } from "@/ui/templates";
+import { RichEditor } from "@/ui/RichEditorLazy";
 import { InkScope } from "@/ui/ink/FigInk";
 import { VocabCard } from "@/ui/content/VocabCard";
 import { Frame } from "./SessionPlayer";
@@ -473,22 +474,15 @@ export interface CardDraft {
   fields?: CardFields;
 }
 
-/** 多行的欄位（3B 之前先用純文字；3B 做完換成 RichEditor）。 */
-function FieldArea({ label, value, onChange, hint, rows = 2 }: { label: string; value: string; onChange: (v: string) => void; hint?: string; rows?: number }) {
+/** 卡片的一格（第 3B 階段：所見即所得的編輯器）。ver 變了就用新的 value 重新開（載入、新增後清空）。 */
+function FieldArea({ label, value, onChange, hint, ver = 0, figs, role = "sol", big, onKey }: { label: string; value: string; onChange: (v: string) => void; hint?: string; ver?: number; figs?: Fig[]; role?: Fig["role"]; big?: boolean; onKey?: Parameters<typeof RichEditor>[0]["onKey"] }) {
   const id = `vf-${label}`;
-  const lines = value.split("\n").length;
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-ui font-medium text-ink-strong">{label}</label>
-      <textarea
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={Math.min(12, Math.max(rows, lines))}
-        aria-describedby={hint ? `${id}-hint` : undefined}
-        autoCapitalize="none"
-        className="block w-full rounded-btn border border-line-strong bg-card px-3 py-2.5 text-base leading-relaxed placeholder:text-ink-muted"
-      />
+      <div id={id} className="mb-1.5 block text-ui font-medium text-ink-strong">{label}</div>
+      <div aria-describedby={hint ? `${id}-hint` : undefined} className={cx("rounded-btn border border-line-strong bg-card px-3 py-2 focus-within:border-blue-accent", big && "min-h-32")}>
+        <RichEditor key={ver} initial={value} placement="card" label={label} figs={figs} role={role} actions={false} noFocus onChange={onChange} onDone={() => undefined} onCancel={() => undefined} onKey={onKey} />
+      </div>
       {hint && <p id={`${id}-hint`} className="mt-1.5 text-meta text-ink-muted">{hint}</p>}
     </div>
   );
@@ -502,8 +496,10 @@ const VOCAB_HINT: Partial<Record<(typeof VOCAB_FIELDS)[number], string>> = {
 };
 
 /** 單字卡的 11 格。 */
-function VocabForm({ value, onChange }: { value: CardFields; onChange: (v: CardFields) => void }) {
-  const set = (k: (typeof VOCAB_FIELDS)[number]) => (v: string) => onChange({ ...value, [k]: v });
+function VocabForm({ value, onChange, ver }: { value: CardFields; onChange: (v: CardFields) => void; ver: number }) {
+  const latest = useRef(value);
+  latest.current = value;
+  const set = (k: (typeof VOCAB_FIELDS)[number]) => (v: string) => onChange({ ...latest.current, [k]: v });
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
@@ -511,7 +507,7 @@ function VocabForm({ value, onChange }: { value: CardFields; onChange: (v: CardF
         <TextField label={VOCAB_FORM_LABEL["Part of Speech"]} hint="例如：v.、n.、adj." value={value["Part of Speech"] ?? ""} onChange={(e) => set("Part of Speech")(e.target.value)} autoCapitalize="none" autoCorrect="off" />
       </div>
       {VOCAB_FIELDS.filter((k) => k !== "Word" && k !== "Part of Speech").map((k) => (
-        <FieldArea key={k} label={VOCAB_FORM_LABEL[k]} value={value[k] ?? ""} onChange={set(k)} rows={VOCAB_ROWS[k] ?? 1} hint={VOCAB_HINT[k]} />
+        <FieldArea key={k} ver={ver} label={VOCAB_FORM_LABEL[k]} value={value[k] ?? ""} onChange={set(k)} big={(VOCAB_ROWS[k] ?? 1) >= 3} hint={VOCAB_HINT[k]} />
       ))}
     </div>
   );
@@ -535,6 +531,8 @@ export function CardEditPage() {
   const [newDeckName, setNewDeckName] = useState("我的卡片");
   const [busy, setBusy] = useState(false);
   const loaded = useRef(false);
+  /** 編輯器重新開的版本（載入那一則筆記、新增後清空時換一個） */
+  const [ver, setVer] = useState(0);
   const figs = useCardFigs(draft?.origin ?? row?.card.origin);
 
   // 編輯：載入那一則筆記
@@ -546,6 +544,7 @@ export function CardEditPage() {
       setFront(n.front);
       setBack(n.back);
       if (n.fields) setFields(n.fields);
+      setVer((v) => v + 1);
     });
     setKind(row.card.kind);
     setDeck(row.card.deck_id);
@@ -587,6 +586,7 @@ export function CardEditPage() {
       setFront("");
       setBack("");
       setFields({});
+      setVer((v) => v + 1);
     }
   };
 
@@ -615,17 +615,11 @@ export function CardEditPage() {
             <Notice icon="info">用 <code>{"{{c1::答案}}"}</code> 挖空、<code>{"{{c1::答案::提示}}"}</code> 加提示。同一個編號一起遮；不同編號各做一張卡{clozeN ? `（目前 ${clozeN} 張）` : ""}。公式裡也可以挖空，例如 <code>{"$E = {{c1::mc^2}}$"}</code>。</Notice>
           )}
           {kind === "vocab" ? (
-            <VocabForm value={fields} onChange={setFields} />
+            <VocabForm value={fields} onChange={setFields} ver={ver} />
           ) : (
           <>
-          <div>
-            <h2 className="mb-2 text-title font-semibold text-ink-strong">{kind === "cloze" ? "內文" : "正面"}</h2>
-            <MarkdownEditor value={front} onChange={setFront} figs={figs} role="q" label={kind === "cloze" ? "內文（Markdown）" : "正面（Markdown）"} minRows="short" />
-          </div>
-          <div>
-            <h2 className="mb-2 text-title font-semibold text-ink-strong">{kind === "cloze" ? "補充（翻面後顯示，可留空）" : "背面"}</h2>
-            <MarkdownEditor value={back} onChange={setBack} figs={figs} role="sol" label={kind === "cloze" ? "補充（Markdown）" : "背面（Markdown）"} minRows="short" />
-          </div>
+          <FieldArea ver={ver} label={kind === "cloze" ? "內文" : "正面"} value={front} onChange={setFront} figs={figs} role="q" big />
+          <FieldArea ver={ver} label={kind === "cloze" ? "補充（翻面後顯示，可留空）" : "背面"} value={back} onChange={setBack} figs={figs} role="sol" big />
           </>
           )}
           <TextField label="標籤" hint="用空白分隔，例如：GRE 易混淆" value={tags} onChange={(e) => setTags(e.target.value)} autoCapitalize="none" autoCorrect="off" />

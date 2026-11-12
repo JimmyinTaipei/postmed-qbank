@@ -6,12 +6,13 @@
 // 取前後文最像的那一個；找不到 → 進「失聯的螢光」清單（不刪）。
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type RefObject } from "react";
-import { createPortal } from "react-dom";
 import { highlights, ink, lookupable, sentenceAt, useHighlights, useInkRows, useInkUnder, useVocabMarks, useVocabMarksUnder, useVocabSubjects, type Fig, type Highlight, type HighlightColor, type VocabMark } from "@/data";
 import { Icon } from "../icons";
-import { Dialog, Sheet } from "../overlays";
-import { Button, IconButton, cx } from "../primitives";
-import { HighlightPalette, MarkdownEditor } from "../templates";
+import { Dialog } from "../overlays";
+import { Button, cx } from "../primitives";
+import { HighlightPalette } from "../templates";
+import { HoverPreview, NoteCard, NoteCardDelete } from "../NoteCard";
+import { RichEditor } from "../RichEditorLazy";
 import { InkPreview } from "../ink/FigInk";
 import { InkPages } from "../ink/Handwriting";
 import { Markdown } from "./Markdown";
@@ -120,7 +121,6 @@ function wrap(pieces: Piece[], s: number, e: number, h: Highlight, inked: boolea
     const mark = document.createElement("mark");
     mark.className = cx("hl", `hl-${h.color}`, (!!h.comment_md || inked || h.color === "none") && "hl-note");
     mark.dataset.hl = h.id;
-    if (h.comment_md) mark.title = h.comment_md;
     node.parentNode!.insertBefore(mark, node);
     mark.appendChild(node);
   }
@@ -175,6 +175,7 @@ export function HighlightableMarkdown({ target, text, figs, role }: Props) {
   const [orphans, setOrphans] = useState<Highlight[]>([]);
   const [pick, setPick] = useState<{ s: number; e: number; quote: string; prefix: string; suffix: string; x: number; y: number } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [openStart, setOpenStart] = useState<"text" | "ink" | undefined>();
   const inked = useInkedHighlights();
   const editField = useContext(HighlightEdit);
   const lookupOn = useLookupOn(target);
@@ -240,12 +241,15 @@ export function HighlightableMarkdown({ target, text, figs, role }: Props) {
     };
   }, [check]);
 
-  const add = async (color: HighlightColor, note: boolean) => {
+  const add = async (color: HighlightColor, note: false | "text" | "ink") => {
     if (!pick) return;
     const id = await highlights.add({ target, quote: pick.quote, prefix: pick.prefix, suffix: pick.suffix, start: pick.s, end: pick.e, color });
     window.getSelection()?.removeAllRanges();
     setPick(null);
-    if (note) setOpen(id);
+    if (note) {
+      setOpenStart(note);
+      setOpen(id);
+    }
   };
 
   const lookup = () => {
@@ -272,6 +276,7 @@ export function HighlightableMarkdown({ target, text, figs, role }: Props) {
     if (!m) return;
     e.stopPropagation();
     setLook(null);
+    setOpenStart(undefined);
     setOpen(m.dataset.hl ?? null);
   };
 
@@ -286,7 +291,8 @@ export function HighlightableMarkdown({ target, text, figs, role }: Props) {
         <div className="fixed z-40" style={paletteAt(pick)} onPointerDown={(e) => e.preventDefault()}>
           <HighlightPalette
             onPick={(c) => void add(c, false)}
-            onNote={() => void add("none", true)}
+            onNote={() => void add("none", "text")}
+            onInk={() => void add("none", "ink")}
             onEdit={editField ? () => { window.getSelection()?.removeAllRanges(); setPick(null); editField(target); } : undefined}
             onLookup={lookupOn && lookupable(pick.quote) ? lookup : undefined}
           />
@@ -309,8 +315,9 @@ export function HighlightableMarkdown({ target, text, figs, role }: Props) {
           </ul>
         </details>
       )}
-      {current && <HighlightPanel key={current.id} h={current} figs={figs} onClose={() => setOpen(null)} />}
+      {current && <HighlightPanel key={current.id} h={current} figs={figs} start={openStart} onClose={() => setOpen(null)} />}
       {look && <VocabLookup key={`${look.target}:${look.start}:${look.mark?.id ?? ""}`} req={look} onClose={() => setLook(null)} />}
+      <NotePreview root={ref} list={list} figs={figs} />
     </div>
   );
 }
@@ -321,14 +328,14 @@ function paletteAt(p: { x: number; y: number }) {
 }
 
 /**
- * 螢光與註記（2026-11-11 改版，使用者回報側邊面板不直覺）：
- * - 先從畫面下方彈出小框：被標的字、文字註記、手寫註記的縮圖、刪除、展開。不擋住內文、不鎖捲動，可以邊看邊寫。
- * - 「展開」才開完整面板：顏色（含「無」）、Markdown 編輯與預覽、手寫（Apple Pencil）。
+ * 螢光與註記的註記卡（第 3B 階段，規格書 §9.10）：取代 11-11 版的下方小框＋「展開」側邊面板。
+ * - 電腦：卡片貼著被標的字；觸控：畫面下緣。不變暗、不鎖捲動。
+ * - 由上到下：被標的字＋顏色列＋刪除、文字註記（所見即所得編輯器）、手寫（縮圖，點了在同一張卡裡展開）、完成。
  * - 「加註」建的是沒有顏色的註記；關掉時什麼都沒寫就自動刪掉，免得留下看不見的空註記。
  */
-function HighlightPanel({ h, figs, onClose }: { h: Highlight; figs?: Fig[]; onClose: () => void }) {
+function HighlightPanel({ h, figs, start, onClose }: { h: Highlight; figs?: Fig[]; /** text：一開始就把游標放在文字註記；ink：一開始就展開手寫 */ start?: "text" | "ink"; onClose: () => void }) {
   const [note, setNote] = useState(h.comment_md ?? "");
-  const [expanded, setExpanded] = useState<false | "text" | "ink">(false);
+  const [inkOpen, setInkOpen] = useState(start === "ink");
   const [confirm, setConfirm] = useState(false);
   const rows = useInkRows(inkTarget(h.id));
   const liveInk = (rows ?? []).filter((r) => !r.deleted);
@@ -356,113 +363,73 @@ function HighlightPanel({ h, figs, onClose }: { h: Highlight; figs?: Fig[]; onCl
     onClose();
   };
 
-  const quote = (
-    <span className={cx("rounded-chip px-1 text-paper-ink", BG[h.color], h.color === "none" && "underline decoration-dotted underline-offset-4 text-ink")}>{h.quote}</span>
-  );
-  const confirmDialog = confirm && (
-    <Dialog title="刪除這個註記？" onClose={() => setConfirm(false)} actions={<><Button variant="ghost" onClick={() => setConfirm(false)}>取消</Button><Button variant="danger" onClick={() => void remove()}>刪除</Button></>}>
-      螢光、文字註記、手寫註記會一起刪除。
-    </Dialog>
-  );
+  const anchor = useCallback(() => Array.from(document.querySelectorAll(`mark[data-hl="${CSS.escape(h.id)}"]`)), [h.id]);
 
-  if (expanded)
-    return (
-      <Sheet
-        title="螢光與註記"
-        size="wide"
-        onClose={onClose}
-        footer={
-          <>
-            <Button variant="danger" icon="trash" className="mr-auto" onClick={() => setConfirm(true)}>刪除</Button>
-            <Button variant="ghost" onClick={() => setExpanded(false)}>收合</Button>
-            <Button variant="primary" onClick={onClose}>完成</Button>
-          </>
-        }
-      >
-        <div className="space-y-4 p-4">
-          <blockquote className="text-body">{quote}</blockquote>
-          <div role="group" aria-label="顏色" className="flex flex-wrap gap-1">
-            {COLORS.map(([c, name]) => (
-              <button key={c} type="button" aria-label={c === "none" ? "不上色（只留註記）" : `改成${name}色`} title={c === "none" ? "不上色" : `${name}色`} aria-pressed={h.color === c} onClick={() => void highlights.update(h.id, { color: c })} className={cx("flex size-(--tap) items-center justify-center rounded-chip hover:bg-hover", h.color === c && "bg-blue-light")}>
-                {c === "none" ? <span className="flex size-6 items-center justify-center rounded-full border border-dashed border-line-strong text-meta text-ink-muted">無</span> : <span className={cx("size-6 rounded-full border border-line-strong", BG[c])} />}
-              </button>
-            ))}
+  return (
+    <NoteCard
+      anchor={anchor}
+      label="螢光與註記"
+      onClose={onClose}
+      title={<span className={cx("rounded-chip px-1 text-paper-ink", BG[h.color], h.color === "none" && "text-ink underline decoration-dotted underline-offset-4")}>{h.quote}</span>}
+      tools={<NoteCardDelete onClick={() => setConfirm(true)} />}
+    >
+      <div role="group" aria-label="顏色" className="-mx-1 flex flex-wrap gap-0.5">
+        {COLORS.map(([c, name]) => (
+          <button key={c} type="button" aria-label={c === "none" ? "不上色（只留註記）" : `改成${name}色`} title={c === "none" ? "不上色" : `${name}色`} aria-pressed={h.color === c} onClick={() => void highlights.update(h.id, { color: c })} className={cx("flex size-(--tap) items-center justify-center rounded-chip hover:bg-hover", h.color === c && "bg-blue-light")}>
+            {c === "none" ? <span className="flex size-6 items-center justify-center rounded-full border border-dashed border-line-strong text-meta text-ink-muted">無</span> : <span className={cx("size-6 rounded-full border border-line-strong", BG[c])} />}
+          </button>
+        ))}
+      </div>
+      <div className="rounded-btn border border-line bg-paper px-3 py-2 focus-within:border-blue-accent">
+        <RichEditor initial={h.comment_md ?? ""} placement="card" label="文字註記" placeholder="寫註記…（可以打 $公式$、- 列點、/表格）" figs={figs} role="sol" actions={false} noFocus={start !== "text"} onChange={setNote} onDone={() => onClose()} onCancel={() => onClose()} />
+      </div>
+      {inkOpen ? (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <h3 className="text-ui font-medium text-ink-strong">手寫註記</h3>
+            <Button variant="ghost" onClick={() => setInkOpen(false)}>收回</Button>
           </div>
-          {expanded === "ink" ? (
-            <>
-              <HandwrittenNote id={h.id} rows={rows} first />
-              <MarkdownEditor value={note} onChange={setNote} figs={figs} label="文字註記（Markdown，可寫公式）" minRows="short" />
-            </>
-          ) : (
-            <>
-              <MarkdownEditor value={note} onChange={setNote} figs={figs} label="文字註記（Markdown，可寫公式）" minRows="short" />
-              <HandwrittenNote id={h.id} rows={rows} />
-            </>
-          )}
+          <div className="-mx-3" data-keep-card>{rows ? <InkPages target={inkTarget(h.id)} rows={rows} toolbarClass="sticky top-0" /> : null}</div>
         </div>
-        {confirmDialog}
-      </Sheet>
-    );
-
-  return createPortal(
-    <div data-noswipe="always" className="fixed inset-x-0 z-30 px-3 print:hidden lg:left-60" style={{ bottom: "calc(env(safe-area-inset-bottom) + 76px)" }}>
-      <section role="dialog" aria-label="註記" className="anim-rise mx-auto max-w-3xl space-y-2 rounded-card border border-line bg-card p-3 shadow-pop">
-        <div className="flex items-center gap-1">
-          <p className="min-w-0 flex-1 truncate text-ui">{quote}</p>
-          <IconButton label="刪除" onClick={() => setConfirm(true)}>
-            <Icon name="trash" />
-          </IconButton>
-          <IconButton label="關閉" onClick={onClose}>
-            <Icon name="x" />
-          </IconButton>
-        </div>
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={2}
-          placeholder="寫註記…（可以用 Markdown、$公式$）"
-          aria-label="文字註記"
-          className="block w-full resize-none rounded-btn border border-line bg-paper px-3 py-2 text-body text-ink-strong placeholder:text-ink-muted focus:border-blue-accent focus:outline-none"
-        />
+      ) : (
         <button
           type="button"
-          onClick={() => setExpanded("ink")}
-          className="relative flex min-h-16 w-full items-center justify-center gap-2 overflow-hidden rounded-btn border border-dashed border-line-strong bg-paper text-ui text-ink-muted hover:border-blue-accent"
+          onClick={() => setInkOpen(true)}
+          className="relative flex min-h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-btn border border-dashed border-line-strong bg-paper text-ui text-ink-muted hover:border-blue-accent"
         >
           {liveInk.length ? (
             <>
-              <InkPreview row={liveInk[0]} className="h-24 w-full" />
+              <InkPreview row={liveInk[0]} className="h-20 w-full" />
               <span className="absolute right-2 bottom-1 rounded-chip bg-card px-1 text-meta">點一下編輯手寫</span>
             </>
           ) : (
             <>
               <Icon name="pencil" size={18} />
-              手寫，點一下展開
+              手寫
             </>
           )}
         </button>
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" icon="fit" onClick={() => setExpanded("text")}>展開</Button>
-          <Button variant="primary" onClick={onClose}>完成</Button>
-        </div>
-      </section>
-      {confirmDialog}
-    </div>,
-    document.body,
+      )}
+      {confirm && (
+        <Dialog title="刪除這個註記？" onClose={() => setConfirm(false)} actions={<><Button variant="ghost" onClick={() => setConfirm(false)}>取消</Button><Button variant="danger" onClick={() => void remove()}>刪除</Button></>}>
+          螢光、文字註記、手寫註記會一起刪除。
+        </Dialog>
+      )}
+    </NoteCard>
   );
 }
 
-function HandwrittenNote({ id, rows, first }: { id: string; rows: ReturnType<typeof useInkRows>; first?: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (first) ref.current?.scrollIntoView({ block: "nearest" });
-  }, [first]);
-  return (
-    <div ref={ref} className="space-y-2">
-      <h3 className="text-ui font-medium text-ink-strong">手寫註記</h3>
-      <div className="-mx-3">{rows ? <InkPages target={inkTarget(id)} rows={rows} toolbarClass="sticky top-0" /> : null}</div>
-    </div>
+/** 滑過有註記的螢光 0.3 秒：浮出註記內容（電腦） */
+function NotePreview({ root, list, figs }: { root: RefObject<HTMLElement | null>; list: Highlight[] | undefined; figs?: Fig[] }) {
+  const render = useCallback(
+    (el: HTMLElement) => {
+      const h = list?.find((x) => x.id === el.dataset.hl);
+      if (!h?.comment_md?.trim()) return null;
+      return <Markdown text={h.comment_md} figs={figs} role="sol" tight />;
+    },
+    [list, figs],
   );
+  return <HoverPreview root={root} selector="mark[data-hl].hl-note" render={render} />;
 }
 
 // ---------- 筆記（資料庫閱讀頁）的螢光 ----------
@@ -507,6 +474,7 @@ export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit }: 
   const [orphans, setOrphans] = useState<Highlight[]>([]);
   const [pick, setPick] = useState<{ bid: string; s: number; e: number; quote: string; prefix: string; suffix: string; x: number; y: number } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [openStart, setOpenStart] = useState<"text" | "ink" | undefined>();
   const prefix = `kb:${docKey}#`;
   const inked = useInkedHighlights();
   const lookupOn = useLookupOn(prefix);
@@ -605,7 +573,8 @@ export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit }: 
       if (!m) return;
       e.stopPropagation();
       setLook(null);
-      setOpen(m.dataset.hl ?? null);
+      setOpenStart(undefined);
+    setOpen(m.dataset.hl ?? null);
     };
     el?.addEventListener("click", onClick);
     return () => {
@@ -615,12 +584,15 @@ export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit }: 
     };
   }, [check, root, version]);
 
-  const add = async (color: HighlightColor, note: boolean) => {
+  const add = async (color: HighlightColor, note: false | "text" | "ink") => {
     if (!pick) return;
     const id = await highlights.add({ target: prefix + pick.bid, quote: pick.quote, prefix: pick.prefix, suffix: pick.suffix, start: pick.s, end: pick.e, color });
     window.getSelection()?.removeAllRanges();
     setPick(null);
-    if (note) setOpen(id);
+    if (note) {
+      setOpenStart(note);
+      setOpen(id);
+    }
   };
 
   const current = open ? (list ?? []).find((h) => h.id === open) : undefined;
@@ -630,7 +602,8 @@ export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit }: 
         <div className="fixed z-40 print:hidden" style={paletteAt(pick)} onPointerDown={(e) => e.preventDefault()}>
           <HighlightPalette
             onPick={(c) => void add(c, false)}
-            onNote={() => void add("none", true)}
+            onNote={() => void add("none", "text")}
+            onInk={() => void add("none", "ink")}
             onEdit={onEdit ? () => { const bid = pick.bid; window.getSelection()?.removeAllRanges(); setPick(null); onEdit(bid); } : undefined}
             onLookup={
               lookupOn && lookupable(pick.quote)
@@ -648,8 +621,9 @@ export function KbHighlightLayer({ docKey, root, list, figs, version, onEdit }: 
         </div>
       )}
       {orphans.length > 0 && <OrphanList orphans={orphans} />}
-      {current && <HighlightPanel key={current.id} h={current} figs={figs} onClose={() => setOpen(null)} />}
+      {current && <HighlightPanel key={current.id} h={current} figs={figs} start={openStart} onClose={() => setOpen(null)} />}
       {look && <VocabLookup key={`${look.target}:${look.start}:${look.mark?.id ?? ""}`} req={look} onClose={() => setLook(null)} />}
+      <NotePreview root={root} list={list} figs={figs} />
     </>
   );
 }

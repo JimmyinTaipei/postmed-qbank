@@ -1,14 +1,17 @@
-// 題目的編輯面板（規格書 §9.3「iPad 改錯字」、第 3 階段）：⋯ →「編輯這一題」。
-// 欄位：題幹與選項／思路／詳解（Markdown＋即時預覽、貼上 AI 回覆自動轉換）、答案（多一步確認）、章節、標籤。
+// 題目的編輯（規格書 §9.3「iPad 改錯字」、第 3 階段；第 3B 階段改版 §9.10）。
+// - 題幹與選項／思路／詳解：在題目頁上就地編輯（ui/content/FieldEditor.tsx）。選字框的「編輯」直接進去；
+//   ⋯ →「編輯這一題」的面板裡選這三欄 → 關掉面板、在題目上編輯。題目不在畫面上時才在面板裡編輯。
+// - 答案（多一步確認）、章節、標籤：表單，仍在面板裡改。
 // 存檔 = 寫一筆修訂（content_patch），題目立刻顯示新內容並標「已修訂・待寫回」；之後在 Mac 上 pmq patches pull。
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { answerValue, FIELD_NAME, fieldValue, patches, useQuestion, useTaxonomy, type AnswerValue, type PatchField, type Question } from "@/data";
 import { Dialog, Sheet, useToast } from "@/ui/overlays";
 import { Button, Chip, EmptyState, Notice, Segmented, Select, Skeleton, Tabs, TextField } from "@/ui/primitives";
-import { MarkdownEditor } from "@/ui/templates";
 import { HighlightEdit } from "@/ui/content/Highlights";
+import { InlineFieldCtx, type InlineField, type InlineFieldApi } from "@/ui/content/FieldEditor";
+import { RichEditor } from "@/ui/RichEditorLazy";
 
 const Ctx = createContext<(id: string, field?: PatchField) => void>(() => {});
 
@@ -17,25 +20,45 @@ export const useEditor = () => useContext(Ctx);
 
 export function EditorProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState<{ id: string; field?: PatchField } | null>(null);
-  // 選字框的「編輯」：target "q:<題號>/<ques|idea|sol>" → 開那一題、那一欄
+  const [cur, setCur] = useState<InlineFieldApi["cur"]>(null);
+  const shown = useRef(new Map<string, number>());
+  const mount = useCallback((id: string) => {
+    shown.current.set(id, (shown.current.get(id) ?? 0) + 1);
+    return () => {
+      const n = (shown.current.get(id) ?? 1) - 1;
+      if (n > 0) shown.current.set(id, n);
+      else shown.current.delete(id);
+    };
+  }, []);
+  const inline = useMemo<InlineFieldApi>(() => ({ cur, start: (id, field) => setCur({ id, field }), stop: () => setCur(null), mount }), [cur, mount]);
+  /** 這題在畫面上就就地編輯，否則開面板 */
+  const editField = useCallback((id: string, field: InlineField) => {
+    if (shown.current.has(id)) {
+      setOpen(null);
+      setCur({ id, field });
+    } else setOpen({ id, field });
+  }, []);
+  // 選字框的「編輯」：target "q:<題號>/<ques|idea|sol>" → 那一題、那一欄
   const editFromTarget = useMemo(
     () => (target: string) => {
       const m = /^q:([^/]+)\/(ques|idea|sol)$/.exec(target);
-      if (m) setOpen({ id: m[1], field: m[2] as PatchField });
+      if (m) editField(m[1], m[2] as InlineField);
     },
-    [],
+    [editField],
   );
   return (
-    <Ctx.Provider value={(id, field) => setOpen({ id, field })}>
-      <HighlightEdit.Provider value={editFromTarget}>{children}</HighlightEdit.Provider>
-      {open && <EditQuestion key={open.id} id={open.id} initialField={open.field} onClose={() => setOpen(null)} />}
+    <Ctx.Provider value={(id, field) => (field === "ques" || field === "idea" || field === "sol" ? editField(id, field) : setOpen({ id, field }))}>
+      <InlineFieldCtx.Provider value={inline}>
+        <HighlightEdit.Provider value={editFromTarget}>{children}</HighlightEdit.Provider>
+        {open && <EditQuestion key={open.id} id={open.id} initialField={open.field} onClose={() => setOpen(null)} onInline={shown.current.has(open.id) ? (f) => editField(open.id, f) : undefined} />}
+      </InlineFieldCtx.Provider>
     </Ctx.Provider>
   );
 }
 
 type Draft = Partial<Record<PatchField, string>>;
 
-function EditQuestion({ id, initialField, onClose }: { id: string; initialField?: PatchField; onClose: () => void }) {
+function EditQuestion({ id, initialField, onClose, onInline }: { id: string; initialField?: PatchField; onClose: () => void; onInline?: (f: InlineField) => void }) {
   const q = useQuestion(id);
   const data = q.data && typeof q.data === "object" ? q.data : null;
   return (
@@ -45,7 +68,7 @@ function EditQuestion({ id, initialField, onClose }: { id: string; initialField?
       ) : !data ? (
         <EmptyState tone="error" title="讀不到這一題">{q.error?.message ?? "這題的本文不在裝置上，連上網路後再試。"}</EmptyState>
       ) : (
-        <Editor q={data} initialField={initialField} onClose={onClose} />
+        <Editor q={data} initialField={initialField} onClose={onClose} onInline={onInline} />
       )}
     </Sheet>
   );
@@ -53,12 +76,12 @@ function EditQuestion({ id, initialField, onClose }: { id: string; initialField?
 
 const MD_FIELDS = ["ques", "idea", "sol"] as const;
 
-function Editor({ q, initialField, onClose }: { q: Question; initialField?: PatchField; onClose: () => void }) {
+function Editor({ q, initialField, onClose, onInline }: { q: Question; initialField?: PatchField; onClose: () => void; onInline?: (f: InlineField) => void }) {
   const toast = useToast();
   const base = q.patch?.base ?? q;
   const phy = q.subject === "PHY";
   const fields: PatchField[] = phy ? ["ques", "idea", "sol", "answer", "chap", "tags"] : ["ques", "sol", "answer", "chap"];
-  const [field, setField] = useState<PatchField>(initialField && fields.includes(initialField) ? initialField : "sol");
+  const [field, setField] = useState<PatchField>(initialField && fields.includes(initialField) ? initialField : onInline ? "answer" : "sol");
   // 編輯器裡看到的是目前畫面上的版本（含還沒寫回的修訂）
   const initial = useMemo(() => {
     const d: Draft = {};
@@ -99,9 +122,16 @@ function Editor({ q, initialField, onClose }: { q: Question; initialField?: Patc
           </Notice>
         )}
         {mark?.[field] === "stale" && <Notice tone="warning" icon="alert">題庫已經更新過這一段，你之前的修訂沒有套用（修訂佇列裡可以看兩個版本）。這裡顯示的是題庫目前的內容。</Notice>}
-        {(field === "ques" || field === "idea" || field === "sol") && (
-          <MarkdownEditor key={field} value={draft[field] ?? ""} onChange={(v) => set(field, v)} figs={q.figs} role={field === "ques" ? "q" : "sol"} label={FIELD_NAME[field] + "（Markdown）"} />
-        )}
+        {(field === "ques" || field === "idea" || field === "sol") &&
+          (onInline ? (
+            <Notice icon="edit" action={<Button variant="primary" onClick={() => onInline(field)}>在題目上改</Button>}>
+              {FIELD_NAME[field]}直接在題目上修改：按右邊的鈕，這個面板會關掉，{FIELD_NAME[field]}變成可以打字的樣子。改完按「完成」或點旁邊就存成修訂。
+            </Notice>
+          ) : (
+            <div className="rounded-btn border border-line px-3 py-2">
+              <RichEditor key={field} initial={initial[field] ?? ""} placement="page" actions={false} label={FIELD_NAME[field]} figs={q.figs} role={field === "ques" ? "q" : "sol"} onChange={(v) => set(field, v)} onDone={() => undefined} onCancel={() => undefined} />
+            </div>
+          ))}
         {field === "ques" && <p className="text-meta text-ink-muted">選項用 (A)(B)(C)… 標記，存檔後會重新切選項。題圖寫成 ![說明](fig:圖代號)，不要改括號裡的代號。</p>}
         {field === "answer" && <AnswerForm q={q} value={draft.answer ?? ""} onChange={(v) => set("answer", v)} />}
         {field === "chap" && <ChapForm q={q} value={draft.chap ?? ""} onChange={(v) => set("chap", v)} />}

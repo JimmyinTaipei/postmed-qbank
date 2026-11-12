@@ -18,7 +18,8 @@ import {
 } from "@/ui/primitives";
 import { Page, SyncStatus } from "@/ui/shell";
 import { RichEditor, preloadEditor, type EditorMode } from "@/ui/RichEditorLazy";
-import { BarList, ChartCard, ColumnChart, EditPanel, ExamTimerBar, HighlightPalette, KbBlocks, ReviewCard, SearchBar, type KbBlockMark } from "@/ui/templates";
+import { NoteCard, NoteCardDelete } from "@/ui/NoteCard";
+import { BarList, ChartCard, ColumnChart, ExamTimerBar, HighlightPalette, KbBlocks, ReviewCard, SearchBar, type KbBlockMark } from "@/ui/templates";
 import type { KbDoc } from "@/data";
 
 // 單字卡樣本（第 8B-1 階段）：內容取自使用者的英文牌組（abate），聲音拿掉
@@ -222,7 +223,6 @@ export default function UiGallery() {
   const [checks, setChecks] = useState<Record<string, boolean>>({ a: true });
   const [dialog, setDialog] = useState(false);
   const [sheet, setSheet] = useState(false);
-  const [edit, setEdit] = useState(false);
   const [flipped, setFlipped] = useState(false);
   const [vocabFlipped, setVocabFlipped] = useState(false);
   const [search, setSearch] = useState("");
@@ -351,12 +351,15 @@ export default function UiGallery() {
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => setDialog(true)}>對話框</Button>
           <Button onClick={() => setSheet(true)}>面板</Button>
-          <Button onClick={() => setEdit(true)}>編輯面板</Button>
           <Menu label="選單示範" items={[{ label: "存疑", icon: "flag", checked: true }, { label: "編輯這一題", icon: "edit", disabledReason: "第 3 階段開放" }, { label: "結束這個題組", icon: "x", danger: true }]}><Icon name="dots" /></Menu>
         </div>
         {dialog && <Dialog title="捨棄這個題組？" onClose={() => setDialog(false)} actions={<><Button variant="ghost" onClick={() => setDialog(false)}>保留</Button><Button variant="danger" onClick={() => setDialog(false)}>捨棄</Button></>}>已經作答的紀錄會留著。</Dialog>}
         {sheet && <Sheet title="面板標題" onClose={() => setSheet(false)} footer={<Button variant="primary" onClick={() => setSheet(false)}>完成</Button>}><div className="space-y-3 p-4">{Array.from({ length: 12 }, (_, i) => <p key={i} className="text-ui">面板內容自己捲動，不帶動背後的頁面。第 {i + 1} 段。</p>)}</div></Sheet>}
-        {edit && <EditPanel title="編輯詳解（展示）" initial={MD_SAMPLE} onClose={() => setEdit(false)} saveDisabledReason="展示頁不會存檔；貼上 AI 回覆可測試自動轉換" />}
+
+      </Group>
+
+      <Group title="註記卡（第 3B 階段）" note="螢光的註記、克漏字小卡都用這張卡。電腦（有滑鼠的寬螢幕）貼在被標的字下方、放不下就放上方，捲動時跟著字走；iPad 與手機固定在畫面下緣。背景不變暗、不鎖捲動；點外面、Esc、完成都會關閉（觸控可以向下滑）。編輯內容不開側邊面板。">
+        <NoteCardDemo />
       </Group>
 
       <Group title="編輯器（第 3B 階段）" note="所見即所得：打 ### 、- 、1. 、> 、**粗體**、$x^2$ 當場變成排好的樣子；/ 叫出插入選單（表格、公式…）；表格裡 Tab 換格、最後一格 Tab 加列。存的仍是 Markdown，沒改到的地方原文一字不動。展示頁不會存檔，按「完成」後下面顯示存出來的 Markdown。">
@@ -387,7 +390,7 @@ export default function UiGallery() {
         </Pair>
         <Pair>
           <Card className="p-4">
-            <KbBlocks doc={KB_DEMO} openDepth={3} editing={false} editMenu={KB_DEMO_MENU} notes={KB_DEMO_NOTES} noteMode onNote={() => {}} />
+            <KbBlocks doc={KB_DEMO} openDepth={3} editing={false} editMenu={KB_DEMO_MENU} notes={KB_DEMO_NOTES} onNote={() => {}} />
           </Card>
         </Pair>
         <Pair>
@@ -444,6 +447,43 @@ const ED_SAMPLES: { id: string; label: string; mode: EditorMode; md: string }[] 
   { id: "li", label: "列點（就地）", mode: "list_item", md: "Acetyl-CoA ⇒ **TCA cycle**（$2\\text{CO}_2$）" },
   { id: "h", label: "標題（就地）", mode: "heading", md: "### C. The <u>***signal termination***</u> of GPCR" },
 ];
+
+function NoteCardDemo() {
+  const [open, setOpen] = useState<null | "anchor" | "bottom">(null);
+  const [ink, setInk] = useState(false);
+  const word = useRef<HTMLElement>(null);
+  return (
+    <Card className="space-y-3 p-4">
+      <p className="text-body">
+        被標的字：<mark ref={word} className="hl hl-yellow hl-note">Pyruvate dehydrogenase complex</mark> 需要 TPP、Lipoate、CoA、FAD、NAD⁺ 五個輔酶。
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => setOpen("anchor")}>貼著字（電腦）</Button>
+        <Button onClick={() => setOpen("bottom")}>畫面下緣（觸控）</Button>
+        <Switch label="有手寫註記" checked={ink} onChange={setInk} />
+      </div>
+      {open && (
+        <NoteCard
+          placement={open}
+          anchor={() => (word.current ? [word.current] : null)}
+          label="註記卡（展示）"
+          title={<span className="rounded-chip bg-hl-yellow px-1 text-paper-ink">Pyruvate dehydrogenase complex</span>}
+          tools={<NoteCardDelete onClick={() => setOpen(null)} />}
+          footer="展示頁不會存檔"
+          onClose={() => setOpen(null)}
+        >
+          <div className="rounded-btn border border-line bg-paper px-3 py-2">
+            <RichEditor initial={"E1 需要 **TPP**；砷（arsenite）抑制 lipoate。\n\n- 缺乏：lactic acidosis"} placement="card" label="文字註記" actions={false} noFocus onChange={() => undefined} onDone={() => undefined} onCancel={() => undefined} />
+          </div>
+          <button type="button" className="flex min-h-12 w-full items-center justify-center gap-2 rounded-btn border border-dashed border-line-strong bg-paper text-ui text-ink-muted">
+            <Icon name="pencil" size={18} />
+            {ink ? "（這裡是手寫縮圖；點一下在卡片裡展開手寫紙）" : "手寫"}
+          </button>
+        </NoteCard>
+      )}
+    </Card>
+  );
+}
 
 function EditorDemo() {
   const [id, setId] = useState("long");

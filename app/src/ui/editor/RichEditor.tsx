@@ -60,6 +60,16 @@ export interface RichEditorProps {
   /** 工具列左邊多放的東西（例如題目欄位的名稱） */
   barStart?: ReactNode;
   className?: string;
+  /** 每次內容改變（稍微延遲）時給目前的 Markdown：註記卡、卡片編輯、整頁筆記用，由外面決定什麼時候存 */
+  onChange?: (md: string) => void;
+  /** false：工具列不放「取消／完成」（外面自己有存檔的按鈕） */
+  actions?: boolean;
+  /** 一開始不搶焦點（例如註記卡打開時游標還在別處） */
+  noFocus?: boolean;
+  /** 空白時顯示的提示 */
+  placeholder?: string;
+  /** 按鍵交給外面先處理（例如卡片編輯器的 ⌘⇧C）；回 true 表示處理掉了 */
+  onKey?: (e: KeyboardEvent, view: EditorView) => boolean;
 }
 
 interface Built {
@@ -122,6 +132,7 @@ export default function RichEditor(props: RichEditorProps) {
   const cb = useRef(props);
   cb.current = props;
   const doneRef = useRef(false);
+  const changeTimer = useRef(0);
 
   const finish = useCallback(() => {
     if (doneRef.current) return;
@@ -174,11 +185,21 @@ export default function RichEditor(props: RichEditorProps) {
     const v = new EditorView(host.current, {
       state,
       nodeViews: nodeViews({ figs, role }),
-      attributes: { class: cx("md ed", placement === "card" && "md-tight"), "aria-label": label, role: "textbox", "aria-multiline": "true", spellcheck: "false", autocapitalize: "off", autocorrect: "off" },
+      handleKeyDown: (vv, e) => !!cb.current.onKey?.(e, vv),
+      attributes: { class: cx("md ed", placement === "card" && "md-tight"), "data-placeholder": props.placeholder ?? "", "aria-label": label, role: "textbox", "aria-multiline": "true", spellcheck: "false", autocapitalize: "off", autocorrect: "off" },
       dispatchTransaction(tr) {
         const s = v.state.apply(tr);
         v.updateState(s);
-        if (tr.docChanged) cb.current.onDirty?.(!startDoc.current || !s.doc.eq(startDoc.current));
+        if (tr.docChanged) {
+          cb.current.onDirty?.(!startDoc.current || !s.doc.eq(startDoc.current));
+          if (cb.current.onChange) {
+            window.clearTimeout(changeTimer.current);
+            changeTimer.current = window.setTimeout(() => {
+              const cur = view.current;
+              if (cur) cb.current.onChange?.(result(cur.state.doc, built.current, mode, initial).md);
+            }, 120);
+          }
+        }
         setTick((t) => t + 1);
       },
     });
@@ -194,9 +215,15 @@ export default function RichEditor(props: RichEditorProps) {
       splitListItem(N.list_item)(v.state, v.dispatch);
       if (props.startInsert === "child") sinkListItem(N.list_item)(v.state, v.dispatch);
     }
-    v.focus();
+    if (!props.noFocus) v.focus();
     setTick((t) => t + 1);
     return () => {
+      // 卸載前把還沒送出的內容送出去
+      if (changeTimer.current && cb.current.onChange) {
+        window.clearTimeout(changeTimer.current);
+        changeTimer.current = 0;
+        cb.current.onChange(result(v.state.doc, built.current, mode, initial).md);
+      }
       v.destroy();
       view.current = null;
     };
@@ -254,7 +281,10 @@ export default function RichEditor(props: RichEditorProps) {
           <textarea
             aria-label={`${label}（原始碼）`}
             value={src}
-            onChange={(e) => setSrc(e.target.value)}
+            onChange={(e) => {
+              setSrc(e.target.value);
+              cb.current.onChange?.(e.target.value);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) (e.preventDefault(), finish());
               if (e.key === "Escape") (e.preventDefault(), cancel());
@@ -268,7 +298,12 @@ export default function RichEditor(props: RichEditorProps) {
           />
         </div>
       ) : (
-        <div ref={host} />
+        <div className="relative">
+          <div ref={host} />
+          {props.placeholder && state && state.doc.childCount <= 1 && !state.doc.textContent && (
+            <span aria-hidden="true" className="pointer-events-none absolute top-0 left-0 text-ink-muted">{props.placeholder}</span>
+          )}
+        </div>
       )}
       {v && state && src === null && <Floating view={v} blocks={blocks} />}
       <Bar
@@ -281,6 +316,7 @@ export default function RichEditor(props: RichEditorProps) {
         onSource={toggleSource}
         onCancel={cancel}
         onDone={finish}
+        actions={props.actions !== false}
         run={run}
       />
     </div>
@@ -289,7 +325,7 @@ export default function RichEditor(props: RichEditorProps) {
 
 // ---------------------------------------------------------------- 工具列
 
-function Bar({ view, blocks, placement, start, source, canSource, onSource, onCancel, onDone, run }: { view: EditorView | null; blocks: boolean; placement: string; start?: ReactNode; source: boolean; canSource: boolean; onSource: () => void; onCancel: () => void; onDone: () => void; run: (c: Command) => () => void }) {
+function Bar({ view, blocks, placement, start, source, canSource, onSource, onCancel, onDone, actions: withActions, run }: { view: EditorView | null; blocks: boolean; placement: string; start?: ReactNode; source: boolean; canSource: boolean; onSource: () => void; onCancel: () => void; onDone: () => void; actions: boolean; run: (c: Command) => () => void }) {
   const touch = useMemo(coarse, []);
   const [bottom, setBottom] = useState(0);
   const [focused, setFocused] = useState(false);
@@ -344,8 +380,12 @@ function Bar({ view, blocks, placement, start, source, canSource, onSource, onCa
           原始碼
         </button>
       )}
-      <Button variant="ghost" {...keepFocus} onClick={onCancel}>取消</Button>
-      <Button variant="primary" {...keepFocus} onClick={onDone} title="完成（⌘Enter）">完成</Button>
+      {withActions && (
+        <>
+          <Button variant="ghost" {...keepFocus} onClick={onCancel}>取消</Button>
+          <Button variant="primary" {...keepFocus} onClick={onDone} title="完成（⌘Enter）">完成</Button>
+        </>
+      )}
     </div>
   );
   if (floating)

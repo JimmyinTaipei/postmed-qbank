@@ -62,7 +62,7 @@
 | `Notice` | primitives.tsx | 頁面內的提示條（說明、警示、錯誤） |
 | `Stat` `SectionTitle` | primitives.tsx | 大數字；區塊小標 |
 | `Dialog` | overlays.tsx | 需要使用者決定才能繼續（捨棄、清除、改答案確認） |
-| `Sheet` | overlays.tsx | 面板：窄螢幕從底部、寬螢幕從右側 |
+| `Sheet` | overlays.tsx | 面板：窄螢幕從底部、寬螢幕從右側。**只用在不是編輯內容的地方**（目錄、新增筆記的表單、篩選、移到牌組）；編輯內容用 `RichEditor` 就地或放在 `NoteCard` 裡，不要為了編輯開 `Sheet`（第 3B 階段） |
 | `Menu` | overlays.tsx | ⋯ 選單。還沒開放的項目用 `disabledReason` |
 | `useToast` | overlays.tsx | 短暫的結果回報，可帶「復原」 |
 | `SyncStatus` | shell.tsx | 同步狀態六種 |
@@ -73,7 +73,8 @@
 | `FigureViewerProvider` | content/FigureViewer.tsx | 全螢幕圖片檢視器；`Markdown` 裡的圖點了會自動開 |
 | `HighlightableMarkdown` | content/Highlights.tsx | 可以畫螢光、加註的 `Markdown`（題幹、思路、詳解）。給 `target`（`q:<ID>/sol`） |
 | `GroupLayout` + `GroupItem` | content/GroupView.tsx | **題組**（第 8A 階段）：同一篇文章的小題放在同一頁。電腦與 iPad 橫向（variant `split:`＝寬 ≥ 64rem 且橫向）左文章右小題、各自捲動；直向文章在上、捲到小題時收成上緣一列。每一小題包一個 `GroupItem`（給 `order`＝原卷題號，克漏字空格 `.cloze-blank` 點了捲過去）。文章的螢光掛在 `g:<gid>/stem`。刷題、模擬考、錯題與複習、單題頁共用；一頁的小題由 `pagesOf()`（`data/group-core.ts`）切 |
-| `MarkdownEditor` | templates.tsx | Markdown 原始碼＋即時預覽；貼上 AI 回覆自動轉 Markdown（`content/paste.ts`）。所有可編輯的 Markdown 都用它 |
+| `RichEditor` | RichEditorLazy.tsx（本體在 `editor/`，進入編輯才下載） | 所見即所得的 Markdown 編輯器（第 3B 階段）。所有可編輯的 Markdown 都用它，三種放法：就地（`placement="inline"`：筆記區塊、題目的題幹／思路／詳解、區塊筆記、題目的我的筆記；點外面或「完成」＝存、Esc＝取消）、註記卡（`"card"`）、整頁（`"page"`：新增的筆記、卡片編輯）。外面自己存檔時給 `onChange`＋`actions={false}`。沒改到的地方原文一字不動 |
+| `NoteCard` | NoteCard.tsx | 註記卡（第 3B 階段）：螢光的註記、克漏字小卡、查單字。電腦貼著被標的字（放不下放上方、捲動跟著走）；觸控固定在畫面下緣、可向下滑關閉。不變暗、不鎖捲動；點外面、Esc、「完成」關閉，關閉時由外面存。`HoverPreview`：電腦上滑過有註記的字 0.3 秒浮出預覽 |
 
 ## 4. 頁面樣板（`app/src/ui/templates.tsx`、`app/src/pages/Templates.tsx`）
 
@@ -87,8 +88,8 @@
 | 卡片內容 | `Markdown` 認得 `![](m/…)`（`.card-img`）、`[sound:m/…]`（`.snd` 喇叭鈕，點了才下載）、`<div class="card-label">`（欄位小標）；克漏字由 `cardFaces()` 先換成 `.cloze`／`.cloze-a`（公式裡用 `\boxed`／`\color`） | 卡片頁、複習畫面、編輯預覽 | 5（完成） |
 | 原卷方格、模擬考計時列 | `PaperGrid`、`ExamTimerBar`（`remainingS = null` 時是不計時、顯示已用時間） | `/papers`、模擬考畫面 | 2（完成） |
 | 圖表卡 | `ChartCard`、`BarList`、`ColumnChart`、`HeatTable`（`rowName` 給列的顯示名稱） | `/stats` `/analysis` | 2（完成） |
-| 資料庫閱讀頁 | `KbBlocks`（收合；編輯模式下每個區塊一個 ✎ `Menu`，項目由頁面用 `editMenu(b)` 給；`marks` 顯示修訂標記「已修訂／新增／刪除・待寫回／已寫回・待發佈／衝突／修訂待處理」，刪除待寫回的區塊加 `.kb-deleted` 淡化＋刪除線）、`HighlightPalette`、`KbHighlightLayer` | `/kb` `/kb/:subject/:doc` `/kb/new/:id`（網站上新增的筆記） | 4（完成） |
-| 編輯面板 | `EditPanel`／`MarkdownEditor`（原始碼＋即時預覽＋貼上轉換；兩欄都 `min-w-0`，超長字或公式不會撐破頁面） | 題目編輯（`pages/EditQuestion.tsx`）、筆記閱讀頁的編輯區塊／插入列點、新筆記草稿頁、卡片編輯 | 3、4、5（完成） |
+| 資料庫閱讀頁 | `KbBlocks`（收合；每個區塊右邊一個 ⋯ `Menu`——電腦上滑鼠移到那一行才出現（`.kb-handle`），觸控在頁首開「編輯」之後出現；項目由頁面用 `editMenu(b)` 給：編輯、插入列點、寫筆記、做成卡片、刪除。按兩下區塊（電腦）或開了「編輯」之後點一下＝就地編輯；區塊筆記在區塊下方就地編輯（`noteEditor`）；`marks` 顯示修訂標記「已修訂／新增／刪除・待寫回／已寫回・待發佈／衝突／修訂待處理」，刪除待寫回的區塊加 `.kb-deleted` 淡化＋刪除線）、`HighlightPalette`、`KbHighlightLayer` | `/kb` `/kb/:subject/:doc` `/kb/new/:id`（網站上新增的筆記） | 4（完成） |
+| 編輯 | `RichEditor`（就地、註記卡、整頁）＋`NoteCard`；題目欄位就地編輯是 `content/FieldEditor.tsx`。`EditPanel`／`MarkdownEditor` 已於第 3B 階段刪除 | 題目的題幹／思路／詳解（就地；答案、章節、標籤仍在 `pages/EditQuestion.tsx` 的面板）、筆記區塊、區塊筆記、新筆記草稿頁、卡片編輯、螢光註記 | 3B（完成） |
 | 個人筆記區、手寫區外框 | `QuestionView` 最下面兩個收合區 | 任何一題作答後 | 3（筆記完成）、6 |
 | 各種狀態 | `EmptyState`、`Skeleton`、`Notice`、`SyncStatus` | `/dev/ui`「狀態」 | — |
 

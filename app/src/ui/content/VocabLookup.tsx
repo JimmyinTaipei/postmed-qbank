@@ -9,7 +9,7 @@
 // 位置與螢光的小框相同（畫面下緣、不擋內文、不鎖捲動）。3B 的註記卡做好後改用註記卡（規格書 §9.10）。
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { NoteCard, NoteCardClose, NoteCardDelete } from "../NoteCard";
 import { Link } from "react-router-dom";
 import {
   boldIn,
@@ -131,24 +131,25 @@ export function VocabLookup({ req, onClose }: { req: LookupReq; onClose: () => v
   };
 
   const loading = !v || lemmas === null;
-  return createPortal(
-    <div data-noswipe="always" className="fixed inset-x-0 z-30 px-3 print:hidden lg:left-60" style={{ bottom: "calc(env(safe-area-inset-bottom) + 76px)" }}>
-      <section role="dialog" aria-label="查單字" className="anim-rise mx-auto max-h-[min(70vh,640px)] max-w-3xl overflow-y-auto rounded-card border border-line bg-card p-3 shadow-pop">
-        <div className="flex items-center gap-1">
-          <p className="min-w-0 flex-1 truncate text-ui">
-            <span className="font-semibold text-ink-strong">{req.quote}</span>
-            {lemma !== req.quote.toLowerCase() && <span className="text-ink-muted">　原形 {lemma}</span>}
-          </p>
-          {markId && (
-            <IconButton label="拿掉這個字的底線" onClick={() => void removeMark()}>
-              <Icon name="trash" />
-            </IconButton>
-          )}
-          <IconButton label="關閉" onClick={onClose}>
-            <Icon name="x" />
-          </IconButton>
-        </div>
-
+  return (
+    <NoteCard
+      anchor={() => (markId ? Array.from(document.querySelectorAll(`span[data-vm="${CSS.escape(markId)}"]`)) : null)}
+      label="查單字"
+      hideDone
+      onClose={onClose}
+      title={
+        <>
+          <span className="font-semibold text-ink-strong">{req.quote}</span>
+          {lemma !== req.quote.toLowerCase() && <span className="text-ink-muted">　原形 {lemma}</span>}
+        </>
+      }
+      tools={
+        <>
+          {markId && <NoteCardDelete label="拿掉這個字的底線" onClick={() => void removeMark()} />}
+          <NoteCardClose onClick={onClose} />
+        </>
+      }
+    >
         {loading ? (
           <p className="py-3 text-ui text-ink-muted">查詢中…</p>
         ) : mode === "new" ? (
@@ -211,9 +212,7 @@ export function VocabLookup({ req, onClose }: { req: LookupReq; onClose: () => v
             </div>
           </div>
         )}
-      </section>
-    </div>,
-    document.body,
+    </NoteCard>
   );
 }
 

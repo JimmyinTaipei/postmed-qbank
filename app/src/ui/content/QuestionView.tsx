@@ -10,7 +10,8 @@ import { Badge, Button, Notice, OptionRow, Segmented, cx, type OptionState } fro
 import { HighlightableMarkdown } from "./Highlights";
 import { QuestionWords } from "./VocabLookup";
 import { Markdown } from "./Markdown";
-import { MarkdownEditor } from "../templates";
+import { RichEditor } from "../RichEditorLazy";
+import { FieldEditor, useInlineField } from "./FieldEditor";
 import { SourceBadges } from "./SourceBadges";
 import { Handwriting, useInkAttemptReset } from "../ink/Handwriting";
 import { InkScope } from "../ink/FigInk";
@@ -139,6 +140,7 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys, headerExtra }
 
   // 圖上標記掛在這一題（第 6B 階段）；物理在已作答畫面上畫的記下那次作答
   const inkScope = useMemo(() => ({ base: `q:${q.id}`, att: done ? attempt?.id : undefined }), [q.id, done, attempt?.id]);
+  const editField = useInlineField(q.id);
 
   return (
     <InkScope value={inkScope}>
@@ -156,7 +158,9 @@ export function QuestionView({ q, flow, attempt, chapter, hotkeys, headerExtra }
         {headerExtra && <span className="ml-auto flex items-center">{headerExtra}</span>}
       </header>
 
-      {parts ? (
+      {editField === "ques" ? (
+        <FieldEditor q={q} field="ques" />
+      ) : parts ? (
         <>
           <HighlightableMarkdown target={`q:${q.id}/ques`} text={parts.stem} figs={q.figs} role="q" />
           {multi && !done && <p className="text-meta text-ink-muted">複選題：選好所有答案後按「送出」。</p>}
@@ -290,14 +294,23 @@ function Result({ q, flow, attempt }: { q: Question; flow: AnswerFlow; attempt: 
 }
 
 function Solution({ q }: { q: Question }) {
+  const editField = useInlineField(q.id);
   return (
     <div className="space-y-4">
-      {q.idea.trim() && (
+      {(q.idea.trim() || editField === "idea") && (
         <Section title="思路">
-          <HighlightableMarkdown target={`q:${q.id}/idea`} text={q.idea} figs={q.figs} role="sol" />
+          {editField === "idea" ? <FieldEditor q={q} field="idea" /> : <HighlightableMarkdown target={`q:${q.id}/idea`} text={q.idea} figs={q.figs} role="sol" />}
         </Section>
       )}
-      <Section title="詳解">{q.sol.trim() ? <HighlightableMarkdown target={`q:${q.id}/sol`} text={q.sol} figs={q.figs} role="sol" /> : <p className="text-ui text-ink-muted">這題還沒有詳解。</p>}</Section>
+      <Section title="詳解">
+        {editField === "sol" ? (
+          <FieldEditor q={q} field="sol" />
+        ) : q.sol.trim() ? (
+          <HighlightableMarkdown target={`q:${q.id}/sol`} text={q.sol} figs={q.figs} role="sol" />
+        ) : (
+          <p className="text-ui text-ink-muted">這題還沒有詳解。</p>
+        )}
+      </Section>
 
       {q.teacher.length > 0 && (
         <div className="space-y-2">
@@ -380,39 +393,47 @@ function RelatedNotes({ id }: { id: string }) {
   );
 }
 
-/** 我的筆記（規格書 §4.6 note）：一題一則 Markdown，會同步、會出現在「匯出全部」。 */
+/** 我的筆記（規格書 §4.6 note）：一題一則 Markdown，會同步、會出現在「匯出全部」。就地編輯（第 3B 階段）。 */
 function NoteBox({ q }: { q: Question }) {
   const target = `q:${q.id}`;
   const note = useNote(target);
+  const toast = useToast();
   const [editing, setEditing] = useState(false);
-  const [text, setText] = useState("");
   const has = !!note?.body_md.trim();
-  const start = () => {
-    setText(note?.body_md ?? "");
-    setEditing(true);
-  };
   return (
     <Fold title={has ? "我的筆記（有內容）" : "我的筆記"} icon="note" defaultOpen={has}>
       {editing ? (
-        <div className="space-y-3">
-          <MarkdownEditor value={text} onChange={setText} figs={q.figs} label="筆記（Markdown，可寫公式與表格）" minRows="short" />
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setEditing(false)}>取消</Button>
-            <Button variant="primary" onClick={() => { void notes.save(target, text); setEditing(false); }}>儲存筆記</Button>
-          </div>
+        <div className="rounded-btn border border-blue-accent px-3 py-2">
+          <RichEditor
+            initial={note?.body_md ?? ""}
+            label="我的筆記"
+            placeholder="寫下自己的理解、易錯點…（可以打 $公式$、- 列點、/表格）"
+            figs={q.figs}
+            role="sol"
+            onCancel={() => setEditing(false)}
+            onDone={(r) => {
+              setEditing(false);
+              if (!r.changed) return;
+              const before = note?.body_md ?? "";
+              void notes.save(target, r.md);
+              toast(r.md.trim() ? "已儲存筆記" : "已刪除筆記", { action: { label: "復原", run: () => void notes.save(target, before) } });
+            }}
+          />
         </div>
       ) : has ? (
         <div className="space-y-2">
-          <Markdown text={note!.body_md} figs={q.figs} role="sol" />
+          <button type="button" onClick={() => setEditing(true)} title="點一下修改" className="block w-full rounded-btn text-left hover:bg-hover">
+            <Markdown text={note!.body_md} figs={q.figs} role="sol" />
+          </button>
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" icon="trash" onClick={() => void notes.remove(target)}>刪除</Button>
-            <Button variant="secondary" icon="edit" onClick={start}>編輯筆記</Button>
+            <Button variant="ghost" icon="trash" onClick={() => { const before = note!.body_md; void notes.remove(target); toast("已刪除筆記", { action: { label: "復原", run: () => void notes.save(target, before) } }); }}>刪除</Button>
+            <Button variant="secondary" icon="edit" onClick={() => setEditing(true)}>編輯筆記</Button>
           </div>
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <p className="min-w-0 flex-1 text-ui text-ink-muted">寫下自己的理解、易錯點。可用 Markdown 與公式，兩台裝置會同步。</p>
-          <Button variant="secondary" icon="plus" onClick={start}>寫筆記</Button>
+          <p className="min-w-0 flex-1 text-ui text-ink-muted">寫下自己的理解、易錯點。可用公式與表格，兩台裝置會同步。</p>
+          <Button variant="secondary" icon="plus" onClick={() => setEditing(true)}>寫筆記</Button>
         </div>
       )}
     </Fold>

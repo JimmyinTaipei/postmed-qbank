@@ -33,7 +33,7 @@ import { Icon } from "@/ui/icons";
 import { Dialog, Menu, Sheet, useToast, type MenuItem } from "@/ui/overlays";
 import { Badge, Button, Card, EmptyState, IconButton, LinkButton, ListCard, ListRow, Notice, SectionTitle, Segmented, Select, Skeleton, TextField } from "@/ui/primitives";
 import { Page } from "@/ui/shell";
-import { KbBlocks, MarkdownEditor } from "@/ui/templates";
+import { KbBlocks } from "@/ui/templates";
 import { RichEditor, type EditResult } from "@/ui/RichEditorLazy";
 import { InkScope } from "@/ui/ink/FigInk";
 import { LostMarks } from "@/ui/ink/LostMarks";
@@ -236,8 +236,23 @@ export function KbDraftPage() {
       {live && <Notice icon="check" action={<LinkButton to={docUrl(live.key)} variant="secondary">開啟</LinkButton>}>這份筆記已經發佈到資料庫。之後請在閱讀頁用「編輯區塊」修改。</Notice>}
       {p.status === "conflict" && <Notice tone="incorrect" icon="alert">沒有寫回：{n.reason ?? "請到修訂佇列看原因"}。可以改檔名重新新增，或放棄這份。</Notice>}
       {!written && p.status === "pending" && <Notice icon="info">寫好之後在 Mac 上執行 bin/pmq patches pull 寫回，再 bin/pmq publish，這份筆記就會出現在資料庫目錄裡。圖請寫回之後在 Mac 上用 Typora 加。</Notice>}
-      <Card className="p-4">
-        <MarkdownEditor value={value} onChange={setText} role="kb" label="筆記內容（Markdown）" />
+      <Card className="p-4 sm:p-6">
+        {closed ? (
+          <Markdown text={value} role="kb" />
+        ) : (
+          <RichEditor
+            key={p.id}
+            initial={p.value}
+            placement="page"
+            label="筆記內容"
+            placeholder="打 # 加空白是標題、- 是列點、/ 叫出插入選單（表格、公式…）"
+            role="kb"
+            actions={false}
+            onChange={setText}
+            onDone={() => void kbPatches.saveDraft(p, value).then(() => toast("已存檔"))}
+            onCancel={() => undefined}
+          />
+        )}
       </Card>
       {!closed && (
         <div className="flex justify-end">
@@ -327,11 +342,14 @@ export function KbReaderPage() {
   const [depth, setDepth] = useState<number>(3);
   const [printing, setPrinting] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [noteMode, setNoteMode] = useState(false);
   const [toc, setToc] = useState(false);
   const [inline, setInline] = useState<InlineTarget | null>(null);
   const [deleting, setDeleting] = useState<KbBlock | null>(null);
   const [noteFor, setNoteFor] = useState<KbBlock | null>(null);
+  const startNote = (b: KbBlock) => {
+    setInline(null);
+    setNoteFor(b);
+  };
   const article = useRef<HTMLElement>(null);
   const hls = useKbHighlights(key);
   const blockNotes = useKbNotes(key);
@@ -416,6 +434,8 @@ export function KbReaderPage() {
     }
     const base = ov?.base.get(b.bid) ?? b;
     const del = ms.find((m) => m.kind === "delete" && m.state !== "conflict");
+    const hasNote = !!blockNotes?.get(b.bid);
+    const noteItem: MenuItem = { label: hasNote ? "修改區塊筆記" : "寫筆記", icon: "note", onSelect: () => startNote(b) };
     const items: MenuItem[] = [
       KB_EDITABLE.has(b.type)
         ? { label: "編輯內容", icon: "edit", onSelect: () => (conflict ? toast(CONFLICT) : startInline({ b, base })) }
@@ -429,6 +449,7 @@ export function KbReaderPage() {
     else if (KB_DELETABLE.has(b.type)) items.push({ label: "刪除這個區塊", icon: "trash", danger: true, onSelect: () => setDeleting(base) });
     else items.push({ label: "刪除這個區塊", icon: "trash", disabledReason: "標題不能在網站上刪（會連整節一起刪）" });
     if (conflict) items.push({ label: "到修訂佇列處理衝突", icon: "alert", onSelect: () => nav("/patches") });
+    items.push(noteItem);
     if (b.md.trim() && b.type !== "html" && b.type !== "code")
       items.push({ label: "做成卡片", icon: "list", onSelect: () => nav("/cards/new", { state: { kind: "cloze", front: b.md, back: "", origin: { from: "kb", doc: key, bid: b.bid } } }) });
     return items;
@@ -500,15 +521,14 @@ export function KbReaderPage() {
             <IconButton label="目錄" onClick={() => setToc(true)}>
               <Icon name="list" />
             </IconButton>
-            <IconButton label={noteMode ? "結束寫筆記" : "在區塊上寫筆記"} pressed={noteMode} onClick={() => { setNoteMode((v) => !v); setEditing(false); }}>
-              <Icon name="note" />
+            <IconButton label={editing ? "結束編輯" : "編輯（點區塊就能改）"} pressed={editing} onClick={() => setEditing((v) => !v)}>
+              <Icon name="edit" />
             </IconButton>
             <Menu
               label="更多動作"
               items={[
                 { label: "下載 .md", icon: "download", onSelect: () => exportMd(doc) },
                 { label: "列印或存成 PDF", icon: "printer", onSelect: () => setPrinting(true) },
-                { label: editing ? "結束編輯區塊" : "編輯區塊", icon: "edit", checked: editing, onSelect: () => { setEditing((v) => !v); setNoteMode(false); } },
               ]}
             >
               <Icon name="dots" />
@@ -525,11 +545,11 @@ export function KbReaderPage() {
         <>
           <div className="flex flex-wrap items-center gap-3 print:hidden">
             <Segmented label="展開到第幾層" value={depth} onChange={setDepth} options={[{ value: 2, label: "大標" }, { value: 3, label: "小標" }, { value: 9, label: "全部" }]} />
-            <p className="text-meta text-ink-muted">選字可以畫螢光、加註</p>
+            <p className="text-meta text-ink-muted">選字可以畫螢光、加註；電腦上按兩下區塊就能改</p>
           </div>
           {editing && (
             <Notice icon="edit">
-              編輯模式：點區塊右邊的筆，可以改內容、在列點下面插入新列點、刪除區塊（電腦上也可以在區塊上按兩下直接改；列點裡按 Enter 是在下面新增一個列點）。存檔後進修訂佇列，在 Mac 上執行 bin/pmq patches pull 寫回筆記檔。圖、程式碼請在 Mac 上用 Typora 改。
+              編輯中：點任何區塊就在原地修改；區塊右邊的 ⋯ 可以插入列點、寫筆記、刪除。列點裡按 Enter 是在下面新增一個列點。存檔後進修訂佇列，在 Mac 上執行 bin/pmq patches pull 寫回筆記檔。圖、程式碼請在 Mac 上用 Typora 改。
             </Notice>
           )}
           {ov && ov.unanchored.length > 0 && (
@@ -537,7 +557,6 @@ export function KbReaderPage() {
               有 {ov.unanchored.length} 筆修訂對不到區塊（Mac 上改過這份筆記）。到修訂佇列看內容，決定要不要放棄。
             </Notice>
           )}
-          {noteMode && <Notice icon="note">筆記模式：點區塊右邊的對話框，在那個區塊下面寫自己的筆記（會同步，不會改到 Mac 上的筆記檔）。</Notice>}
           <KbHighlightLayer docKey={key!} root={article} list={hls} figs={doc.figs} version={version} onEdit={editBlock} />
           {orphanNotes.length > 0 && (
             <details className="rounded-btn border border-line bg-card print:hidden">
@@ -566,9 +585,25 @@ export function KbReaderPage() {
                   editMenu={menu}
                   marks={uiMarks}
                   notes={blockNotes}
-                  noteMode={noteMode}
-                  onNote={setNoteFor}
+                  onNote={startNote}
+                  noteEditor={
+                    noteFor && key ? {
+                      bid: noteFor.bid,
+                      node: (
+                        <BlockNoteEditor
+                          key={noteFor.bid}
+                          docKey={key}
+                          b={noteFor}
+                          doc={doc}
+                          initial={blockNotes?.get(noteFor.bid)?.body_md ?? ""}
+                          onClose={() => setNoteFor(null)}
+                          onSaved={(msg, undo) => toast(msg, undo ? { action: { label: "復原", run: undo } } : undefined)}
+                        />
+                      ),
+                    } : null
+                  }
                   onOpen={(b, at) => {
+                    setNoteFor(null);
                     if (!KB_EDITABLE.has(b.type)) return;
                     const ms = uiMarks?.get(b.bid) ?? [];
                     if (ms.some((m) => m.state === "conflict")) return toast(CONFLICT);
@@ -655,7 +690,6 @@ export function KbReaderPage() {
           </div>,
           document.body,
         )}
-      {noteFor && key && <BlockNoteSheet docKey={key} b={noteFor} doc={doc!} initial={blockNotes?.get(noteFor.bid)?.body_md ?? ""} onClose={() => setNoteFor(null)} onSaved={(msg) => toast(msg)} />}
       {deleting && key && (
         <Dialog
           title="刪除這個區塊？"
@@ -679,28 +713,25 @@ type InlineTarget = { b: KbBlock; base?: KbBlock; patch?: ContentPatch; insert?:
 
 const countAll = (bs: KbBlock[]): number => bs.reduce((n, b) => n + 1 + countAll(b.children), 0);
 
-function BlockNoteSheet({ docKey, b, doc, initial, onClose, onSaved }: { docKey: string; b: KbBlock; doc: KbDoc; initial: string; onClose: () => void; onSaved: (msg: string) => void }) {
-  const [text, setText] = useState(initial);
+/** 區塊筆記就地編輯（第 3B 階段；取代原本的側邊面板）。點外面或「完成」＝存；空白＝刪除。 */
+function BlockNoteEditor({ docKey, b, doc, initial, onClose, onSaved }: { docKey: string; b: KbBlock; doc: KbDoc; initial: string; onClose: () => void; onSaved: (msg: string, undo?: () => void) => void }) {
   const target = `kb:${docKey}#${b.bid}`;
   return (
-    <Sheet
-      title="區塊筆記"
-      size="wide"
-      onClose={onClose}
-      footer={
-        <>
-          {initial && <Button variant="danger" icon="trash" className="mr-auto" onClick={() => { void notes.remove(target); onSaved("已刪除筆記"); onClose(); }}>刪除</Button>}
-          <Button variant="ghost" onClick={onClose}>取消</Button>
-          <Button variant="primary" disabled={text === initial} onClick={() => { void notes.save(target, text); onSaved(text.trim() ? "已儲存筆記" : "已刪除筆記"); onClose(); }}>儲存筆記</Button>
-        </>
-      }
-    >
-      <div className="space-y-4 p-4">
-        <blockquote className="rounded-btn border border-line px-3 py-2 text-ui text-ink-muted">
-          <Markdown text={b.type === "heading" ? b.md.replace(/^#+\s*/, "") : b.md} figs={doc.figs} role="kb" tight />
-        </blockquote>
-        <MarkdownEditor value={text} onChange={setText} figs={doc.figs} role="kb" label="我的筆記（Markdown，可寫公式與表格）" />
-      </div>
-    </Sheet>
+    <RichEditor
+      initial={initial}
+      placement="inline"
+      label="區塊筆記"
+      placeholder="寫下自己的筆記…（會同步，不會改到 Mac 上的筆記檔）"
+      figs={doc.figs}
+      role="kb"
+      barStart={<span className="mr-1 flex items-center gap-1 text-meta text-ink-muted"><Icon name="note" size={14} />我的筆記</span>}
+      onCancel={onClose}
+      onDone={(r) => {
+        onClose();
+        if (!r.changed) return;
+        void notes.save(target, r.md);
+        onSaved(r.md.trim() ? (initial ? "已更新筆記" : "已新增筆記") : "已刪除筆記", () => void notes.save(target, initial));
+      }}
+    />
   );
 }

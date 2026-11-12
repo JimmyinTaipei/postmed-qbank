@@ -604,6 +604,28 @@
 
 /* ---------- 資料庫閱讀頁（第 4 階段） ---------- */
 
+/* 區塊右邊的 ⋯（第 3B 階段）：電腦上滑鼠移到那一行才出現；觸控在頁首開「編輯」之後出現。
+   用透明度而不是 display，選單打開、鍵盤移過去時仍然看得到 */
+.kb-handle {
+  display: inline-flex;
+  opacity: 0;
+  pointer-events: none;
+}
+.kb-handle.kb-handle-on,
+.kb-handle:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: hover) and (pointer: fine) {
+  .kb-handle {
+    pointer-events: auto;
+  }
+  .kb-row:hover > .kb-handle,
+  .kb-row:hover > span > .kb-handle {
+    opacity: 1;
+  }
+}
+
 /* 從題目的「相關筆記」或目錄跳過來：那個區塊閃一下 */
 .kb-flash {
   border-radius: var(--r-btn);
